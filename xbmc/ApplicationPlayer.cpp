@@ -236,6 +236,13 @@ bool CApplicationPlayer::SeekScene(bool bPlus)
   return (player && player->SeekScene(bPlus));
 }
 
+void CApplicationPlayer::ToggleCommSkip()
+{
+  boost::shared_ptr<IPlayer> player = GetInternal();
+  if (player)
+    player->ToggleCommSkip();
+}
+
 void CApplicationPlayer::SeekTime(int64_t iTime)
 {
   boost::shared_ptr<IPlayer> player = GetInternal();

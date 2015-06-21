@@ -136,6 +136,7 @@ public:
   int   SeekChapter(int iChapter);
   void  SeekPercentage(float fPercent = 0);
   bool  SeekScene(bool bPlus = true);
+  void  ToggleCommSkip();
   void  SeekTime(int64_t iTime = 0);
   void  SetAudioStream(int iStream);
   void  SetAVDelay(float fValue = 0.0f);

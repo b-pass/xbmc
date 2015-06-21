@@ -1288,6 +1288,16 @@
             <formatlabel>14046</formatlabel>
           </control>
         </setting>
+        <setting id="pvrplayback.commskipdisabled" type="boolean" label="Commercial Skip Disabled" help="Check this to disable automatic commercial skipping">
+          <level>1</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="pvrplayback.commskipnotify" type="boolean" label="Display Commercial Notifications" help="Show commercial notifications during playback">
+          <level>1</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
       </group>
     </category>
     <category id="pvrrecord" label="19043" help="36233">
