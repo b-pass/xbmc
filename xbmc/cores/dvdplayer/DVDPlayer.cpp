@@ -580,8 +580,8 @@ CDVDPlayer::CDVDPlayer(IPlayerCallback& callback)
   m_omxplayer_mode                     = false;
 #endif
 
-  m_SkipCommercials = !CSettings::Get().GetBool("pvrplayback.commskipdisabled");
-  m_NotifyCommercials = CSettings::Get().GetBool("pvrplayback.commskipnotify");
+  m_SkipCommercials = CSettings::Get().GetBool("videoplayer.commskipenabled");
+  m_NotifyCommercials = CSettings::Get().GetBool("videoplater.commskipnotify");
 
   CreatePlayers();
 }
