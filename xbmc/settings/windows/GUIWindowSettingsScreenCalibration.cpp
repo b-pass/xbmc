@@ -37,9 +37,8 @@
 #include "utils/Variant.h"
 #include "windowing/WindowingFactory.h"
 
+#include <string>
 #include <utility>
-
-using namespace std;
 
 #define CONTROL_LABEL_ROW1  2
 #define CONTROL_LABEL_ROW2  3
@@ -140,12 +139,11 @@ bool CGUIWindowSettingsScreenCalibration::OnMessage(CGUIMessage& message)
   {
   case GUI_MSG_WINDOW_DEINIT:
     {
-      CDisplaySettings::Get().UpdateCalibrations();
-      CSettings::Get().Save();
+      CDisplaySettings::GetInstance().UpdateCalibrations();
+      CSettings::GetInstance().Save();
       g_graphicsContext.SetCalibrating(false);
-      g_windowManager.ShowOverlay(OVERLAY_STATE_SHOWN);
       // reset our screen resolution to what it was initially
-      g_graphicsContext.SetVideoResolution(CDisplaySettings::Get().GetCurrentResolution());
+      g_graphicsContext.SetVideoResolution(CDisplaySettings::GetInstance().GetCurrentResolution());
       // Inform the player so we can update the resolution
 #ifdef HAS_VIDEO_PLAYBACK
       g_renderManager.Update();
@@ -157,7 +155,6 @@ bool CGUIWindowSettingsScreenCalibration::OnMessage(CGUIMessage& message)
   case GUI_MSG_WINDOW_INIT:
     {
       CGUIWindow::OnMessage(message);
-      g_windowManager.ShowOverlay(OVERLAY_STATE_HIDDEN);
       g_graphicsContext.SetCalibrating(true);
 
       // Get the allowable resolutions that we can calibrate...

@@ -68,7 +68,7 @@ bool CTextureCacheJob::DoWork()
 
   // check whether we need cache the job anyway
   bool needsRecaching = false;
-  std::string path(CTextureCache::Get().CheckCachedImage(m_url, false, needsRecaching));
+  std::string path(CTextureCache::GetInstance().CheckCachedImage(m_url, false, needsRecaching));
   if (!path.empty() && !needsRecaching)
     return false;
   return CacheTexture();
@@ -208,7 +208,7 @@ CBaseTexture *CTextureCacheJob::LoadImage(const std::string &image, unsigned int
       && !StringUtils::StartsWithNoCase(file.GetMimeType(), "image/") && !StringUtils::EqualsNoCase(file.GetMimeType(), "application/octet-stream")) // ignore non-pictures
     return NULL;
 
-  CBaseTexture *texture = CBaseTexture::LoadFromFile(image, width, height, CSettings::Get().GetBool("pictures.useexifrotation"), requirePixels, file.GetMimeType());
+  CBaseTexture *texture = CBaseTexture::LoadFromFile(image, width, height, requirePixels, file.GetMimeType());
   if (!texture)
     return NULL;
 
@@ -239,7 +239,7 @@ std::string CTextureCacheJob::GetImageHash(const std::string &url)
     if (!time)
       time = st.st_ctime;
     if (time || st.st_size)
-      return StringUtils::Format("d%" PRId64"s%" PRId64, time, st.st_size);;
+      return StringUtils::Format("d%" PRId64"s%" PRId64, time, st.st_size);
 
     // the image exists but we couldn't determine the mtime/ctime and/or size
     // so set an obviously bad hash

@@ -14,10 +14,10 @@ DEPENDS = \
 	libmodplug librtmp libxml2 yajl libmicrohttpd mysql libffi \
 	python26 libshairplay \
 	libplist libcec libbluray boost tinyxml dummy-libxbmc \
-	libamplayer libssh taglib libusb libnfs libmp3lame \
-	pythonmodule-pil libxslt ffmpeg platform
+	libamplayer libssh taglib libusb libnfs \
+	pythonmodule-pil libxslt ffmpeg platform crossguid libdcadec giflib
 
-FFMPEG_DEPENDS = gnutls
+FFMPEG_DEPENDS = gnutls libdcadec
 
 ifeq ($(ENABLE_GPLV3),yes)
   DEPENDS+=samba-gplv3 libcdio-gplv3
@@ -26,7 +26,6 @@ else
 endif
 
 ifeq ($(OS),ios)
-  DEPENDS += Backrow
   EXCLUDED_DEPENDS = libcec libusb
 endif
 
@@ -56,6 +55,7 @@ endif
 ALSA_LIB=
 LINUX_SYSTEM_LIBS=
 ifeq ($(OS),linux)
+  DEPENDS += libuuid
   #not for raspberry pi
   ifneq ($(TARGET_PLATFORM),raspberry-pi)
     DEPENDS += libsdl2 linux-system-libs
@@ -85,10 +85,9 @@ python26: expat gettext libxml2 sqlite3 openssl libffi
 libcdio: $(ICONV)
 libplist: libxml2 $(ZLIB)
 libbluray: $(ICONV) libxml2
-libssh: openssl
+libssh: openssl $(ZLIB)
 mysql: openssl
 libzip: $(ZLIB)
-libmp3lame: $(ICONV)
 libpng: $(ZLIB)
 openssl: $(ZLIB)
 gnutls: nettle $(ZLIB)
@@ -98,6 +97,9 @@ libsdl2: $(LINUX_SYSTEM_LIBS)
 libxslt: libgcrypt
 ffmpeg: $(ICONV) $(ZLIB) bzip2 libvorbis $(FFMPEG_DEPENDS)
 libcec: platform
+ifeq ($(OS),linux)
+crossguid: libuuid
+endif
 
 .installed-$(PLATFORM): $(DEPENDS)
 	touch $@

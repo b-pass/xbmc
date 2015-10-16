@@ -37,12 +37,13 @@
  * number of the tag reported by the PVR backend and can not be played!
  */
 
-#include "XBDateTime.h"
-#include "addons/include/xbmc_pvr_types.h"
-#include "utils/ISerializable.h"
-#include "pvr/timers/PVRTimerType.h"
-
 #include <memory>
+
+#include "addons/include/xbmc_pvr_types.h"
+#include "pvr/timers/PVRTimerType.h"
+#include "threads/CriticalSection.h"
+#include "utils/ISerializable.h"
+#include "XBDateTime.h"
 
 class CFileItem;
 class CVariant;
@@ -103,6 +104,11 @@ namespace PVR
      */
     bool HasEpgInfoTag() const;
 
+    /*!
+     * @return True if this timer has corresponding epg info tag with series attributes, false otherwise
+     */
+    bool HasSeriesEpgInfoTag() const;
+
     int ChannelNumber(void) const;
     std::string ChannelName(void) const;
     std::string ChannelIcon(void) const;
@@ -158,16 +164,10 @@ namespace PVR
     void SetStartFromUTC(CDateTime &start) { m_StartTime = start; }
     void SetStartFromLocalTime(CDateTime &start) { m_StartTime = start.GetAsUTCDateTime(); }
 
-    bool IsStartAtAnyTime(void) const;
-    void SetStartAtAnyTime(void);
-
     CDateTime EndAsUTC(void) const;
     CDateTime EndAsLocalTime(void) const;
     void SetEndFromUTC(CDateTime &end) { m_StopTime = end; }
     void SetEndFromLocalTime(CDateTime &end) { m_StopTime = end.GetAsUTCDateTime(); }
-
-    bool IsEndAtAnyTime(void) const;
-    void SetEndAtAnyTime(void);
 
     CDateTime FirstDayAsUTC(void) const;
     CDateTime FirstDayAsLocalTime(void) const;
@@ -202,7 +202,7 @@ namespace PVR
 
     /* Client control functions */
     bool AddToClient() const;
-    bool DeleteFromClient(bool bForce = false, bool bDeleteSchedule = false) const;
+    bool DeleteFromClient(bool bForce = false) const;
     bool RenameOnClient(const std::string &strNewName);
     bool UpdateOnClient();
 
@@ -233,11 +233,14 @@ namespace PVR
     std::string           m_strSummary;          /*!< @brief summary string with the time to show inside a GUI list */
     PVR_TIMER_STATE       m_state;               /*!< @brief the state of this timer */
     int                   m_iClientId;           /*!< @brief ID of the backend */
-    int                   m_iClientIndex;        /*!< @brief index number of the tag, given by the backend, -1 for new */
+    unsigned int          m_iClientIndex;        /*!< @brief index number of the tag, given by the backend, PVR_TIMER_NO_CLIENT_INDEX for new */
     unsigned int          m_iParentClientIndex;  /*!< @brief for timers scheduled by repeated timers, the index number of the parent, given by the backend, PVR_TIMER_NO_PARENT for no parent */
     int                   m_iClientChannelUid;   /*!< @brief channel uid */
+    bool                  m_bStartAnyTime;       /*!< @brief Ignore start date and time clock. Record at 'Any Time' */
+    bool                  m_bEndAnyTime;         /*!< @brief Ignore end date and time clock. Record at 'Any Time' */
     int                   m_iPriority;           /*!< @brief priority of the timer */
     int                   m_iLifetime;           /*!< @brief lifetime of the timer in days */
+    int                   m_iMaxRecordings;      /*!< @brief (optional) backend setting for maximum number of recordings to keep*/
     unsigned int          m_iWeekdays;           /*!< @brief bit based store of weekdays for repeating timers */
     unsigned int          m_iPreventDupEpisodes; /*!< @brief only record new episodes for repeating epg based timers */
     unsigned int          m_iRecordingGroup;     /*!< @brief (optional) if set, the addon/backend stores the recording to a group (sub-folder) */

@@ -18,6 +18,9 @@
  *
  */
 
+#include <memory>
+#include <string>
+
 #include "SkinSettings.h"
 #include "GUIInfoManager.h"
 #include "addons/Skin.h"
@@ -29,8 +32,6 @@
 
 #define XML_SKINSETTINGS  "skinsettings"
 
-using namespace std;
-
 CSkinSettings::CSkinSettings()
 {
   Clear();
@@ -39,28 +40,28 @@ CSkinSettings::CSkinSettings()
 CSkinSettings::~CSkinSettings()
 { }
 
-CSkinSettings& CSkinSettings::Get()
+CSkinSettings& CSkinSettings::GetInstance()
 {
   static CSkinSettings sSkinSettings;
   return sSkinSettings;
 }
 
-int CSkinSettings::TranslateString(const string &setting)
+int CSkinSettings::TranslateString(const std::string &setting)
 {
   return g_SkinInfo->TranslateString(setting);
 }
 
-const string& CSkinSettings::GetString(int setting) const
+const std::string& CSkinSettings::GetString(int setting) const
 {
   return g_SkinInfo->GetString(setting);
 }
 
-void CSkinSettings::SetString(int setting, const string &label)
+void CSkinSettings::SetString(int setting, const std::string &label)
 {
   g_SkinInfo->SetString(setting, label);
 }
 
-int CSkinSettings::TranslateBool(const string &setting)
+int CSkinSettings::TranslateBool(const std::string &setting)
 {
   return g_SkinInfo->TranslateBool(setting);
 }
@@ -75,7 +76,7 @@ void CSkinSettings::SetBool(int setting, bool set)
   g_SkinInfo->SetBool(setting, set);
 }
 
-void CSkinSettings::Reset(const string &setting)
+void CSkinSettings::Reset(const std::string &setting)
 {
   g_SkinInfo->Reset(setting);
 }
@@ -184,6 +185,7 @@ void CSkinSettings::MigrateSettings(const ADDON::SkinPtr& skin)
     skin->SaveSettings();
 
     // save the guisettings.xml
-    CSettings::Get().Save();
+    CSettings::GetInstance().Save();
   }
 }
+

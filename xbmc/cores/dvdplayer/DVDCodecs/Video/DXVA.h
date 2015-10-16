@@ -112,7 +112,7 @@ public:
   static bool EnsureContext(CDXVAContext **ctx, CDecoder *decoder);
   bool GetInputAndTarget(int codec, GUID &inGuid, DXGI_FORMAT &outFormat);
   bool GetConfig(const D3D11_VIDEO_DECODER_DESC *format, D3D11_VIDEO_DECODER_CONFIG &config);
-  bool CreateSurfaces(D3D11_VIDEO_DECODER_DESC format, unsigned int count, unsigned int alignment, ID3D11Texture2D **texture, ID3D11VideoDecoderOutputView **surfaces);
+  bool CreateSurfaces(D3D11_VIDEO_DECODER_DESC format, unsigned int count, unsigned int alignment, ID3D11VideoDecoderOutputView **surfaces);
   bool CreateDecoder(D3D11_VIDEO_DECODER_DESC *format, const D3D11_VIDEO_DECODER_CONFIG *config, CDXVADecoderWrapper **decoder);
   void Release(CDecoder *decoder);
   ID3D11VideoContext* GetVideoContext() { return m_vcontext; }
@@ -172,7 +172,6 @@ protected:
 
   CDXVADecoderWrapper*         m_decoder;
   HANDLE                       m_device;
-  GUID                         m_input;
   D3D11_VIDEO_DECODER_DESC     m_format;
   int                          m_refs;
   CRenderPicture              *m_presentPicture;
@@ -187,7 +186,6 @@ protected:
   unsigned int                 m_surface_alignment;
   CCriticalSection             m_section;
   CEvent                       m_event;
-  ID3D11Texture2D*             m_viewResource;
 };
 
 };

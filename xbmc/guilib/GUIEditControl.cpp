@@ -39,8 +39,6 @@
 const char* CGUIEditControl::smsLetters[10] = { " !@#$%^&*()[]{}<>/\\|0", ".,;:\'\"-+_=?`~1", "abc2ABC", "def3DEF", "ghi4GHI", "jkl5JKL", "mno6MNO", "pqrs7PQRS", "tuv8TUV", "wxyz9WXYZ" };
 const unsigned int CGUIEditControl::smsDelay = 1000;
 
-using namespace std;
-
 #ifdef TARGET_WINDOWS
 extern HWND g_hWnd;
 #endif
@@ -486,15 +484,17 @@ void CGUIEditControl::ProcessText(unsigned int currentTime)
     changed |= m_label2.SetMaxRect(m_clipRect.x1 + m_textOffset, m_posY, m_clipRect.Width() - m_textOffset, m_height);
 
     std::wstring text = GetDisplayedText();
+    std::string hint = m_hintInfo.GetLabel(GetParentID());
 
-    if (!HasFocus() && text.empty())
+    if (!HasFocus() && text.empty() && !hint.empty())
     {
-      std::string hint = m_hintInfo.GetLabel(GetParentID());
-      if (!hint.empty())
-        changed |= m_label2.SetText(hint);
+      changed |= m_label2.SetText(hint);
     }
-    else if (HasFocus() && m_inputType != INPUT_TYPE_READONLY)
+    else if ((HasFocus() || GetParentID() == WINDOW_DIALOG_KEYBOARD) &&
+             m_inputType != INPUT_TYPE_READONLY)
+    {
       changed |= SetStyledText(text);
+    }
     else
       changed |= m_label2.SetTextW(text);
 
@@ -546,7 +546,7 @@ std::wstring CGUIEditControl::GetDisplayedText() const
       text.append(m_text2.size() - m_cursorPos, L'*');
     }
     else
-      text.append(m_text2.size(), L'*');;
+      text.append(m_text2.size(), L'*');
   }
   else if (!m_edit.empty())
     text.insert(m_editOffset, m_edit);
@@ -583,13 +583,10 @@ bool CGUIEditControl::SetStyledText(const std::wstring &text)
   }
 
   // show the cursor
-  if (HasFocus() || GetParentID() == WINDOW_DIALOG_KEYBOARD)
-  {
-    unsigned int ch = L'|';
-    if ((++m_cursorBlink % 64) > 32)
-      ch |= (3 << 16);
-    styled.insert(styled.begin() + m_cursorPos, ch);
-  }
+  unsigned int ch = L'|';
+  if ((++m_cursorBlink % 64) > 32)
+    ch |= (3 << 16);
+  styled.insert(styled.begin() + m_cursorPos, ch);
 
   return m_label2.SetStyledText(styled, colors);
 }

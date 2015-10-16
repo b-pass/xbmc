@@ -24,15 +24,17 @@
 #include "threads/SingleLock.h"
 #include "utils/TimeUtils.h"
 #include "Application.h"
-#include "ApplicationMessenger.h"
+#include "messaging/ApplicationMessenger.h"
 #include "input/Key.h"
+
+using namespace KODI::MESSAGING;
 
 CGUIDialog::CGUIDialog(int id, const std::string &xmlFile, DialogModalityType modalityType /* = DialogModalityType::MODAL */)
     : CGUIWindow(id, xmlFile)
 {
   m_modalityType = modalityType;
   m_wasRunning = false;
-  m_renderOrder = 1;
+  m_renderOrder = RENDER_ORDER_DIALOG;
   m_autoClosing = false;
   m_showStartTime = 0;
   m_showDuration = 0;
@@ -89,10 +91,6 @@ bool CGUIDialog::OnMessage(CGUIMessage& message)
   {
   case GUI_MSG_WINDOW_DEINIT:
     {
-      CGUIWindow *pWindow = g_windowManager.GetWindow(g_windowManager.GetActiveWindow());
-      if (pWindow)
-        g_windowManager.ShowOverlay(pWindow->GetOverlayState());
-
       CGUIWindow::OnMessage(message);
       return true;
     }
@@ -206,7 +204,7 @@ void CGUIDialog::Open()
   {
     // make sure graphics lock is not held
     CSingleExit leaveIt(g_graphicsContext);
-    CApplicationMessenger::Get().Open(this);
+    CApplicationMessenger::GetInstance().SendMsg(TMSG_GUI_DIALOG_OPEN, -1, -1, static_cast<void*>(this));
   }
   else
     Open_Internal();
@@ -223,7 +221,7 @@ void CGUIDialog::Render()
 void CGUIDialog::SetDefaults()
 {
   CGUIWindow::SetDefaults();
-  m_renderOrder = 1;
+  m_renderOrder = RENDER_ORDER_DIALOG;
 }
 
 void CGUIDialog::SetAutoClose(unsigned int timeoutMs)

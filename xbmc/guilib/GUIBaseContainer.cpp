@@ -33,8 +33,6 @@
 #include "settings/Settings.h"
 #include "guiinfo/GUIInfoLabels.h"
 
-using namespace std;
-
 #define HOLD_TIME_START 100
 #define HOLD_TIME_END   3000
 #define SCROLLING_GAP   200U
@@ -570,7 +568,7 @@ void CGUIBaseContainer::OnJumpLetter(char letter, bool skip /*=false*/)
   {
     CGUIListItemPtr item = m_items[i];
     std::string label = item->GetLabel();
-    if (CSettings::Get().GetBool("filelists.ignorethewhensorting"))
+    if (CSettings::GetInstance().GetBool(CSettings::SETTING_FILELISTS_IGNORETHEWHENSORTING))
       label = SortUtils::RemoveArticles(label);
     if (0 == strnicmp(label.c_str(), m_match.c_str(), m_match.size()))
     {
@@ -648,11 +646,14 @@ int CGUIBaseContainer::GetSelectedItem() const
 
 CGUIListItemPtr CGUIBaseContainer::GetListItem(int offset, unsigned int flag) const
 {
-  if (!m_items.size())
+  if (!m_items.size() || !m_layout)
     return CGUIListItemPtr();
   int item = GetSelectedItem() + offset;
   if (flag & INFOFLAG_LISTITEM_POSITION) // use offset from the first item displayed, taking into account scrolling
     item = CorrectOffset((int)(m_scroller.GetValue() / m_layout->Size(m_orientation)), offset);
+  
+  if (flag & INFOFLAG_LISTITEM_ABSOLUTE) // use offset from the first item
+    item = CorrectOffset(0, offset);
 
   if (flag & INFOFLAG_LISTITEM_WRAP)
   {
@@ -789,7 +790,7 @@ void CGUIBaseContainer::SetFocus(bool bOnOff)
   CGUIControl::SetFocus(bOnOff);
 }
 
-void CGUIBaseContainer::SaveStates(vector<CControlState> &states)
+void CGUIBaseContainer::SaveStates(std::vector<CControlState> &states)
 {
   if (!m_listProvider || !m_listProvider->AlwaysFocusDefaultItem())
     states.push_back(CControlState(GetID(), GetSelectedItem()));
@@ -1167,6 +1168,8 @@ bool CGUIBaseContainer::GetCondition(int condition, int data) const
     return (HasNextPage());
   case CONTAINER_HAS_PREVIOUS:
     return (HasPreviousPage());
+  case CONTAINER_HAS_PARENT_ITEM:
+    return (m_items.size() && m_items[0]->IsFileItem() && (std::static_pointer_cast<CFileItem>(m_items[0]))->IsParentFolder());
   case CONTAINER_SUBITEM:
     {
       CGUIListItemLayout *layout = GetFocusedLayout();

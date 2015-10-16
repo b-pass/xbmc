@@ -21,12 +21,13 @@
  *
  */
 
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "settings/lib/ISettingCallback.h"
 #include "utils/GlobalsHandling.h"
 #include "utils/uXstrings.h"
-
-#include <string>
-#include <vector>
 
 class CSetting;
 
@@ -35,7 +36,7 @@ class CCharsetConverter : public ISettingCallback
 public:
   CCharsetConverter();
 
-  virtual void OnSettingChanged(const CSetting* setting);
+  virtual void OnSettingChanged(const CSetting* setting) override;
 
   static void reset();
   static void resetSystemCharset();

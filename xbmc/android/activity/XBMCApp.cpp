@@ -43,12 +43,13 @@
 #include "windowing/WinEvents.h"
 #include "guilib/GUIWindowManager.h"
 #include "utils/log.h"
-#include "ApplicationMessenger.h"
+#include "messaging/ApplicationMessenger.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 #include "AppParamParser.h"
 #include "XbmcContext.h"
 #include <android/bitmap.h>
+#include "cores/AudioEngine/AEFactory.h"
 #include "android/jni/JNIThreading.h"
 #include "android/jni/BroadcastReceiver.h"
 #include "android/jni/Intent.h"
@@ -83,6 +84,7 @@
 #define GIGABYTES       1073741824
 
 using namespace std;
+using namespace KODI::MESSAGING;
 
 template<class T, void(T::*fn)()>
 void* thread_run(void* obj)
@@ -98,6 +100,7 @@ CJNIWakeLock *CXBMCApp::m_wakeLock = NULL;
 ANativeWindow* CXBMCApp::m_window = NULL;
 int CXBMCApp::m_batteryLevel = 0;
 bool CXBMCApp::m_hasFocus = false;
+bool CXBMCApp::m_headsetPlugged = false;
 CCriticalSection CXBMCApp::m_applicationsMutex;
 std::vector<androidPackage> CXBMCApp::m_applications;
 
@@ -157,12 +160,17 @@ void CXBMCApp::onResume()
   intentFilter.addAction("android.intent.action.BATTERY_CHANGED");
   intentFilter.addAction("android.intent.action.DREAMING_STOPPED");
   intentFilter.addAction("android.intent.action.SCREEN_ON");
+  intentFilter.addAction("android.intent.action.HEADSET_PLUG");
+  intentFilter.addAction("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED");
   registerReceiver(*this, intentFilter);
 
   if (!g_application.IsInScreenSaver())
     EnableWakeLock(true);
   else
     g_application.WakeUpScreenSaverAndDPMS();
+
+  CJNIAudioManager audioManager(getSystemService("audio"));
+  m_headsetPlugged = audioManager.isWiredHeadsetOn() || audioManager.isBluetoothA2dpOn();
 
   // Clear the applications cache. We could have installed/deinstalled apps
   {
@@ -350,6 +358,11 @@ bool CXBMCApp::HasFocus()
   return m_hasFocus;
 }
 
+bool CXBMCApp::IsHeadsetPlugged()
+{
+  return m_headsetPlugged;
+}
+
 void CXBMCApp::run()
 {
   int status = 0;
@@ -401,24 +414,28 @@ void CXBMCApp::XBMC_Pause(bool pause)
   android_printf("XBMC_Pause(%s)", pause ? "true" : "false");
   // Only send the PAUSE action if we are pausing XBMC and video is currently playing
   if (pause && g_application.m_pPlayer->IsPlayingVideo() && !g_application.m_pPlayer->IsPaused())
-    CApplicationMessenger::Get().SendAction(CAction(ACTION_PAUSE), WINDOW_INVALID, true);
+    CApplicationMessenger::GetInstance().SendMsg(TMSG_GUI_ACTION, WINDOW_INVALID, -1, static_cast<void*>(new CAction(ACTION_PAUSE)));
 }
 
 void CXBMCApp::XBMC_Stop()
 {
-  CApplicationMessenger::Get().Quit();
+  CApplicationMessenger::GetInstance().PostMsg(TMSG_QUIT);
 }
 
 bool CXBMCApp::XBMC_SetupDisplay()
 {
   android_printf("XBMC_SetupDisplay()");
-  return CApplicationMessenger::Get().SetupDisplay();
+  bool result;
+  CApplicationMessenger::GetInstance().SendMsg(TMSG_DISPLAY_SETUP, -1, -1, static_cast<void*>(&result));
+  return result;
 }
 
 bool CXBMCApp::XBMC_DestroyDisplay()
 {
   android_printf("XBMC_DestroyDisplay()");
-  return CApplicationMessenger::Get().DestroyDisplay();
+  bool result;
+  CApplicationMessenger::GetInstance().SendMsg(TMSG_DISPLAY_DESTROY, -1, -1, static_cast<void*>(&result));
+  return result;
 }
 
 int CXBMCApp::SetBuffersGeometry(int width, int height, int format)
@@ -734,8 +751,24 @@ void CXBMCApp::onReceive(CJNIIntent intent)
   if (action == "android.intent.action.BATTERY_CHANGED")
     m_batteryLevel = intent.getIntExtra("level",-1);
   else if (action == "android.intent.action.DREAMING_STOPPED" || action == "android.intent.action.SCREEN_ON")
+  {
     if (HasFocus())
       g_application.WakeUpScreenSaverAndDPMS();
+  }
+  else if (action == "android.intent.action.HEADSET_PLUG" || action == "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED")
+  {
+    bool newstate;
+    if (action == "android.intent.action.HEADSET_PLUG")
+      newstate = (intent.getIntExtra("state", 0) != 0);
+    else
+      newstate = (intent.getIntExtra("android.bluetooth.profile.extra.STATE", 0) == 2 /* STATE_CONNECTED */);
+
+    if (newstate != m_headsetPlugged)
+    {
+      m_headsetPlugged = newstate;
+      CAEFactory::DeviceChange();
+    }
+  }
 }
 
 void CXBMCApp::onNewIntent(CJNIIntent intent)
@@ -743,21 +776,23 @@ void CXBMCApp::onNewIntent(CJNIIntent intent)
   std::string action = intent.getAction();
   if (action == "android.intent.action.VIEW")
   {
-    std::string playFile = GetFilenameFromIntent(intent);
-    CApplicationMessenger::Get().MediaPlay(playFile);
+    CApplicationMessenger::GetInstance().SendMsg(TMSG_MEDIA_PLAY, 1, 0, static_cast<void*>(
+                                         new CFileItem(GetFilenameFromIntent(intent))));
   }
 }
 
 void CXBMCApp::onVolumeChanged(int volume)
 {
-  CApplicationMessenger::Get().SendAction(CAction(ACTION_VOLUME_SET, (float)volume), WINDOW_INVALID, false);
+  CApplicationMessenger::GetInstance().PostMsg(TMSG_GUI_ACTION, WINDOW_INVALID, -1, static_cast<void*>(
+                                       new CAction(ACTION_VOLUME_SET, static_cast<float>(volume))));
 }
 
 void CXBMCApp::onAudioFocusChange(int focusChange)
 {
   CXBMCApp::android_printf("Audio Focus changed: %d", focusChange);
   if (focusChange == CJNIAudioManager::AUDIOFOCUS_LOSS && g_application.m_pPlayer->IsPlaying() && !g_application.m_pPlayer->IsPaused())
-    CApplicationMessenger::Get().SendAction(CAction(ACTION_PAUSE), WINDOW_INVALID, true);
+    CApplicationMessenger::GetInstance().SendMsg(TMSG_GUI_ACTION, WINDOW_INVALID, -1, static_cast<void*>(
+                                         new CAction(ACTION_PAUSE)));
 }
 
 void CXBMCApp::SetupEnv()

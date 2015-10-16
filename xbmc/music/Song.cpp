@@ -24,7 +24,6 @@
 #include "FileItem.h"
 #include "settings/AdvancedSettings.h"
 
-using namespace std;
 using namespace MUSIC_INFO;
 
 CSong::CSong(CFileItem& item)
@@ -34,7 +33,9 @@ CSong::CSong(CFileItem& item)
   tag.GetReleaseDate(stTime);
   strTitle = tag.GetTitle();
   genre = tag.GetGenre();
-  artist = tag.GetArtist();
+  std::vector<std::string> artist = tag.GetArtist();
+  std::vector<std::string> musicBrainArtistHints = tag.GetMusicBrainzArtistHints();
+  strArtistDesc = tag.GetArtistString();
   if (!tag.GetMusicBrainzArtistID().empty())
   { // have musicbrainz artist info, so use it
     for (size_t i = 0; i < tag.GetMusicBrainzArtistID().size(); i++)
@@ -42,10 +43,13 @@ CSong::CSong(CFileItem& item)
       std::string artistId = tag.GetMusicBrainzArtistID()[i];
       std::string artistName;
       /*
-       We try and get the corresponding artist name from the album artist tag.
+       We try and get the corresponding artist name from the hints list.
+       If the hints list is missing or the wrong length, it will try the artist list.
        We match on the same index, and if that fails just use the first name we have.
        */
-      if (!artist.empty())
+      if (i < musicBrainArtistHints.size())
+        artistName = musicBrainArtistHints[i];
+      else if (!artist.empty())
         artistName = (i < artist.size()) ? artist[i] : artist[0];
       if (artistName.empty())
         artistName = artistId;
@@ -56,7 +60,7 @@ CSong::CSong(CFileItem& item)
   }
   else
   { // no musicbrainz info, so fill in directly
-    for (vector<string>::const_iterator it = tag.GetArtist().begin(); it != tag.GetArtist().end(); ++it)
+    for (std::vector<std::string>::const_iterator it = tag.GetArtist().begin(); it != tag.GetArtist().end(); ++it)
     {
       std::string strJoinPhrase = (it == --tag.GetArtist().end() ? "" : g_advancedSettings.m_musicItemSeparator);
       CArtistCredit artistCredit(*it, "", strJoinPhrase);
@@ -64,7 +68,7 @@ CSong::CSong(CFileItem& item)
     }
   }
   strAlbum = tag.GetAlbum();
-  albumArtist = tag.GetAlbumArtist();
+  m_albumArtist = tag.GetAlbumArtist();
   strMusicBrainzTrackID = tag.GetMusicBrainzTrackID();
   strComment = tag.GetComment();
   strCueSheet = tag.GetCueSheet();
@@ -109,9 +113,9 @@ void CSong::Serialize(CVariant& value) const
 {
   value["filename"] = strFileName;
   value["title"] = strTitle;
-  value["artist"] = artist;
+  value["artist"] = GetArtist();
   value["album"] = strAlbum;
-  value["albumartist"] = albumArtist;
+  value["albumartist"] = GetAlbumArtist();
   value["genre"] = genre;
   value["duration"] = iDuration;
   value["track"] = iTrack;
@@ -131,9 +135,8 @@ void CSong::Clear()
 {
   strFileName.clear();
   strTitle.clear();
-  artist.clear();
   strAlbum.clear();
-  albumArtist.clear();
+  m_albumArtist.clear();
   genre.clear();
   strThumb.clear();
   strMusicBrainzTrackID.clear();
@@ -155,6 +158,39 @@ void CSong::Clear()
   idAlbum = -1;
   bCompilation = false;
   embeddedArt.clear();
+}
+const std::vector<std::string> CSong::GetArtist() const
+{
+  //Get artist names as vector from artist credits
+  std::vector<std::string> songartists;
+  for (VECARTISTCREDITS::const_iterator artistCredit = artistCredits.begin(); artistCredit != artistCredits.end(); ++artistCredit)
+  {
+    songartists.push_back(artistCredit->GetArtist());
+  }
+  return songartists;
+}
+
+const std::vector<std::string> CSong::GetMusicBrainzArtistID() const
+{
+  //Get artist MusicBrainz IDs as vector from artist credits
+  std::vector<std::string> muisicBrainzID;
+  for (VECARTISTCREDITS::const_iterator artistCredit = artistCredits.begin(); artistCredit != artistCredits.end(); ++artistCredit)
+  {
+    muisicBrainzID.push_back(artistCredit->GetMusicBrainzArtistID());
+  }
+  return muisicBrainzID;
+}
+
+const std::string CSong::GetArtistString() const
+{
+  //Artist description may be different from the artists in artistcredits (see ARTISTS tag processing)
+  //but is takes precidence as a string because artistcredits is not always filled during processing
+  if (!strArtistDesc.empty())
+    return strArtistDesc;
+  std::string artistString;
+  for (VECARTISTCREDITS::const_iterator artistCredit = artistCredits.begin(); artistCredit != artistCredits.end(); ++artistCredit)
+    artistString += artistCredit->GetArtist() + artistCredit->GetJoinPhrase();
+  return artistString;
 }
 
 bool CSong::HasArt() const

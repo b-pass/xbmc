@@ -18,12 +18,14 @@
 *  <http://www.gnu.org/licenses/>.
 *
 */
-#include <memory>
+
+#include <stdint.h>
 
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
-#include <stdint.h>
+#include <utility>
 
 class TiXmlElement;
 
@@ -35,6 +37,7 @@ namespace ADDON
     ADDON_VIZ,
     ADDON_SKIN,
     ADDON_PVRDLL,
+    ADDON_ADSPDLL,
     ADDON_SCRIPT,
     ADDON_SCRIPT_WEATHER,
     ADDON_SUBTITLE_MODULE,
@@ -87,6 +90,7 @@ namespace ADDON
     virtual ~IAddon() {};
     virtual AddonPtr Clone() const =0;
     virtual TYPE Type() const =0;
+    virtual TYPE FullType() const =0;
     virtual bool IsType(TYPE type) const =0;
     virtual AddonProps Props() const =0;
     virtual AddonProps& Props() =0;
@@ -125,7 +129,7 @@ namespace ADDON
     virtual void OnPostInstall(bool update, bool modal) =0;
     virtual void OnPreUnInstall() =0;
     virtual void OnPostUnInstall() =0;
-    virtual bool CanInstall(const std::string& referer) =0;
+    virtual bool CanInstall() =0;
 
   protected:
     virtual bool LoadSettings(bool bForce = false) =0;

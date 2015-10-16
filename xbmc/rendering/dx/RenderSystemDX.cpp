@@ -409,21 +409,11 @@ bool CRenderSystemDX::IsFormatSupport(DXGI_FORMAT format, unsigned int usage)
 
 bool CRenderSystemDX::DestroyRenderSystem()
 {
-  if (m_pSwapChain)
-    m_pSwapChain->SetFullscreenState(false, NULL);
-
   DeleteDevice();
 
   SAFE_RELEASE(m_pOutput);
   SAFE_RELEASE(m_adapter);
   SAFE_RELEASE(m_dxgiFactory);
-#ifdef _DEBUG
-  if (m_d3dDebug)
-  {
-    m_d3dDebug->ReportLiveDeviceObjects(D3D11_RLDO_SUMMARY | D3D11_RLDO_DETAIL);
-    m_d3dDebug->Release();
-  }
-#endif
   return true;
 }
 
@@ -438,6 +428,9 @@ void CRenderSystemDX::DeleteDevice()
   for (std::vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
     (*i)->OnDestroyDevice();
 
+  if (m_pSwapChain)
+    m_pSwapChain->SetFullscreenState(false, NULL);
+
   SAFE_DELETE(m_pGUIShader);
   SAFE_RELEASE(m_pTextureRight);
   SAFE_RELEASE(m_pRenderTargetViewRight);
@@ -449,12 +442,8 @@ void CRenderSystemDX::DeleteDevice()
   SAFE_RELEASE(m_depthStencilState);
   SAFE_RELEASE(m_depthStencilView);
   SAFE_RELEASE(m_pRenderTargetView);
-  SAFE_RELEASE(m_pSwapChain);
-  SAFE_RELEASE(m_pSwapChain1);
-  SAFE_RELEASE(m_pD3DDev);
   if (m_pContext && m_pContext != m_pImdContext)
   {
-    FinishCommandList(false);
     m_pContext->ClearState();
     m_pContext->Flush();
     SAFE_RELEASE(m_pContext);
@@ -465,6 +454,16 @@ void CRenderSystemDX::DeleteDevice()
     m_pImdContext->Flush();
     SAFE_RELEASE(m_pImdContext);
   }
+  SAFE_RELEASE(m_pSwapChain);
+  SAFE_RELEASE(m_pSwapChain1);
+  SAFE_RELEASE(m_pD3DDev);
+#ifdef _DEBUG
+  if (m_d3dDebug)
+  {
+    m_d3dDebug->ReportLiveDeviceObjects(D3D11_RLDO_SUMMARY | D3D11_RLDO_DETAIL);
+    SAFE_RELEASE(m_d3dDebug);
+  }
+#endif
   m_bResizeRequred = false;
   m_bHWStereoEnabled = false;
   m_bRenderCreated = false;
@@ -495,10 +494,10 @@ void CRenderSystemDX::OnDeviceReset()
   { // we're back
     for (std::vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
       (*i)->OnResetDevice();
-
-    g_renderManager.Flush();
-    g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_RESET);
   }
+
+  g_renderManager.Flush();
+  g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_RESET);
 }
 
 bool CRenderSystemDX::CreateDevice()
@@ -513,6 +512,8 @@ bool CRenderSystemDX::CreateDevice()
   {
     D3D_FEATURE_LEVEL_11_1,
     D3D_FEATURE_LEVEL_11_0,
+    D3D_FEATURE_LEVEL_10_1,
+    D3D_FEATURE_LEVEL_10_0,
     D3D_FEATURE_LEVEL_9_3,
     D3D_FEATURE_LEVEL_9_2,
     D3D_FEATURE_LEVEL_9_1,
@@ -530,18 +531,23 @@ bool CRenderSystemDX::CreateDevice()
 
   if (FAILED(hr))
   {
+    // DirectX 11.0 platforms will not recognize D3D_FEATURE_LEVEL_11_1 so we need to retry without it
     CLog::Log(LOGDEBUG, "%s - First try to create device failed with error: %s.", __FUNCTION__, GetErrorDescription(hr).c_str());
+    CLog::Log(LOGDEBUG, "%s - Trying to create device with lowest feature level: %#x.", __FUNCTION__, featureLevels[1]);
 
-    for (int i = 1; i < ARRAYSIZE(featureLevels); i++)
+    hr = D3D11CreateDevice(m_adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, createDeviceFlags, &featureLevels[1], ARRAYSIZE(featureLevels) - 1,
+                           D3D11_SDK_VERSION, &m_pD3DDev, &m_featureLevel, &m_pImdContext);
+    if (FAILED(hr))
     {
-      CLog::Log(LOGDEBUG, "%s - Trying to create device with lowest feature level: %#x.", __FUNCTION__, featureLevels[i]);
-      // DirectX 11.0 platforms will not recognize D3D_FEATURE_LEVEL_11_1 so we need to retry without it
-      hr = D3D11CreateDevice(m_adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, createDeviceFlags, &featureLevels[i], ARRAYSIZE(featureLevels) - i,
+      // still failed. seems driver doesn't support video API acceleration, try without VIDEO_SUPPORT flag
+      CLog::Log(LOGDEBUG, "%s - Next try to create device failed with error: %s.", __FUNCTION__, GetErrorDescription(hr).c_str());
+      CLog::Log(LOGDEBUG, "%s - Trying to create device without video API support.", __FUNCTION__);
+
+      createDeviceFlags &= ~D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
+      hr = D3D11CreateDevice(m_adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, createDeviceFlags, &featureLevels[1], ARRAYSIZE(featureLevels) - 1,
                              D3D11_SDK_VERSION, &m_pD3DDev, &m_featureLevel, &m_pImdContext);
       if (SUCCEEDED(hr))
-        break;
-
-      CLog::Log(LOGDEBUG, "%s - Next try to create device failed with error: %s.", __FUNCTION__, GetErrorDescription(hr).c_str());
+        CLog::Log(LOGNOTICE, "%s - Your video driver doesn't support DirectX 11 Video Acceleration API. Application is not be able to use hardware video processing and decoding", __FUNCTION__);
     }
   }
 
@@ -1044,7 +1050,7 @@ bool CRenderSystemDX::CreateStates()
 	m_pContext->OMSetDepthStencilState(m_depthStencilState, 0);
 
   D3D11_RASTERIZER_DESC rasterizerState;
-  rasterizerState.CullMode = D3D11_CULL_BACK; 
+  rasterizerState.CullMode = D3D11_CULL_NONE; 
   rasterizerState.FillMode = D3D11_FILL_SOLID;// DEBUG - D3D11_FILL_WIREFRAME
   rasterizerState.FrontCounterClockwise = false;
   rasterizerState.DepthBias = 0;
@@ -1071,7 +1077,7 @@ bool CRenderSystemDX::CreateStates()
   blendState.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA; // D3D11_BLEND_INV_SRC_ALPHA;
   blendState.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
   blendState.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-  blendState.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+  blendState.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
   blendState.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
   blendState.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
@@ -1202,6 +1208,7 @@ bool CRenderSystemDX::BeginRender()
     if (DXGI_ERROR_DEVICE_REMOVED == m_nDeviceStatus)
     {
       OnDeviceLost();
+      OnDeviceReset();
     }
     return false;
   }
@@ -1326,7 +1333,7 @@ void CRenderSystemDX::ApplyStateBlock()
   m_pGUIShader->ApplyStateBlock();
 }
 
-void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight)
+void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor)
 {
   if (!m_bRenderCreated)
     return;
@@ -1345,7 +1352,7 @@ void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, i
   // position.
   XMMATRIX flipY, translate;
   flipY = XMMatrixScaling(1.0, -1.0f, 1.0f);
-  translate = XMMatrixTranslation(-(w + offset.x), -(h + offset.y), 2 * h);
+  translate = XMMatrixTranslation(-(w + offset.x - stereoFactor), -(h + offset.y), 2 * h);
   m_pGUIShader->SetView(XMMatrixMultiply(translate, flipY));
 
   // projection onto screen space
@@ -1354,6 +1361,9 @@ void CRenderSystemDX::SetCameraPosition(const CPoint &camera, int screenWidth, i
 
 void CRenderSystemDX::Project(float &x, float &y, float &z)
 {
+  if (!m_bRenderCreated)
+    return;
+
   m_pGUIShader->Project(x, y, z);
 }
 
@@ -1403,7 +1413,7 @@ bool CRenderSystemDX::TestRender()
     0, D3DFVF_CUSTOMVERTEX,
     D3DPOOL_DEFAULT, &pVB, NULL ) ) )
   {
-    return false;;
+    return false;
   }
 
   // Now we fill the vertex buffer. To do this, we need to Lock() the VB to
@@ -1474,7 +1484,10 @@ void CRenderSystemDX::RestoreViewPort()
 
 bool CRenderSystemDX::ScissorsCanEffectClipping()
 {
-  return m_pGUIShader != NULL && m_pGUIShader->HardwareClipIsPossible(); 
+  if (!m_bRenderCreated)
+    return false;
+
+  return m_pGUIShader != NULL && m_pGUIShader->HardwareClipIsPossible();
 }
 
 CRect CRenderSystemDX::ClipRectToScissorRect(const CRect &rect)
@@ -1629,6 +1642,9 @@ bool CRenderSystemDX::SupportsStereo(RENDER_STEREO_MODE mode) const
 
 void CRenderSystemDX::FlushGPU()
 {
+  if (!m_bRenderCreated)
+    return;
+
   FinishCommandList();
   m_pImdContext->Flush();
 }

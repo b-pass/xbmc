@@ -21,6 +21,7 @@
 
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "pictures/PictureScalingAlgorithm.h"
@@ -122,10 +123,10 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
 
     static CAdvancedSettings* getInstance();
 
-    virtual void OnSettingsLoaded();
-    virtual void OnSettingsUnloaded();
+    virtual void OnSettingsLoaded() override;
+    virtual void OnSettingsUnloaded() override;
 
-    virtual void OnSettingChanged(const CSetting *setting);
+    virtual void OnSettingChanged(const CSetting *setting) override;
 
     void Initialize();
     bool Initialized() { return m_initialized; };
@@ -269,10 +270,8 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_iMusicLibraryRecentlyAddedItems;
     int m_iMusicLibraryDateAdded;
     bool m_bMusicLibraryAllItemsOnBottom;
-    bool m_bMusicLibraryAlbumsSortByArtistThenYear;
     bool m_bMusicLibraryCleanOnUpdate;
     std::string m_strMusicLibraryAlbumFormat;
-    std::string m_strMusicLibraryAlbumFormatRight;
     bool m_prioritiseAPEv2tags;
     std::string m_musicItemSeparator;
     std::string m_videoItemSeparator;
@@ -361,6 +360,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     DatabaseSettings m_databaseVideo; // advanced video database setup
     DatabaseSettings m_databaseTV;    // advanced tv database setup
     DatabaseSettings m_databaseEpg;   /*!< advanced EPG database setup */
+    DatabaseSettings m_databaseADSP;  /*!< advanced audio dsp database setup */
 
     bool m_guiVisualizeDirtyRegions;
     int  m_guiAlgorithmDirtyRegions;
@@ -385,6 +385,9 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     std::string GetMusicExtensions() const;
 
     void SetDebugMode(bool debug);
+
+    //! \brief Toggles dirty-region visualization
+    void ToggleDirtyRegionVisualization() { m_guiVisualizeDirtyRegions = !m_guiVisualizeDirtyRegions; };
 
     // runtime settings which cannot be set from advancedsettings.xml
     std::string m_pictureExtensions;

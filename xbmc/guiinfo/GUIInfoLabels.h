@@ -79,6 +79,7 @@
 #define PLAYER_ISINTERNETSTREAM      54
 #define PLAYER_FILENAME              55
 #define PLAYER_SEEKSTEPSIZE          56
+#define PLAYER_IS_CHANNEL_PREVIEW_ACTIVE  57
 
 #define WEATHER_CONDITIONS          100
 #define WEATHER_TEMPERATURE         101
@@ -124,6 +125,7 @@
 #define SYSTEM_PROFILENAME          146
 #define SYSTEM_PROFILETHUMB         147
 #define SYSTEM_HAS_LOGINSCREEN      148
+#define SYSTEM_HAS_MODAL_DIALOG     149
 #define SYSTEM_HDD_SMART            150
 #define SYSTEM_HDD_TEMPERATURE      151
 #define SYSTEM_HDD_MODEL            152
@@ -133,6 +135,7 @@
 #define SYSTEM_HDD_LOCKSTATE        157
 #define SYSTEM_HDD_LOCKKEY          158
 #define SYSTEM_INTERNET_STATE       159
+#define SYSTEM_HAS_INPUT_HIDDEN     160
 #define SYSTEM_ALARM_LESS_OR_EQUAL  180
 #define SYSTEM_PROFILECOUNT         181
 #define SYSTEM_ISFULLSCREEN         182
@@ -255,7 +258,9 @@
 #define VIDEOPLAYER_CAN_RESUME_LIVE_TV 316
 #define VIDEOPLAYER_IMDBNUMBER        317
 #define VIDEOPLAYER_EPISODENAME       318
+#define VIDEOPLAYER_USER_RATING       319
 
+#define CONTAINER_HAS_PARENT_ITEM    341
 #define CONTAINER_CAN_FILTER         342
 #define CONTAINER_CAN_FILTERADVANCED 343
 #define CONTAINER_FILTERED           344
@@ -316,6 +321,7 @@
 #define VISUALISATION_PRESET        401
 #define VISUALISATION_NAME          402
 #define VISUALISATION_ENABLED       403
+#define VISUALISATION_HAS_PRESETS   404
 
 #define STRING_IS_EMPTY             410
 #define STRING_COMPARE              411
@@ -326,8 +332,6 @@
 
 #define SKIN_BOOL                   600
 #define SKIN_STRING                 601
-#define SKIN_HAS_MUSIC_OVERLAY      602
-#define SKIN_HAS_VIDEO_OVERLAY      603
 #define SKIN_THEME                  604
 #define SKIN_COLOUR_THEME           605
 #define SKIN_HAS_THEME              606
@@ -385,7 +389,7 @@
 #define SYSTEM_PLATFORM_DARWIN      743
 #define SYSTEM_PLATFORM_DARWIN_OSX  744
 #define SYSTEM_PLATFORM_DARWIN_IOS  745
-#define SYSTEM_PLATFORM_DARWIN_ATV2 746
+//#define SYSTEM_PLATFORM_DARWIN_ATV2 746
 #define SYSTEM_PLATFORM_ANDROID     747
 #define SYSTEM_PLATFORM_LINUX_RASPBERRY_PI 748
 
@@ -408,6 +412,7 @@
 #define FANART_IMAGE                1003
 
 #define SYSTEM_PROFILEAUTOLOGIN     1004
+#define SYSTEM_HAS_ADSP             1005
 
 #define PVR_CONDITIONS_START        1100
 #define PVR_IS_RECORDING            (PVR_CONDITIONS_START)
@@ -422,7 +427,8 @@
 #define PVR_ACTUAL_STREAM_ENCRYPTED (PVR_CONDITIONS_START + 9)
 #define PVR_HAS_TV_CHANNELS         (PVR_CONDITIONS_START + 10)
 #define PVR_HAS_RADIO_CHANNELS      (PVR_CONDITIONS_START + 11)
-#define PVR_CONDITIONS_END          PVR_HAS_RADIO_CHANNELS
+#define PVR_IS_TIMESHIFTING         (PVR_CONDITIONS_START + 12)
+#define PVR_CONDITIONS_END          PVR_IS_TIMESHIFTING
 
 #define PVR_STRINGS_START           1200
 #define PVR_NEXT_RECORDING_CHANNEL  (PVR_STRINGS_START)
@@ -464,7 +470,78 @@
 #define PVR_ACTUAL_STREAM_MUX       (PVR_STRINGS_START + 36)
 #define PVR_ACTUAL_STREAM_PROVIDER  (PVR_STRINGS_START + 37)
 #define PVR_BACKEND_DISKSPACE_PROGR (PVR_STRINGS_START + 38)
-#define PVR_STRINGS_END             PVR_ACTUAL_STREAM_PROVIDER
+#define PVR_TIMESHIFT_START_TIME    (PVR_STRINGS_START + 39)
+#define PVR_TIMESHIFT_END_TIME      (PVR_STRINGS_START + 40)
+#define PVR_TIMESHIFT_PLAY_TIME     (PVR_STRINGS_START + 41)
+#define PVR_TIMESHIFT_PROGRESS      (PVR_STRINGS_START + 42)
+#define PVR_STRINGS_END             PVR_TIMESHIFT_PROGRESS
+
+#define ADSP_CONDITIONS_START       1300
+#define ADSP_IS_ACTIVE              (ADSP_CONDITIONS_START)
+#define ADSP_HAS_INPUT_RESAMPLE     (ADSP_CONDITIONS_START + 1)
+#define ADSP_HAS_PRE_PROCESS        (ADSP_CONDITIONS_START + 2)
+#define ADSP_HAS_MASTER_PROCESS     (ADSP_CONDITIONS_START + 3)
+#define ADSP_HAS_POST_PROCESS       (ADSP_CONDITIONS_START + 4)
+#define ADSP_HAS_OUTPUT_RESAMPLE    (ADSP_CONDITIONS_START + 5)
+#define ADSP_MASTER_ACTIVE          (ADSP_CONDITIONS_START + 6)
+#define ADSP_CONDITIONS_END         ADSP_MASTER_ACTIVE
+
+#define ADSP_STRINGS_START          1350
+#define ADSP_ACTIVE_STREAM_TYPE     (ADSP_STRINGS_START)
+#define ADSP_DETECTED_STREAM_TYPE   (ADSP_STRINGS_START + 1)
+#define ADSP_MASTER_NAME            (ADSP_STRINGS_START + 7)
+#define ADSP_MASTER_INFO            (ADSP_STRINGS_START + 8)
+#define ADSP_MASTER_OWN_ICON        (ADSP_STRINGS_START + 9)
+#define ADSP_MASTER_OVERRIDE_ICON   (ADSP_STRINGS_START + 10)
+#define ADSP_STRINGS_END            ADSP_MASTER_OVERRIDE_ICON
+
+#define RDS_DATA_START              1400
+#define RDS_HAS_RDS                 (RDS_DATA_START)
+#define RDS_HAS_RADIOTEXT           (RDS_DATA_START + 1)
+#define RDS_HAS_RADIOTEXT_PLUS      (RDS_DATA_START + 2)
+#define RDS_GET_RADIOTEXT_LINE      (RDS_DATA_START + 3)
+#define RDS_TITLE                   (RDS_DATA_START + 4)
+#define RDS_BAND                    (RDS_DATA_START + 5)
+#define RDS_ARTIST                  (RDS_DATA_START + 6)
+#define RDS_COMPOSER                (RDS_DATA_START + 7)
+#define RDS_CONDUCTOR               (RDS_DATA_START + 8)
+#define RDS_ALBUM                   (RDS_DATA_START + 9)
+#define RDS_ALBUM_TRACKNUMBER       (RDS_DATA_START + 10)
+#define RDS_GET_RADIO_STYLE         (RDS_DATA_START + 11)
+#define RDS_COMMENT                 (RDS_DATA_START + 12)
+#define RDS_INFO_NEWS               (RDS_DATA_START + 13)
+#define RDS_INFO_NEWS_LOCAL         (RDS_DATA_START + 14)
+#define RDS_INFO_STOCK              (RDS_DATA_START + 15)
+#define RDS_INFO_STOCK_SIZE         (RDS_DATA_START + 16)
+#define RDS_INFO_SPORT              (RDS_DATA_START + 17)
+#define RDS_INFO_SPORT_SIZE         (RDS_DATA_START + 18)
+#define RDS_INFO_LOTTERY            (RDS_DATA_START + 19)
+#define RDS_INFO_LOTTERY_SIZE       (RDS_DATA_START + 20)
+#define RDS_INFO_WEATHER            (RDS_DATA_START + 21)
+#define RDS_INFO_WEATHER_SIZE       (RDS_DATA_START + 22)
+#define RDS_INFO_CINEMA             (RDS_DATA_START + 23)
+#define RDS_INFO_CINEMA_SIZE        (RDS_DATA_START + 24)
+#define RDS_INFO_HOROSCOPE          (RDS_DATA_START + 25)
+#define RDS_INFO_HOROSCOPE_SIZE     (RDS_DATA_START + 26)
+#define RDS_INFO_OTHER              (RDS_DATA_START + 27)
+#define RDS_INFO_OTHER_SIZE         (RDS_DATA_START + 28)
+#define RDS_PROG_STATION            (RDS_DATA_START + 29)
+#define RDS_PROG_NOW                (RDS_DATA_START + 30)
+#define RDS_PROG_NEXT               (RDS_DATA_START + 31)
+#define RDS_PROG_HOST               (RDS_DATA_START + 32)
+#define RDS_PROG_EDIT_STAFF         (RDS_DATA_START + 33)
+#define RDS_PROG_HOMEPAGE           (RDS_DATA_START + 34)
+#define RDS_PROG_STYLE              (RDS_DATA_START + 35)
+#define RDS_PHONE_HOTLINE           (RDS_DATA_START + 36)
+#define RDS_PHONE_STUDIO            (RDS_DATA_START + 37)
+#define RDS_SMS_STUDIO              (RDS_DATA_START + 38)
+#define RDS_EMAIL_HOTLINE           (RDS_DATA_START + 39)
+#define RDS_EMAIL_STUDIO            (RDS_DATA_START + 40)
+#define RDS_HAS_HOTLINE_DATA        (RDS_DATA_START + 41)
+#define RDS_HAS_STUDIO_DATA         (RDS_DATA_START + 42)
+#define RDS_AUDIO_LANG              (RDS_DATA_START + 43)
+#define RDS_CHANNEL_COUNTRY         (RDS_DATA_START + 44)
+#define RDS_DATA_END                RDS_CHANNEL_COUNTRY
 
 #define WINDOW_PROPERTY             9993
 #define WINDOW_IS_TOPMOST           9994
@@ -636,6 +713,9 @@
 #define LISTITEM_IS_COLLECTION      (LISTITEM_START + 148)
 #define LISTITEM_HASTIMERSCHEDULE   (LISTITEM_START + 149)
 #define LISTITEM_TIMERTYPE          (LISTITEM_START + 150)
+#define LISTITEM_EPG_EVENT_TITLE    (LISTITEM_START + 151)
+#define LISTITEM_DATETIME           (LISTITEM_START + 152)
+#define LISTITEM_USER_RATING        (LISTITEM_START + 153)
 
 #define LISTITEM_PROPERTY_START     (LISTITEM_START + 200)
 #define LISTITEM_PROPERTY_END       (LISTITEM_PROPERTY_START + 1000)
@@ -644,7 +724,7 @@
 #define MUSICPLAYER_PROPERTY_OFFSET 800 // 100 id's reserved for musicplayer props.
 #define LISTITEM_ART_OFFSET         900 // 100 id's reserved for listitem art.
 
-#define CONDITIONAL_LABEL_START       LISTITEM_END + 1 // 36001
+#define CONDITIONAL_LABEL_START       LISTITEM_END + 1 // 36201
 #define CONDITIONAL_LABEL_END         37000
 
 // the multiple information vector
@@ -656,4 +736,5 @@
 // Stored in the top 8 bits of GUIInfo::m_data1
 // therefore we only have room for 8 flags
 #define INFOFLAG_LISTITEM_WRAP        ((uint32_t) (1 << 25))  // Wrap ListItem lookups
-#define INFOFLAG_LISTITEM_POSITION    ((uint32_t) (1 << 26))  // Absolute ListItem lookups
+#define INFOFLAG_LISTITEM_POSITION    ((uint32_t) (1 << 26))  // ListItem lookups based on cursor position
+#define INFOFLAG_LISTITEM_ABSOLUTE    ((uint32_t) (1 << 27))  // Absolute ListItem lookups

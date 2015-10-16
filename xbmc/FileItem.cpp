@@ -42,6 +42,7 @@
 #include "music/MusicDatabase.h"
 #include "epg/Epg.h"
 #include "pvr/channels/PVRChannel.h"
+#include "pvr/channels/PVRRadioRDSInfoTag.h"
 #include "pvr/recordings/PVRRecording.h"
 #include "pvr/timers/PVRTimerInfoTag.h"
 #include "video/VideoInfoTag.h"
@@ -62,7 +63,6 @@
 #include <assert.h>
 #include <algorithm>
 
-using namespace std;
 using namespace XFILE;
 using namespace PLAYLIST;
 using namespace MUSIC_INFO;
@@ -151,7 +151,7 @@ CFileItem::CFileItem(const CPVRChannelPtr& channel)
   m_pvrChannelInfoTag = channel;
   SetLabel(channel->ChannelName());
   m_strLabel2 = epgNow ? epgNow->Title() :
-      CSettings::Get().GetBool("epg.hidenoinfoavailable") ?
+      CSettings::GetInstance().GetBool(CSettings::SETTING_EPG_HIDENOINFOAVAILABLE) ?
                             "" : g_localizeStrings.Get(19055); // no information available
 
   if (channel->IsRadio())
@@ -222,7 +222,7 @@ CFileItem::CFileItem(const CArtist& artist)
   m_strPath = artist.strArtist;
   m_bIsFolder = true;
   URIUtils::AddSlashAtEnd(m_strPath);
-  GetMusicInfoTag()->SetArtist(artist.strArtist);
+  GetMusicInfoTag()->SetArtist(artist);
   FillInMimeType(false);
 }
 
@@ -385,6 +385,7 @@ const CFileItem& CFileItem::operator=(const CFileItem& item)
   m_pvrChannelInfoTag = item.m_pvrChannelInfoTag;
   m_pvrRecordingInfoTag = item.m_pvrRecordingInfoTag;
   m_pvrTimerInfoTag = item.m_pvrTimerInfoTag;
+  m_pvrRadioRDSInfoTag = item.m_pvrRadioRDSInfoTag;
 
   m_lStartOffset = item.m_lStartOffset;
   m_lStartPartNumber = item.m_lStartPartNumber;
@@ -426,6 +427,7 @@ void CFileItem::Initialize()
   m_iHasLock = 0;
   m_bCanQueue = true;
   m_specialSort = SortSpecialNone;
+  m_doContentLookup = true;
 }
 
 void CFileItem::Reset()
@@ -452,6 +454,7 @@ void CFileItem::Reset()
   m_pvrChannelInfoTag.reset();
   m_pvrRecordingInfoTag.reset();
   m_pvrTimerInfoTag.reset();
+  m_pvrRadioRDSInfoTag.reset();
   delete m_pictureInfoTag;
   m_pictureInfoTag=NULL;
   m_extrainfo.clear();
@@ -504,6 +507,13 @@ void CFileItem::Archive(CArchive& ar)
     }
     else
       ar << 0;
+    if (m_pvrRadioRDSInfoTag)
+    {
+      ar << 1;
+      ar << *m_pvrRadioRDSInfoTag;
+    }
+    else
+      ar << 0;
     if (m_pictureInfoTag)
     {
       ar << 1;
@@ -549,6 +559,9 @@ void CFileItem::Archive(CArchive& ar)
       ar >> *GetVideoInfoTag();
     ar >> iType;
     if (iType == 1)
+      ar >> *m_pvrRadioRDSInfoTag;
+    ar >> iType;
+    if (iType == 1)
       ar >> *GetPictureInfoTag();
 
     SetInvalid();
@@ -573,6 +586,9 @@ void CFileItem::Serialize(CVariant& value) const
 
   if (m_videoInfoTag)
     (*m_videoInfoTag).Serialize(value["videoInfoTag"]);
+
+  if (m_pvrRadioRDSInfoTag)
+    m_pvrRadioRDSInfoTag->Serialize(value["rdsInfoTag"]);
 
   if (m_pictureInfoTag)
     (*m_pictureInfoTag).Serialize(value["pictureInfoTag"]);
@@ -739,6 +755,11 @@ bool CFileItem::IsPVRTimer() const
   return HasPVRTimerInfoTag();
 }
 
+bool CFileItem::IsPVRRadioRDS() const
+{
+  return HasPVRRadioRDSInfoTag();
+}
+
 bool CFileItem::IsDiscStub() const
 {
   if (IsVideoDb() && HasVideoInfoTag())
@@ -845,7 +866,7 @@ bool CFileItem::IsFileFolder(EFileFolderType types) const
     || IsZIP()
     || IsRAR()
     || IsRSS()
-    || IsType(".ogg|.oga|.nsf|.sid|.sap|.xsp")
+    || IsType(".ogg|.oga|.nsf|.sid|.sap|.xbt|.xsp")
 #if defined(TARGET_ANDROID)
     || IsType(".apk")
 #endif
@@ -1379,6 +1400,11 @@ void CFileItem::UpdateInfo(const CFileItem &item, bool replaceLabels /*=true*/)
     *GetMusicInfoTag() = *item.GetMusicInfoTag();
     SetInvalid();
   }
+  if (item.HasPVRRadioRDSInfoTag())
+  {
+    m_pvrRadioRDSInfoTag = item.m_pvrRadioRDSInfoTag;
+    SetInvalid();
+  }
   if (item.HasPictureInfoTag())
   {
     *GetPictureInfoTag() = *item.GetPictureInfoTag();
@@ -1423,8 +1449,9 @@ void CFileItem::SetFromAlbum(const CAlbum &album)
   if (!album.strAlbum.empty())
     SetLabel(album.strAlbum);
   m_bIsFolder = true;
-  m_strLabel2 = StringUtils::Join(album.artist, g_advancedSettings.m_musicItemSeparator);
+  m_strLabel2 = album.GetAlbumArtistString();
   GetMusicInfoTag()->SetAlbum(album);
+  SetArt(album.art);
   m_bIsAlbum = true;
   CMusicDatabase::SetPropertiesFromAlbum(*this,album);
   FillInMimeType(false);
@@ -1562,12 +1589,15 @@ bool CFileItem::LoadTracksFromCueDocument(CFileItemList& scannedItems)
       {
         if (song.strAlbum.empty() && !tag.GetAlbum().empty())
           song.strAlbum = tag.GetAlbum();
-        if (song.albumArtist.empty() && !tag.GetAlbumArtist().empty())
-          song.albumArtist = tag.GetAlbumArtist();
+        //Pass album artist to final MusicInfoTag object via setting song album artist vector. 
+        if (song.GetAlbumArtist().empty() && !tag.GetAlbumArtist().empty())
+          song.SetAlbumArtist(tag.GetAlbumArtist());        
         if (song.genre.empty() && !tag.GetGenre().empty())
           song.genre = tag.GetGenre();
-        if (song.artist.empty() && !tag.GetArtist().empty())
-          song.artist = tag.GetArtist();
+        //Pass artist to final MusicInfoTag object via setting song artist description string only.
+        //Artist credits not used during loading from cue sheet. 
+        if (song.strArtistDesc.empty() && !tag.GetArtistString().empty())
+          song.strArtistDesc = tag.GetArtistString();
         if (tag.GetDiscNumber())
           song.iTrack |= (tag.GetDiscNumber() << 16); // see CMusicInfoTag::GetDiscNumber()
         if (!tag.GetCueSheet().empty())
@@ -1876,7 +1906,7 @@ const CFileItemPtr CFileItemList::Get(const std::string& strPath) const
 
   if (m_fastLookup)
   {
-    map<std::string, CFileItemPtr>::const_iterator it=m_map.find(strPath);
+    std::map<std::string, CFileItemPtr>::const_iterator it=m_map.find(strPath);
     if (it != m_map.end())
       return it->second;
 
@@ -1990,7 +2020,7 @@ void CFileItemList::Sort(SortDescription sortDescription)
 void CFileItemList::Randomize()
 {
   CSingleLock lock(m_lock);
-  random_shuffle(m_items.begin(), m_items.end());
+  std::random_shuffle(m_items.begin(), m_items.end());
 }
 
 void CFileItemList::Archive(CArchive& ar)
@@ -2178,7 +2208,7 @@ void CFileItemList::FilterCueItems()
 {
   CSingleLock lock(m_lock);
   // Handle .CUE sheet files...
-  vector<string> itemstodelete;
+  std::vector<std::string> itemstodelete;
   for (int i = 0; i < (int)m_items.size(); i++)
   {
     CFileItemPtr pItem = m_items[i];
@@ -2218,8 +2248,8 @@ void CFileItemList::FilterCueItems()
                 }
                 else
                 { // try replacing the extension with one of our allowed ones.
-                  vector<string> extensions = StringUtils::Split(g_advancedSettings.GetMusicExtensions(), "|");
-                  for (vector<string>::const_iterator i = extensions.begin(); i != extensions.end(); ++i)
+                  std::vector<std::string> extensions = StringUtils::Split(g_advancedSettings.GetMusicExtensions(), "|");
+                  for (std::vector<std::string>::const_iterator i = extensions.begin(); i != extensions.end(); ++i)
                   {
                     strMediaFile = URIUtils::ReplaceExtension(pItem->GetPath(), *i);
                     CFileItem item(strMediaFile, false);
@@ -2299,9 +2329,9 @@ void CFileItemList::StackFolders()
   // Precompile our REs
   VECCREGEXP folderRegExps;
   CRegExp folderRegExp(true, CRegExp::autoUtf8);
-  const vector<string>& strFolderRegExps = g_advancedSettings.m_folderStackRegExps;
+  const std::vector<std::string>& strFolderRegExps = g_advancedSettings.m_folderStackRegExps;
 
-  vector<string>::const_iterator strExpression = strFolderRegExps.begin();
+  std::vector<std::string>::const_iterator strExpression = strFolderRegExps.begin();
   while (strExpression != strFolderRegExps.end())
   {
     if (!folderRegExp.RegComp(*strExpression))
@@ -2396,8 +2426,8 @@ void CFileItemList::StackFiles()
   // Precompile our REs
   VECCREGEXP stackRegExps;
   CRegExp tmpRegExp(true, CRegExp::autoUtf8);
-  const vector<string>& strStackRegExps = g_advancedSettings.m_videoStackRegExps;
-  vector<string>::const_iterator strRegExp = strStackRegExps.begin();
+  const std::vector<std::string>& strStackRegExps = g_advancedSettings.m_videoStackRegExps;
+  std::vector<std::string>::const_iterator strRegExp = strStackRegExps.begin();
   while (strRegExp != strStackRegExps.end())
   {
     if (tmpRegExp.RegComp(*strRegExp))
@@ -2433,7 +2463,7 @@ void CFileItemList::StackFiles()
     std::string           stackName;
     std::string           file1;
     std::string           filePath;
-    vector<int>           stack;
+    std::vector<int>      stack;
     VECCREGEXP::iterator  expr        = stackRegExps.begin();
 
     URIUtils::Split(item1->GetPath(), filePath, file1);
@@ -2558,7 +2588,7 @@ void CFileItemList::StackFiles()
         // item->m_bIsFolder = true;  // don't treat stacked files as folders
         // the label may be in a different char set from the filename (eg over smb
         // the label is converted from utf8, but the filename is not)
-        if (!CSettings::Get().GetBool("filelists.showextensions"))
+        if (!CSettings::GetInstance().GetBool(CSettings::SETTING_FILELISTS_SHOWEXTENSIONS))
           URIUtils::RemoveExtension(stackName);
 
         item1->SetLabel(stackName);
@@ -2684,10 +2714,10 @@ std::string CFileItem::GetUserMusicThumb(bool alwaysCheckRemote /* = false */, b
   }
 
   // if a folder, check for folder.jpg
-  if (m_bIsFolder && !IsFileFolder() && (!IsRemote() || alwaysCheckRemote || CSettings::Get().GetBool("musicfiles.findremotethumbs")))
+  if (m_bIsFolder && !IsFileFolder() && (!IsRemote() || alwaysCheckRemote || CSettings::GetInstance().GetBool(CSettings::SETTING_MUSICFILES_FINDREMOTETHUMBS)))
   {
-    vector<string> thumbs = StringUtils::Split(g_advancedSettings.m_musicThumbs, "|");
-    for (vector<string>::const_iterator i = thumbs.begin(); i != thumbs.end(); ++i)
+    std::vector<std::string> thumbs = StringUtils::Split(g_advancedSettings.m_musicThumbs, "|");
+    for (std::vector<std::string>::const_iterator i = thumbs.begin(); i != thumbs.end(); ++i)
     {
       std::string folderThumb(GetFolderThumb(*i));
       if (CFile::Exists(folderThumb))
@@ -2891,7 +2921,9 @@ std::string CFileItem::GetBaseMoviePath(bool bUseFolderNames) const
   if (IsOpticalMediaFile())
     return GetLocalMetadataPath();
 
-  if ((!m_bIsFolder || URIUtils::IsInArchive(m_strPath)) && bUseFolderNames)
+  if (bUseFolderNames &&
+     (!m_bIsFolder || URIUtils::IsInArchive(m_strPath) ||
+     (HasVideoInfoTag() && GetVideoInfoTag()->m_iDbId > 0 && !MediaTypes::IsContainer(GetVideoInfoTag()->m_type))))
   {
     std::string name2(strMovieName);
     URIUtils::GetParentPath(name2,strMovieName);
@@ -2964,7 +2996,7 @@ std::string CFileItem::GetLocalFanart() const
     items.Append(moreItems);
   }
 
-  vector<string> fanarts = StringUtils::Split(g_advancedSettings.m_fanartImages, "|");
+  std::vector<std::string> fanarts = StringUtils::Split(g_advancedSettings.m_fanartImages, "|");
 
   strFile = URIUtils::ReplaceExtension(strFile, "-fanart");
   fanarts.insert(m_bIsFolder ? fanarts.end() : fanarts.begin(), URIUtils::GetFileName(strFile));
@@ -2972,7 +3004,7 @@ std::string CFileItem::GetLocalFanart() const
   if (!strFile2.empty())
     fanarts.insert(m_bIsFolder ? fanarts.end() : fanarts.begin(), URIUtils::GetFileName(strFile2));
 
-  for (vector<string>::const_iterator i = fanarts.begin(); i != fanarts.end(); ++i)
+  for (std::vector<std::string>::const_iterator i = fanarts.begin(); i != fanarts.end(); ++i)
   {
     for (int j = 0; j < items.Size(); j++)
     {
@@ -3028,7 +3060,7 @@ bool CFileItem::LoadMusicTag()
   // load tag from file
   CLog::Log(LOGDEBUG, "%s: loading tag information for file: %s", __FUNCTION__, m_strPath.c_str());
   CMusicInfoTagLoaderFactory factory;
-  unique_ptr<IMusicInfoTagLoader> pLoader (factory.CreateLoader(*this));
+  std::unique_ptr<IMusicInfoTagLoader> pLoader (factory.CreateLoader(*this));
   if (pLoader.get() != NULL)
   {
     if (pLoader->Load(m_strPath, *GetMusicInfoTag()))
@@ -3194,9 +3226,9 @@ std::string CFileItem::FindTrailer() const
   // Precompile our REs
   VECCREGEXP matchRegExps;
   CRegExp tmpRegExp(true, CRegExp::autoUtf8);
-  const vector<string>& strMatchRegExps = g_advancedSettings.m_trailerMatchRegExps;
+  const std::vector<std::string>& strMatchRegExps = g_advancedSettings.m_trailerMatchRegExps;
 
-  vector<string>::const_iterator strRegExp = strMatchRegExps.begin();
+  std::vector<std::string>::const_iterator strRegExp = strMatchRegExps.begin();
   while (strRegExp != strMatchRegExps.end())
   {
     if (tmpRegExp.RegComp(*strRegExp))

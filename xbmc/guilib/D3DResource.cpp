@@ -351,8 +351,9 @@ void CD3DTexture::SaveTexture()
     if (SUCCEEDED(pContext->Map(texture, 0, D3D11_MAP_READ, 0, &res)))
     {
       m_pitch = res.RowPitch;
-      m_data = new unsigned char[res.RowPitch * m_height];
-      memcpy(m_data, res.pData, res.RowPitch * m_height);
+      unsigned int memUsage = GetMemoryUsage(res.RowPitch);
+      m_data = new unsigned char[memUsage];
+      memcpy(m_data, res.pData, memUsage);
       pContext->Unmap(texture, 0);
     }
     else
@@ -402,7 +403,15 @@ void CD3DTexture::OnResetDevice()
 
 unsigned int CD3DTexture::GetMemoryUsage(unsigned int pitch) const
 {
-  return pitch * m_height;
+  switch (m_format)
+  {
+  case DXGI_FORMAT_BC1_UNORM:
+  case DXGI_FORMAT_BC2_UNORM:
+  case DXGI_FORMAT_BC3_UNORM:
+    return pitch * m_height / 4;
+  default:
+    return pitch * m_height;
+  }
 }
 
 // static methods
@@ -524,7 +533,7 @@ bool CD3DEffect::SetTexture(LPCSTR handle, CD3DTexture &texture)
   {
     ID3DX11EffectShaderResourceVariable* var = m_effect->GetVariableByName(handle)->AsShaderResource();
     if (var->IsValid())
-      return (var->SetResource(texture.GetShaderResource()));
+      return SUCCEEDED(var->SetResource(texture.GetShaderResource()));
   }
   return false;
 }
@@ -812,7 +821,7 @@ void CD3DVertexShader::ReleaseShader()
   m_inited = false;
 }
 
-bool CD3DVertexShader::Create(const std::wstring vertexFile, D3D11_INPUT_ELEMENT_DESC* vertexLayout, unsigned int vertexLayoutSize)
+bool CD3DVertexShader::Create(const std::wstring& vertexFile, D3D11_INPUT_ELEMENT_DESC* vertexLayout, unsigned int vertexLayoutSize)
 {
   ReleaseShader();
 
@@ -966,7 +975,7 @@ void CD3DPixelShader::ReleaseShader()
   m_inited = false;
 }
 
-bool CD3DPixelShader::Create(const std::wstring wstrFile)
+bool CD3DPixelShader::Create(const std::wstring& wstrFile)
 {
   ReleaseShader();
 

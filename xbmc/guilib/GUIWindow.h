@@ -36,6 +36,7 @@ class CFileItem; typedef std::shared_ptr<CFileItem> CFileItemPtr;
 
 #include "GUICallback.h"  // for GUIEvent
 
+#include <limits.h>
 #include <map>
 #include <vector>
 
@@ -50,6 +51,15 @@ class CFileItem; typedef std::shared_ptr<CFileItem> CFileItemPtr;
  GUIEventHandler<c, CGUIMessage&> selectedHandler(this, &m); \
  m_mapSelectedEvents[i] = selectedHandler; \
 } \
+
+enum RenderOrder {
+  RENDER_ORDER_WINDOW = 0,
+  RENDER_ORDER_DIALOG = 1,
+  RENDER_ORDER_WINDOW_SCREENSAVER = INT_MAX,
+  RENDER_ORDER_WINDOW_POINTER = INT_MAX - 1,
+  RENDER_ORDER_WINDOW_DEBUG = INT_MAX - 2,
+  RENDER_ORDER_DIALOG_TELETEXT = INT_MAX - 3
+};
 
 // forward
 class TiXmlNode;
@@ -154,10 +164,6 @@ public:
                                                    // versions of UpdateVisibility, and are deemed visible if they're in
                                                    // the window manager's active list.
 
-  enum OVERLAY_STATE { OVERLAY_STATE_PARENT_WINDOW=0, OVERLAY_STATE_SHOWN, OVERLAY_STATE_HIDDEN };
-
-  OVERLAY_STATE GetOverlayState() const { return m_overlayState; };
-
   virtual bool IsAnimating(ANIMATION_TYPE animType);
   void DisableAnimations();
 
@@ -231,7 +237,6 @@ protected:
   void LoadControl(TiXmlElement* pControl, CGUIControlGroup *pGroup, const CRect &rect);
 
   std::vector<int> m_idRange;
-  OVERLAY_STATE m_overlayState;
   RESOLUTION_INFO m_coordsRes; // resolution that the window coordinates are in.
   bool m_needsScaling;
   bool m_windowLoaded;  // true if the window's xml file has been loaded
@@ -271,6 +276,9 @@ protected:
   bool m_manualRunActions;
 
   int m_exclusiveMouseControl; ///< \brief id of child control that wishes to receive all mouse events \sa GUI_MSG_EXCLUSIVE_MOUSE
+
+  int m_menuControlID;
+  int m_menuLastFocusedControlID;
 
 private:
   std::map<std::string, CVariant, icompare> m_mapProperties;

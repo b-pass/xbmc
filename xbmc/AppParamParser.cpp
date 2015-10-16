@@ -21,7 +21,7 @@
 #include "AppParamParser.h"
 #include "PlayListPlayer.h"
 #include "Application.h"
-#include "ApplicationMessenger.h"
+#include "messaging/ApplicationMessenger.h"
 #include "settings/AdvancedSettings.h"
 #include "utils/log.h"
 #include "utils/SystemInfo.h"
@@ -34,6 +34,8 @@
 #include "linux/XTimeUtils.h"
 #endif
 #include <stdlib.h>
+
+using namespace KODI::MESSAGING;
 
 CAppParamParser::CAppParamParser()
 {
@@ -55,13 +57,13 @@ void CAppParamParser::Parse(const char* argv[], int nArgs)
         {
           if ((argv[next][0] != '-') && (argv[next][0] == '/'))
           {
-            CInputManager::Get().SetRemoteControlName(argv[next]);
+            CInputManager::GetInstance().SetRemoteControlName(argv[next]);
             i++;
           }
         }
       }
       else if (strnicmp(argv[i], "-n", 2) == 0 || strnicmp(argv[i], "--nolirc", 8) == 0)
-        CInputManager::Get().DisableRemoteControl();
+        CInputManager::GetInstance().DisableRemoteControl();
 
       if (stricmp(argv[i], "-d") == 0)
       {
@@ -155,6 +157,5 @@ void CAppParamParser::PlayPlaylist()
     g_playlistPlayer.SetCurrentPlaylist(0);
   }
 
-  ThreadMessage tMsg = {TMSG_PLAYLISTPLAYER_PLAY, -1};
-  CApplicationMessenger::Get().SendMessage(tMsg, false);
+  CApplicationMessenger::GetInstance().PostMsg(TMSG_PLAYLISTPLAYER_PLAY, -1);
 }

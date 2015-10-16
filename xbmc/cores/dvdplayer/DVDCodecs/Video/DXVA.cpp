@@ -33,13 +33,11 @@
 #include "../DVDCodecUtils.h"
 #include "DXVA.h"
 #include "settings/AdvancedSettings.h"
-#include "utils/AutoPtrHandle.h"
 #include "utils/Log.h"
 #include "utils/StringUtils.h"
 #include "windowing/WindowingFactory.h"
 
 using namespace DXVA;
-using namespace AUTOPTR;
 
 static void RelBufferS(void *opaque, uint8_t *data)
 { ((CDecoder*)opaque)->RelBuffer(data); }
@@ -491,8 +489,9 @@ bool CDXVAContext::GetConfig(const D3D11_VIDEO_DECODER_DESC *format, D3D11_VIDEO
   return true;
 }
 
-bool CDXVAContext::CreateSurfaces(D3D11_VIDEO_DECODER_DESC format, unsigned int count, unsigned int alignment, ID3D11Texture2D **texture, ID3D11VideoDecoderOutputView **surfaces)
+bool CDXVAContext::CreateSurfaces(D3D11_VIDEO_DECODER_DESC format, unsigned int count, unsigned int alignment, ID3D11VideoDecoderOutputView **surfaces)
 {
+  HRESULT hr = S_OK;
   ID3D11Device* pDevice = g_Windowing.Get3D11Device();
 
   CD3D11_TEXTURE2D_DESC texDesc(format.OutputFormat, 
@@ -500,9 +499,10 @@ bool CDXVAContext::CreateSurfaces(D3D11_VIDEO_DECODER_DESC format, unsigned int 
                                 FFALIGN(format.SampleHeight, alignment), 
                                 count, 1, D3D11_BIND_DECODER);
 
-  if (FAILED(pDevice->CreateTexture2D(&texDesc, NULL, texture)))
+  ID3D11Texture2D *texture = nullptr;
+  if (FAILED(pDevice->CreateTexture2D(&texDesc, NULL, &texture)))
   {
-    CLog::Log(LOGNOTICE, "%s - failed creating decoder texture array", __FUNCTION__);
+    CLog::Log(LOGERROR, "%s - failed creating decoder texture array", __FUNCTION__);
     return false;
   }
 
@@ -511,17 +511,26 @@ bool CDXVAContext::CreateSurfaces(D3D11_VIDEO_DECODER_DESC format, unsigned int 
   vdovDesc.Texture2D.ArraySlice = 0;
   vdovDesc.ViewDimension = D3D11_VDOV_DIMENSION_TEXTURE2D;
 
-  for (unsigned i = 0; i < count; ++i)
+  size_t i;
+  for (i = 0; i < count; ++i)
   {
     vdovDesc.Texture2D.ArraySlice = D3D11CalcSubresource(0, i, texDesc.MipLevels);
-    if (FAILED(m_service->CreateVideoDecoderOutputView(*texture, &vdovDesc, &surfaces[i])))
+    hr = m_service->CreateVideoDecoderOutputView(texture, &vdovDesc, &surfaces[i]);
+    if (FAILED(hr))
     {
-      CLog::Log(LOGNOTICE, "%s - failed creating surfaces", __FUNCTION__);
-      return false;
+      CLog::Log(LOGERROR, "%s - failed creating surfaces", __FUNCTION__);
+      break;
     }
-
   }
-  return true;
+  SAFE_RELEASE(texture);
+
+  if (FAILED(hr))
+  {
+    for (size_t j = 0; j < i; ++j)
+      SAFE_RELEASE(surfaces[j]);
+  }
+
+  return SUCCEEDED(hr);
 }
 
 bool CDXVAContext::CreateDecoder(D3D11_VIDEO_DECODER_DESC *format, const D3D11_VIDEO_DECODER_CONFIG *config, CDXVADecoderWrapper **decoder)
@@ -755,7 +764,6 @@ CDecoder::CDecoder()
   m_context          = (dxva_context*)calloc(1, sizeof(dxva_context));
   m_context->cfg     = reinterpret_cast<DXVA2_ConfigPictureDecode*>(calloc(1, sizeof(DXVA2_ConfigPictureDecode)));
   m_context->surface = reinterpret_cast<IDirect3DSurface9**>(calloc(32, sizeof(IDirect3DSurface9*)));
-  m_viewResource = nullptr;
   m_surface_alignment = 16;
   g_Windowing.Register(this);
 }
@@ -794,7 +802,6 @@ void CDecoder::Close()
     m_dxva_context->Release(this);
   }
   m_dxva_context = nullptr;
-  SAFE_RELEASE(m_viewResource);
 }
 
 static bool CheckH264L41(AVCodecContext *avctx)
@@ -904,6 +911,13 @@ bool CDecoder::Open(AVCodecContext *avctx, AVCodecContext* mainctx, enum PixelFo
   }
 
   CLog::Log(LOGDEBUG, "DXVA - Selected input/output format: %d", m_format.OutputFormat);
+  CLog::Log(LOGDEBUG, "DXVA - source requires %d references", avctx->refs);
+  if (m_format.Guid == DXVADDI_Intel_ModeH264_E && avctx->refs > 11)
+  {
+    const dxva2_mode_t *mode = dxva2_find_mode(&m_format.Guid);
+    CLog::Log(LOGWARNING, "DXVA - too many references %d for selected decoder '%s'.", avctx->refs, mode->name);
+    return false;
+  }
 
   m_format.SampleWidth = avctx->coded_width;
   m_format.SampleHeight = avctx->coded_height;
@@ -924,8 +938,6 @@ bool CDecoder::Open(AVCodecContext *avctx, AVCodecContext* mainctx, enum PixelFo
     else
       m_refs = 2;
   }
-  CLog::Log(LOGDEBUG, "DXVA - source requires %d references", avctx->refs);
-
   /* decoding MPEG-2 requires additional alignment on some Intel GPUs,
      but it causes issues for H.264 on certain AMD GPUs..... */
   if (avctx->codec_id == AV_CODEC_ID_MPEG2VIDEO)
@@ -957,7 +969,7 @@ bool CDecoder::Open(AVCodecContext *avctx, AVCodecContext* mainctx, enum PixelFo
 
   m_avctx = mainctx;
   DXGI_ADAPTER_DESC AIdentifier = g_Windowing.GetAIdentifier();
-  if (AIdentifier.VendorId == PCIV_Intel && m_input == DXVADDI_Intel_ModeH264_E)
+  if (AIdentifier.VendorId == PCIV_Intel && m_format.Guid == DXVADDI_Intel_ModeH264_E)
   {
 #ifdef FF_DXVA2_WORKAROUND_INTEL_CLEARVIDEO
     m_context->workaround |= FF_DXVA2_WORKAROUND_INTEL_CLEARVIDEO;
@@ -1107,7 +1119,7 @@ bool CDecoder::OpenDecoder()
   CLog::Log(LOGDEBUG, "DXVA - allocating %d surfaces with format %d", m_context->surface_count, m_format.OutputFormat);
 
   if (!m_dxva_context->CreateSurfaces(m_format, m_context->surface_count, m_surface_alignment, 
-                                      &m_viewResource, reinterpret_cast<ID3D11VideoDecoderOutputView**>(m_context->surface)))
+                                      reinterpret_cast<ID3D11VideoDecoderOutputView**>(m_context->surface)))
     return false;
 
   for(unsigned i = 0; i < m_context->surface_count; i++)

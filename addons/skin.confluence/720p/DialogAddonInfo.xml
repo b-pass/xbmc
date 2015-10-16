@@ -2,7 +2,6 @@
 <window>
 	<defaultcontrol always="true">9000</defaultcontrol>
 	<coordinates>
-		<system>1</system>
 		<left>185</left>
 		<top>40</top>
 		<origin x="185" y="10">!IsEmpty(ListItem.Property(Addon.broken))</origin>
@@ -319,14 +318,6 @@
 					<width>220</width>
 					<height>43</height>
 					<label>24021</label>
-					<align>center</align>
-					<font>font12_title</font>
-				</control>
-				<control type="button" id="11">
-					<description>Rollback button</description>
-					<width>220</width>
-					<height>43</height>
-					<label>24048</label>
 					<align>center</align>
 					<font>font12_title</font>
 				</control>

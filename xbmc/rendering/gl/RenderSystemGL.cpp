@@ -302,7 +302,7 @@ bool CRenderSystemGL::IsExtSupported(const char* extension)
   name += extension;
   name += " ";
 
-  return m_RenderExtensions.find(name) != std::string::npos;;
+  return m_RenderExtensions.find(name) != std::string::npos;
 }
 
 bool CRenderSystemGL::PresentRender(const CDirtyRegionList& dirty)
@@ -437,7 +437,7 @@ void CRenderSystemGL::ApplyStateBlock()
   glEnable(GL_SCISSOR_TEST);
 }
 
-void CRenderSystemGL::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight)
+void CRenderSystemGL::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor)
 {
   if (!m_bRenderCreated)
     return;
@@ -451,7 +451,7 @@ void CRenderSystemGL::SetCameraPosition(const CPoint &camera, int screenWidth, i
   float h = (float)m_viewPort[3]*0.5f;
 
   glMatrixModview->LoadIdentity();
-  glMatrixModview->Translatef(-(w + offset.x), +(h + offset.y), 0);
+  glMatrixModview->Translatef(-(w + offset.x - stereoFactor), +(h + offset.y), 0);
   glMatrixModview->LookAt(0.0, 0.0, -2.0*h, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0);
   glMatrixModview.Load();
 

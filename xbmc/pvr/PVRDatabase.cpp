@@ -19,16 +19,18 @@
  */
 
 #include "PVRDatabase.h"
+
+#include <utility>
+
 #include "dbwrappers/dataset.h"
+#include "pvr/addons/PVRClient.h"
+#include "pvr/channels/PVRChannelGroupInternal.h"
+#include "pvr/channels/PVRChannelGroupsContainer.h"
+#include "pvr/PVRManager.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
-
-#include "PVRManager.h"
-#include "channels/PVRChannelGroupsContainer.h"
-#include "channels/PVRChannelGroupInternal.h"
-#include "addons/PVRClient.h"
 
 using namespace dbiplus;
 using namespace PVR;
@@ -139,7 +141,7 @@ void CPVRDatabase::UpdateTables(int iVersion)
   {
     VECADDONS addons;
     CAddonDatabase database;
-    if (database.Open() && CAddonMgr::Get().GetAddons(ADDON_PVRDLL, addons, true))
+    if (database.Open() && CAddonMgr::GetInstance().GetAddons(ADDON_PVRDLL, addons, true))
     {
       /** find all old client IDs */
       std::string strQuery(PrepareSQL("SELECT idClient, sUid FROM clients"));
@@ -233,7 +235,7 @@ int CPVRDatabase::Get(CPVRChannelGroupInternal &results)
   {
     try
     {
-      bool bIgnoreEpgDB = CSettings::Get().GetBool("epg.ignoredbforclient");
+      bool bIgnoreEpgDB = CSettings::GetInstance().GetBool(CSettings::SETTING_EPG_IGNOREDBFORCLIENT);
       while (!m_pDS->eof())
       {
         CPVRChannelPtr channel = CPVRChannelPtr(new CPVRChannel());

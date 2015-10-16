@@ -22,11 +22,13 @@
 \brief
 */
 #pragma once
-#include "dbwrappers/Database.h"
-#include "Album.h"
+#include <utility>
+
 #include "addons/Scraper.h"
-#include "utils/SortUtils.h"
+#include "Album.h"
+#include "dbwrappers/Database.h"
 #include "MusicDbUrl.h"
+#include "utils/SortUtils.h"
 
 class CArtist;
 class CFileItem;
@@ -572,6 +574,8 @@ private:
     album_bCompilation,
     album_iTimesPlayed,
     album_strReleaseType,
+    album_dtDateAdded,
+    album_dtLastPlayed,
     album_enumCount // end of the enum, do not add past here
   } AlbumFields;
 
@@ -605,6 +609,7 @@ private:
     artist_strYearsActive,
     artist_strImage,
     artist_strFanart,
+    artist_dtDateAdded,
     artist_enumCount // end of the enum, do not add past here
   } ArtistFields;
 

@@ -100,11 +100,13 @@ using namespace MUSIC_INFO;
  *  %Y - Year
  *  %Z - tvshow title
  *  %a - Date Added
+ *  %d - Date and Time
  *  %p - Last Played
+ *  %r - User Rating
  *  *t - Date Taken (suitable for Pictures)
  */
 
-#define MASK_CHARS "NSATBGYFLDIJRCKMEPHZOQUVXWapt"
+#define MASK_CHARS "NSATBGYFLDIJRCKMEPHZOQUVXWadprt"
 
 CLabelFormatter::CLabelFormatter(const std::string &mask, const std::string &mask2)
 {
@@ -112,7 +114,7 @@ CLabelFormatter::CLabelFormatter(const std::string &mask, const std::string &mas
   AssembleMask(0, mask);
   AssembleMask(1, mask2);
   // save a bool for faster lookups
-  m_hideFileExtensions = !CSettings::Get().GetBool("filelists.showextensions");
+  m_hideFileExtensions = !CSettings::GetInstance().GetBool(CSettings::SETTING_FILELISTS_SHOWEXTENSIONS);
 }
 
 std::string CLabelFormatter::GetContent(unsigned int label, const CFileItem *item) const
@@ -171,8 +173,8 @@ std::string CLabelFormatter::GetMaskContent(const CMaskString &mask, const CFile
       value = StringUtils::Format("%02.2i", music->GetDiscNumber());
     break;
   case 'A':
-    if (music && music->GetArtist().size())
-      value = StringUtils::Join(music->GetArtist(), g_advancedSettings.m_musicItemSeparator);
+    if (music && music->GetArtistString().size())
+      value = music->GetArtistString(); 
     if (movie && movie->m_artist.size())
       value = StringUtils::Join(movie->m_artist, g_advancedSettings.m_videoItemSeparator);
     break;
@@ -321,9 +323,19 @@ std::string CLabelFormatter::GetMaskContent(const CMaskString &mask, const CFile
     if (music && music->GetDateAdded().IsValid())
       value = music->GetDateAdded().GetAsLocalizedDate();
     break;
+  case 'd': // date and time
+    if (item->m_dateTime.IsValid())
+      value = item->m_dateTime.GetAsLocalizedDateTime();
+    break;
   case 'p': // Last played
     if (movie && movie->m_lastPlayed.IsValid())
       value = movie->m_lastPlayed.GetAsLocalizedDate();
+    if (music && music->GetLastPlayed().IsValid())
+      value = music->GetLastPlayed().GetAsLocalizedDate();
+    break;
+  case 'r': // userrating
+    if (movie && movie->m_iUserRating != 0)
+      value = StringUtils::Format("%i", movie->m_iUserRating);
     break;
   case 't': // Date Taken
     if (pic && pic->GetDateTimeTaken().IsValid())

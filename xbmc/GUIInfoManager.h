@@ -28,6 +28,7 @@
 
 #include "threads/CriticalSection.h"
 #include "guilib/IMsgTargetCallback.h"
+#include "messaging/IMessageTarget.h"
 #include "inttypes.h"
 #include "XBDateTime.h"
 #include "utils/Observer.h"
@@ -42,6 +43,11 @@
 namespace MUSIC_INFO
 {
   class CMusicInfoTag;
+}
+namespace PVR
+{
+  class CPVRRadioRDSInfoTag;
+  typedef std::shared_ptr<PVR::CPVRRadioRDSInfoTag> CPVRRadioRDSInfoTagPtr;
 }
 class CVideoInfoTag;
 class CFileItem;
@@ -93,14 +99,18 @@ private:
  \ingroup strings
  \brief
  */
-class CGUIInfoManager : public IMsgTargetCallback, public Observable
+class CGUIInfoManager : public IMsgTargetCallback, public Observable,
+                        public KODI::MESSAGING::IMessageTarget
 {
 public:
   CGUIInfoManager(void);
   virtual ~CGUIInfoManager(void);
 
   void Clear();
-  virtual bool OnMessage(CGUIMessage &message);
+  virtual bool OnMessage(CGUIMessage &message) override;
+
+  virtual int GetMessageMask() override;
+  virtual void OnApplicationMessage(KODI::MESSAGING::ThreadMessage* pMsg) override;
 
   /*! \brief Register a boolean condition/expression
    This routine allows controls or other clients of the info manager to register
@@ -155,8 +165,10 @@ public:
   void SetCurrentVideoTag(const CVideoInfoTag &tag);
 
   const MUSIC_INFO::CMusicInfoTag *GetCurrentSongTag() const;
+  const PVR::CPVRRadioRDSInfoTagPtr GetCurrentRadioRDSInfoTag() const;
   const CVideoInfoTag* GetCurrentMovieTag() const;
 
+  std::string GetRadioRDSLabel(int item);
   std::string GetMusicLabel(int item);
   std::string GetMusicTagLabel(int info, const CFileItem *item);
   std::string GetVideoLabel(int item);
@@ -178,8 +190,11 @@ public:
   void SetShowTime(bool showtime) { m_playerShowTime = showtime; };
   void SetShowCodec(bool showcodec) { m_playerShowCodec = showcodec; };
   void SetShowInfo(bool showinfo) { m_playerShowInfo = showinfo; };
+  bool GetShowInfo() const { return m_playerShowInfo; }
   void ToggleShowCodec() { m_playerShowCodec = !m_playerShowCodec; };
   bool ToggleShowInfo() { m_playerShowInfo = !m_playerShowInfo; return m_playerShowInfo; };
+  bool IsPlayerOSDActive() const;
+  bool IsPlayerChannelPreviewActive() const;
 
   std::string GetSystemHeatInfo(int info);
   CTemperature GetGPUTemperature();

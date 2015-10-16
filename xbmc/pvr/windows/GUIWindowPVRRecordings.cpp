@@ -18,24 +18,26 @@
  *
  */
 
-#include "GUIWindowPVRRecordings.h"
-
 #include "ContextMenuManager.h"
-#include "guilib/GUIKeyboardFactory.h"
+#include "GUIInfoManager.h"
+#include "cores/AudioEngine/DSPAddons/ActiveAEDSP.h"
 #include "dialogs/GUIDialogYesNo.h"
+#include "guilib/LocalizeStrings.h"
+#include "guilib/GUIKeyboardFactory.h"
 #include "guilib/GUIRadioButtonControl.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
-#include "guilib/LocalizeStrings.h"
-#include "GUIInfoManager.h"
-#include "pvr/PVRManager.h"
-#include "pvr/recordings/PVRRecordings.h"
-#include "pvr/timers/PVRTimers.h"
+#include "threads/SingleLock.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
-#include "threads/SingleLock.h"
-#include "pvr/addons/PVRClients.h"
 #include "video/windows/GUIWindowVideoNav.h"
+
+#include "pvr/PVRManager.h"
+#include "pvr/addons/PVRClients.h"
+#include "pvr/recordings/PVRRecordings.h"
+#include "pvr/timers/PVRTimers.h"
+
+#include "GUIWindowPVRRecordings.h"
 
 using namespace PVR;
 
@@ -116,6 +118,9 @@ void CGUIWindowPVRRecordings::GetContextButtons(int itemNumber, CContextButtons 
 
   bool isDeletedRecording = false;
 
+  if (ActiveAE::CActiveAEDSP::GetInstance().IsProcessing())
+    buttons.Add(CONTEXT_BUTTON_ACTIVE_ADSP_SETTINGS, 15047);  /* if something is played and dsp is active, allow settings selection */
+
   if (pItem->HasPVRRecordingInfoTag())
   {
     isDeletedRecording = pItem->GetPVRRecordingInfoTag()->IsDeleted();
@@ -171,7 +176,7 @@ void CGUIWindowPVRRecordings::GetContextButtons(int itemNumber, CContextButtons 
   if (!isDeletedRecording)
     CGUIWindowPVRBase::GetContextButtons(itemNumber, buttons);
 
-  CContextMenuManager::Get().AddVisibleItems(pItem, buttons);
+  CContextMenuManager::GetInstance().AddVisibleItems(pItem, buttons);
 }
 
 bool CGUIWindowPVRRecordings::OnAction(const CAction &action)
@@ -201,6 +206,7 @@ bool CGUIWindowPVRRecordings::OnContextButton(int itemNumber, CONTEXT_BUTTON but
       OnContextButtonDeleteAll(pItem.get(), button) ||
       OnContextButtonInfo(pItem.get(), button) ||
       OnContextButtonMarkWatched(pItem, button) ||
+      OnContextButtonActiveAEDSPSettings(pItem.get(), button) ||
       CGUIWindowPVRBase::OnContextButton(itemNumber, button);
 }
 
@@ -236,6 +242,9 @@ void CGUIWindowPVRRecordings::UpdateButtons(void)
 
 bool CGUIWindowPVRRecordings::OnMessage(CGUIMessage &message)
 {
+  if (!IsValidMessage(message))
+    return false;
+  
   bool bReturn = false;
   switch (message.GetMessage())
   {
@@ -294,6 +303,9 @@ bool CGUIWindowPVRRecordings::OnMessage(CGUIMessage &message)
       switch(message.GetParam1())
       {
         case ObservableMessageTimers:
+        case ObservableMessageEpg:
+        case ObservableMessageEpgContainer:
+        case ObservableMessageEpgActiveItem:
         case ObservableMessageCurrentItem:
         {
           if (IsActive())

@@ -18,36 +18,40 @@
  *
  */
 
-#include <limits.h>
-
-#include "system.h"
 #include "AdvancedSettings.h"
+
+#include <climits>
+#include <algorithm>
+#include <string>
+#include <vector>
+
+#include "addons/AddonManager.h"
+#include "addons/AudioDecoder.h"
+#include "addons/IAddon.h"
 #include "Application.h"
-#include "network/DNSNameCache.h"
 #include "filesystem/File.h"
-#include "utils/LangCodeExpander.h"
+#include "filesystem/SpecialProtocol.h"
 #include "LangInfo.h"
+#include "network/DNSNameCache.h"
 #include "profiles/ProfilesManager.h"
 #include "settings/lib/Setting.h"
 #include "settings/Settings.h"
 #include "settings/SettingUtils.h"
+#include "system.h"
+#include "utils/LangCodeExpander.h"
+#include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/SystemInfo.h"
 #include "utils/URIUtils.h"
-#include "utils/XMLUtils.h"
-#include "utils/log.h"
 #include "utils/Variant.h"
-#include "filesystem/SpecialProtocol.h"
-#include "addons/IAddon.h"
-#include "addons/AddonManager.h"
-#include "addons/AudioDecoder.h"
+#include "utils/XMLUtils.h"
+
 #if defined(TARGET_DARWIN_IOS)
 #include "osx/DarwinUtils.h"
 #endif
 
 using namespace ADDON;
 using namespace XFILE;
-using namespace std;
 
 CAdvancedSettings::CAdvancedSettings()
 {
@@ -66,7 +70,7 @@ void CAdvancedSettings::OnSettingsLoaded()
   CLog::Log(LOGNOTICE, "Default Audio Player: %s", m_audioDefaultPlayer.c_str());
 
   // setup any logging...
-  if (CSettings::Get().GetBool("debug.showloginfo"))
+  if (CSettings::GetInstance().GetBool(CSettings::SETTING_DEBUG_SHOWLOGINFO))
   {
     m_logLevel = std::max(m_logLevelHint, LOG_LEVEL_DEBUG_FREEMEM);
     CLog::Log(LOGNOTICE, "Enabled debug logging due to GUI setting (%d)", m_logLevel);
@@ -78,8 +82,8 @@ void CAdvancedSettings::OnSettingsLoaded()
   }
   CLog::SetLogLevel(m_logLevel);
 
-  m_extraLogEnabled = CSettings::Get().GetBool("debug.extralogging");
-  setExtraLogLevel(CSettings::Get().GetList("debug.setextraloglevel"));
+  m_extraLogEnabled = CSettings::GetInstance().GetBool(CSettings::SETTING_DEBUG_EXTRALOGGING);
+  setExtraLogLevel(CSettings::GetInstance().GetList(CSettings::SETTING_DEBUG_SETEXTRALOGLEVEL));
 }
 
 void CAdvancedSettings::OnSettingsUnloaded()
@@ -93,11 +97,11 @@ void CAdvancedSettings::OnSettingChanged(const CSetting *setting)
     return;
 
   const std::string &settingId = setting->GetId();
-  if (settingId == "debug.showloginfo")
+  if (settingId == CSettings::SETTING_DEBUG_SHOWLOGINFO)
     SetDebugMode(((CSettingBool*)setting)->GetValue());
-  else if (settingId == "debug.extralogging")
+  else if (settingId == CSettings::SETTING_DEBUG_EXTRALOGGING)
     m_extraLogEnabled = static_cast<const CSettingBool*>(setting)->GetValue();
-  else if (settingId == "debug.setextraloglevel")
+  else if (settingId == CSettings::SETTING_DEBUG_SETEXTRALOGLEVEL)
     setExtraLogLevel(CSettingUtils::GetList(static_cast<const CSettingList*>(setting)));
 }
 
@@ -204,7 +208,7 @@ void CAdvancedSettings::Initialize()
   m_fullScreenOnMovieStart = true;
   m_cachePath = "special://temp/";
 
-  m_videoCleanDateTimeRegExp = "(.*[^ _\\,\\.\\(\\)\\[\\]\\-])[ _\\.\\(\\)\\[\\]\\-]+(19[0-9][0-9]|20[0-1][0-9])([ _\\,\\.\\(\\)\\[\\]\\-]|[^0-9]$)";
+  m_videoCleanDateTimeRegExp = "(.*[^ _\\,\\.\\(\\)\\[\\]\\-])[ _\\.\\(\\)\\[\\]\\-]+(19[0-9][0-9]|20[0-9][0-9])([ _\\,\\.\\(\\)\\[\\]\\-]|[^0-9]$)?";
 
   m_videoCleanStringRegExps.clear();
   m_videoCleanStringRegExps.push_back("[ _\\,\\.\\(\\)\\[\\]\\-](ac3|dts|custom|dc|remastered|divx|divx5|dsr|dsrip|dutch|dvd|dvd5|dvd9|dvdrip|dvdscr|dvdscreener|screener|dvdivx|cam|fragment|fs|hdtv|hdrip|hdtvrip|internal|limited|multisubs|ntsc|ogg|ogm|pal|pdtv|proper|repack|rerip|retail|r3|r5|bd5|se|svcd|swedish|german|read.nfo|nfofix|unrated|extended|ws|telesync|ts|telecine|tc|brrip|bdrip|480p|480i|576p|576i|720p|720i|1080p|1080i|3d|hrhd|hrhdtv|hddvd|bluray|x264|h264|xvid|xvidvd|xxx|www.www|cd[1-9]|\\[.*\\])([ _\\,\\.\\(\\)\\[\\]\\-]|$)");
@@ -268,11 +272,9 @@ void CAdvancedSettings::Initialize()
   m_fanartImages = "fanart.jpg|fanart.png";
 
   m_bMusicLibraryAllItemsOnBottom = false;
-  m_bMusicLibraryAlbumsSortByArtistThenYear = false;
   m_bMusicLibraryCleanOnUpdate = false;
   m_iMusicLibraryRecentlyAddedItems = 25;
   m_strMusicLibraryAlbumFormat = "";
-  m_strMusicLibraryAlbumFormatRight = "";
   m_prioritiseAPEv2tags = false;
   m_musicItemSeparator = " / ";
   m_videoItemSeparator = " / ";
@@ -399,7 +401,7 @@ void CAdvancedSettings::Initialize()
     std::string logDir = getenv("HOME");
     #if defined(TARGET_DARWIN_OSX)
     logDir += "/Library/Logs/";
-    #else // ios/atv2
+    #else // ios
     logDir += "/" + std::string(CDarwinUtils::GetAppRootFolder()) + "/";
     #endif
     m_logFolder = logDir;
@@ -421,7 +423,7 @@ bool CAdvancedSettings::Load()
   ParseSettingsFile("special://xbmc/system/advancedsettings.xml");
   for (unsigned int i = 0; i < m_settingsFiles.size(); i++)
     ParseSettingsFile(m_settingsFiles[i]);
-  ParseSettingsFile(CProfilesManager::Get().GetUserDataItem("advancedsettings.xml"));
+  ParseSettingsFile(CProfilesManager::GetInstance().GetUserDataItem("advancedsettings.xml"));
 
   // Add the list of disc stub extensions (if any) to the list of video extensions
   if (!m_discStubExtensions.empty())
@@ -736,10 +738,8 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     XMLUtils::GetInt(pElement, "recentlyaddeditems", m_iMusicLibraryRecentlyAddedItems, 1, INT_MAX);
     XMLUtils::GetBoolean(pElement, "prioritiseapetags", m_prioritiseAPEv2tags);
     XMLUtils::GetBoolean(pElement, "allitemsonbottom", m_bMusicLibraryAllItemsOnBottom);
-    XMLUtils::GetBoolean(pElement, "albumssortbyartistthenyear", m_bMusicLibraryAlbumsSortByArtistThenYear);
     XMLUtils::GetBoolean(pElement, "cleanonupdate", m_bMusicLibraryCleanOnUpdate);
     XMLUtils::GetString(pElement, "albumformat", m_strMusicLibraryAlbumFormat);
-    XMLUtils::GetString(pElement, "albumformatright", m_strMusicLibraryAlbumFormatRight);
     XMLUtils::GetString(pElement, "itemseparator", m_musicItemSeparator);
     XMLUtils::GetInt(pElement, "dateadded", m_iMusicLibraryDateAdded);
   }
@@ -824,7 +824,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     const char* hide = pElement->Attribute("hide");
     if (hide == NULL || strnicmp("false", hide, 4) != 0)
     {
-      CSetting *setting = CSettings::Get().GetSetting("debug.showloginfo");
+      CSetting *setting = CSettings::GetInstance().GetSetting(CSettings::SETTING_DEBUG_SHOWLOGINFO);
       if (setting != NULL)
         setting->SetVisible(false);
     }
@@ -977,7 +977,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
         CLog::Log(LOGDEBUG,"  Registering substition pair:");
         CLog::Log(LOGDEBUG,"    From: [%s]", strFrom.c_str());
         CLog::Log(LOGDEBUG,"    To:   [%s]", strTo.c_str());
-        m_pathSubstitutions.push_back(make_pair(strFrom,strTo));
+        m_pathSubstitutions.push_back(std::make_pair(strFrom,strTo));
       }
       else
       {
@@ -1115,6 +1115,22 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     XMLUtils::GetBoolean(pDatabase, "compression", m_databaseTV.compression);
   }
 
+  pDatabase = pRootElement->FirstChildElement("adspdatabase");
+  if (pDatabase)
+  {
+    XMLUtils::GetString(pDatabase, "type", m_databaseADSP.type);
+    XMLUtils::GetString(pDatabase, "host", m_databaseADSP.host);
+    XMLUtils::GetString(pDatabase, "port", m_databaseADSP.port);
+    XMLUtils::GetString(pDatabase, "user", m_databaseADSP.user);
+    XMLUtils::GetString(pDatabase, "pass", m_databaseADSP.pass);
+    XMLUtils::GetString(pDatabase, "name", m_databaseADSP.name);
+    XMLUtils::GetString(pDatabase, "key", m_databaseADSP.key);
+    XMLUtils::GetString(pDatabase, "cert", m_databaseADSP.cert);
+    XMLUtils::GetString(pDatabase, "ca", m_databaseADSP.ca);
+    XMLUtils::GetString(pDatabase, "capath", m_databaseADSP.capath);
+    XMLUtils::GetString(pDatabase, "ciphers", m_databaseADSP.ciphers);
+  }
+
   pDatabase = pRootElement->FirstChildElement("epgdatabase");
   if (pDatabase)
   {
@@ -1151,13 +1167,13 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
   if (!seekSteps.empty())
   {
     m_seekSteps.clear();
-    std::vector<string> steps = StringUtils::Split(seekSteps, ',');
-    for(std::vector<string>::iterator it = steps.begin(); it != steps.end(); ++it)
+    std::vector<std::string> steps = StringUtils::Split(seekSteps, ',');
+    for(std::vector<std::string>::iterator it = steps.begin(); it != steps.end(); ++it)
       m_seekSteps.push_back(atoi((*it).c_str()));
   }
 
   // load in the settings overrides
-  CSettings::Get().Load(pRootElement, true);  // true to hide the settings we read in
+  CSettings::GetInstance().Load(pRootElement, true);  // true to hide the settings we read in
 }
 
 void CAdvancedSettings::Clear()
@@ -1285,8 +1301,8 @@ void CAdvancedSettings::GetCustomExtensions(TiXmlElement *pRootElement, std::str
     extensions += "|" + extraExtensions;
   if (XMLUtils::GetString(pRootElement, "remove", extraExtensions) && !extraExtensions.empty())
   {
-    vector<string> exts = StringUtils::Split(extraExtensions, '|');
-    for (vector<string>::const_iterator i = exts.begin(); i != exts.end(); ++i)
+    std::vector<std::string> exts = StringUtils::Split(extraExtensions, '|');
+    for (std::vector<std::string>::const_iterator i = exts.begin(); i != exts.end(); ++i)
     {
       size_t iPos = extensions.find(*i);
       if (iPos != std::string::npos)
@@ -1383,7 +1399,7 @@ std::string CAdvancedSettings::GetMusicExtensions() const
   std::string result(m_musicExtensions);
 
   VECADDONS codecs;
-  CAddonMgr::Get().GetAddons(ADDON_AUDIODECODER, codecs);
+  CAddonMgr::GetInstance().GetAddons(ADDON_AUDIODECODER, codecs);
   for (size_t i=0;i<codecs.size();++i)
   {
     std::shared_ptr<CAudioDecoder> dec(std::static_pointer_cast<CAudioDecoder>(codecs[i]));
