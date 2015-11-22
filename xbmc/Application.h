@@ -24,6 +24,7 @@
 #include "XBApplicationEx.h"
 
 #include "guilib/IMsgTargetCallback.h"
+#include "guilib/Resolution.h"
 #include "utils/GlobalsHandling.h"
 #include "messaging/IMessageTarget.h"
 
@@ -72,7 +73,6 @@ namespace MEDIA_DETECT
 #include "interfaces/IActionListener.h"
 
 class CSeekHandler;
-class CKaraokeLyricsManager;
 class CInertialScrollingHandler;
 class DPMSSupport;
 class CSplash;
@@ -144,7 +144,7 @@ public:
   virtual bool Cleanup() override;
 
   bool CreateGUI();
-  bool InitWindow();
+  bool InitWindow(RESOLUTION res = RES_INVALID);
   bool DestroyWindow();
   void StartServices();
   void StopServices();
@@ -283,7 +283,7 @@ public:
   void UpdateLibraries();
   void CheckMusicPlaylist();
 
-  bool ExecuteXBMCAction(std::string action);
+  bool ExecuteXBMCAction(std::string action, const CGUIListItemPtr &item = NULL);
 
   static bool OnEvent(XBMC_Event& newEvent);
 
@@ -317,8 +317,6 @@ public:
   } PlayState;
   PlayState m_ePlayState;
   CCriticalSection m_playStateMutex;
-
-  CKaraokeLyricsManager* m_pKaraokeMgr;
 
   PLAYERCOREID m_eForcedNextPlayer;
   std::string m_strPlayListFile;

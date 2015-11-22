@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([kodi], [15.9.703], [http://trac.kodi.tv])
+AC_INIT([kodi], [15.9.801], [http://trac.kodi.tv])
 AC_CONFIG_HEADERS([xbmc/config.h])
 AH_TOP([#pragma once])
 m4_include([m4/ax_prog_cc_for_build.m4])
@@ -1125,7 +1125,7 @@ int main() {
   )])
 AC_LANG_POP([C++])
 
-if test "${target_platform}" = "target_linux" || test "${target_platform}" = "target_raspberry_pi"; then
+if test "${target_platform}" = "target_linux" || test "${target_platform}" = "target_raspberry_pi" || test "${target_platform}" = "target_android"; then
   PKG_CHECK_MODULES([UUID], [uuid],, AC_MSG_ERROR(libuuid not found))
 fi
 
@@ -1141,9 +1141,6 @@ AC_LINK_IFELSE(
   [AC_MSG_ERROR(crossguid not found)])
 LIBS="$SAVED_LIBS"
 AC_LANG_POP([C++])
-if test "${target_platform}" = "target_android"; then
-  CXXFLAGS="$CXXFLAGS -DGUID_ANDROID"
-fi
 
 PKG_CHECK_MODULES([YAJL], [yajl >= 2],
   [INCLUDES="$INCLUDES $YAJL_CFLAGS"; LIBS="$LIBS $YAJL_LIBS"; YAJL_FOUND="true"],
@@ -2375,7 +2372,6 @@ OUTPUT_FILES="Makefile \
     xbmc/cores/playercorefactory/Makefile \
     xbmc/messaging/Makefile \
     xbmc/messaging/helpers/Makefile \
-    xbmc/music/karaoke/Makefile \
     xbmc/osx/Makefile \
     xbmc/guilib/Makefile \
     xbmc/input/linux/Makefile \
@@ -2429,6 +2425,8 @@ OUTPUT_FILES="Makefile \
     tools/android/packaging/xbmc/src/org/xbmc/kodi/XBMCOnFrameAvailableListener.java \
     tools/android/packaging/xbmc/src/org/xbmc/kodi/XBMCSettingsContentObserver.java \
     tools/android/packaging/xbmc/src/org/xbmc/kodi/XBMCOnAudioFocusChangeListener.java \
+    tools/android/packaging/xbmc/src/org/xbmc/kodi/XBMCVideoView.java \
+    tools/android/packaging/xbmc/activity_main.xml \
     tools/android/packaging/xbmc/strings.xml \
     addons/xbmc.addon/addon.xml"
 

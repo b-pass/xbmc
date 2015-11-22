@@ -274,7 +274,7 @@ const std::string &CMusicInfoTag::GetCueSheet() const
   return m_cuesheet;
 }
 
-char CMusicInfoTag::GetRating() const
+char CMusicInfoTag::GetUserrating() const
 {
   return m_rating;
 }
@@ -463,7 +463,7 @@ void CMusicInfoTag::SetLyrics(const std::string& lyrics)
   m_strLyrics = lyrics;
 }
 
-void CMusicInfoTag::SetRating(char rating)
+void CMusicInfoTag::SetUserrating(char rating)
 {
   m_rating = rating;
 }
@@ -628,7 +628,7 @@ void CMusicInfoTag::SetAlbum(const CAlbum& album)
   SetMusicBrainzAlbumID(album.strMusicBrainzAlbumID);
   SetGenre(album.genre);
   SetMood(StringUtils::Join(album.moods, g_advancedSettings.m_musicItemSeparator));
-  SetRating('0' + album.iRating);
+  SetUserrating('0' + album.iRating);
   SetCompilation(album.bCompilation);
   SYSTEMTIME stTime;
   stTime.wYear = album.iYear;
@@ -667,7 +667,7 @@ void CMusicInfoTag::SetSong(const CSong& song)
   SetLastPlayed(song.lastPlayed);
   SetDateAdded(song.dateAdded);
   SetCoverArtInfo(song.embeddedArt.size, song.embeddedArt.mime);
-  SetRating(song.rating);
+  SetUserrating(song.rating);
   SetURL(song.strFileName);
   SYSTEMTIME stTime;
   stTime.wYear = song.iYear;
@@ -706,12 +706,12 @@ void CMusicInfoTag::Serialize(CVariant& value) const
   value["loaded"] = m_bLoaded;
   value["year"] = m_dwReleaseDate.wYear;
   value["musicbrainztrackid"] = m_strMusicBrainzTrackID;
-  value["musicbrainzartistid"] = StringUtils::Join(m_musicBrainzArtistID, " / ");
+  value["musicbrainzartistid"] = m_musicBrainzArtistID;
   value["musicbrainzalbumid"] = m_strMusicBrainzAlbumID;
-  value["musicbrainzalbumartistid"] = StringUtils::Join(m_musicBrainzAlbumArtistID, " / ");
+  value["musicbrainzalbumartistid"] = m_musicBrainzAlbumArtistID; 
   value["musicbrainztrmid"] = m_strMusicBrainzTRMID;
   value["comment"] = m_strComment;
-  value["mood"] = m_strMood;
+  value["mood"] = StringUtils::Split(m_strMood, g_advancedSettings.m_musicItemSeparator);
   value["rating"] = (int)(m_rating - '0');
   value["playcount"] = m_iTimesPlayed;
   value["lastplayed"] = m_lastPlayed.IsValid() ? m_lastPlayed.GetAsDBDateTime() : StringUtils::Empty;
@@ -738,9 +738,9 @@ void CMusicInfoTag::ToSortable(SortItem& sortable, Field field) const
       sortable[FieldTitle] = title;
     break;
   }
-  case FieldArtist:      sortable[FieldArtist] = m_artist; break;
+  case FieldArtist:      sortable[FieldArtist] = m_strArtistDesc; break;
   case FieldAlbum:       sortable[FieldAlbum] = m_strAlbum; break;
-  case FieldAlbumArtist: sortable[FieldAlbumArtist] = m_albumArtist; break;
+  case FieldAlbumArtist: sortable[FieldAlbumArtist] = m_strAlbumArtistDesc; break;
   case FieldGenre:       sortable[FieldGenre] = m_genre; break;
   case FieldTime:        sortable[FieldTime] = m_iDuration; break;
   case FieldTrackNumber: sortable[FieldTrackNumber] = m_iTrack; break;

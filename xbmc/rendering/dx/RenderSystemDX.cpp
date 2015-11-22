@@ -158,7 +158,7 @@ void CRenderSystemDX::SetMonitor(HMONITOR monitor)
         {
           pAdapter->GetDesc(&m_adapterDesc);
 
-          CLog::Log(LOGDEBUG, __FUNCTION__" - Selected %S adapter. ", m_adapterDesc.Description, outputDesc.DeviceName);
+          CLog::Log(LOGDEBUG, __FUNCTION__" - Selected %S adapter. ", m_adapterDesc.Description);
 
           SAFE_RELEASE(m_adapter);
           m_adapter = pAdapter;
@@ -490,14 +490,16 @@ void CRenderSystemDX::OnDeviceReset()
 
   if (m_needNewDevice)
     CreateDevice();
-  else
-  { // we're back
+  
+  if (m_bRenderCreated)
+  {
+    // we're back
     for (std::vector<ID3DResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
       (*i)->OnResetDevice();
-  }
 
-  g_renderManager.Flush();
-  g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_RESET);
+    g_renderManager.Flush();
+    g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_RESET);
+  }
 }
 
 bool CRenderSystemDX::CreateDevice()
@@ -1248,9 +1250,7 @@ bool CRenderSystemDX::ClearBuffers(color_t color)
     if (m_stereoView == RENDER_STEREO_VIEW_RIGHT)
     {
       // execute command's queue
-      if ( m_stereoMode != RENDER_STEREO_MODE_SPLIT_HORIZONTAL
-        && m_stereoMode != RENDER_STEREO_MODE_SPLIT_VERTICAL)
-        FinishCommandList();
+      FinishCommandList();
 
       // do not clear RT for anaglyph modes
       if ( m_stereoMode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA

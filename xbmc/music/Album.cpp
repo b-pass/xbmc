@@ -204,6 +204,15 @@ const std::string CAlbum::GetAlbumArtistString() const
   return artistString;
 }
 
+const std::vector<int> CAlbum::GetArtistIDArray() const
+{
+  // Get album artist IDs for json rpc
+  std::vector<int> artistids;
+  for (VECARTISTCREDITS::const_iterator artistCredit = artistCredits.begin(); artistCredit != artistCredits.end(); ++artistCredit)
+    artistids.push_back(artistCredit->GetArtistId());
+  return artistids;
+}
+
 std::string CAlbum::GetReleaseType() const
 {
   return ReleaseTypeToString(releaseType);

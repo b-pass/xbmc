@@ -88,6 +88,11 @@ public:
   */
   const std::string GetArtistString() const;
 
+  /*! \brief Get song artist IDs (for json rpc) from the vector of artistcredits objects
+  \return album artist IDs as a vector of integers
+  */
+  const std::vector<int> GetArtistIDArray() const;
+
   /*! \brief Get album artist names associated with song from tag data
    Note for initial album processing only, normalised album artist data belongs to album 
    and is stored in album artist credits
@@ -143,10 +148,6 @@ public:
   int iEndOffset;
   bool bCompilation;
 
-  // Karaoke-specific information
-  long       iKaraokeNumber;        //! Karaoke song number to "select by number". 0 for non-karaoke
-  std::string strKaraokeLyrEncoding; //! Karaoke song lyrics encoding if known. Empty if unknown.
-  int        iKaraokeDelay;         //! Karaoke song lyrics-music delay in 1/10 seconds.
   ReplayGain replayGain;
 
 private:

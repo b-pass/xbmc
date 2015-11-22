@@ -57,7 +57,6 @@
 #include "utils/RegExp.h"
 #include "utils/log.h"
 #include "utils/Variant.h"
-#include "music/karaoke/karaokelyricsfactory.h"
 #include "utils/Mime.h"
 
 #include <assert.h>
@@ -403,6 +402,7 @@ const CFileItem& CFileItem::operator=(const CFileItem& item)
   m_extrainfo = item.m_extrainfo;
   m_specialSort = item.m_specialSort;
   m_bIsAlbum = item.m_bIsAlbum;
+  m_doContentLookup = item.m_doContentLookup;
   return *this;
 }
 
@@ -492,6 +492,7 @@ void CFileItem::Archive(CArchive& ar)
     ar << m_mimetype;
     ar << m_extrainfo;
     ar << m_specialSort;
+    ar << m_doContentLookup;
 
     if (m_musicInfoTag)
     {
@@ -549,6 +550,7 @@ void CFileItem::Archive(CArchive& ar)
     ar >> m_extrainfo;
     ar >> temp;
     m_specialSort = (SortSpecial)temp;
+    ar >> m_doContentLookup;
 
     int iType;
     ar >> iType;
@@ -799,14 +801,6 @@ bool CFileItem::IsAudio() const
   }
 
   return URIUtils::HasExtension(m_strPath, g_advancedSettings.GetMusicExtensions());
-}
-
-bool CFileItem::IsKaraoke() const
-{
-  if (!IsAudio())
-    return false;
-
-  return CKaraokeLyricsFactory::HasLyrics( m_strPath );
 }
 
 bool CFileItem::IsPicture() const

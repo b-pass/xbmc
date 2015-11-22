@@ -311,6 +311,8 @@ bool CGUIWindowMusicNav::GetDirectory(const std::string &strDirectory, CFileItem
       items.SetContent("albums");
     else if (node == VIDEODATABASEDIRECTORY::NODE_TYPE_TAGS)
       items.SetContent("tags");
+    else
+      items.SetContent("");
   }
   else if (StringUtils::StartsWithNoCase(strDirectory, "musicdb://") || items.IsMusicDb())
   {
@@ -338,6 +340,8 @@ bool CGUIWindowMusicNav::GetDirectory(const std::string &strDirectory, CFileItem
       items.SetContent("genres");
     else if (node == NODE_TYPE_YEAR)
       items.SetContent("years");
+    else
+      items.SetContent("");
   }
   else if (URIUtils::PathEquals(strDirectory, "special://musicplaylists/"))
     items.SetContent("playlists");
@@ -544,16 +548,16 @@ void CGUIWindowMusicNav::GetContextButtons(int itemNumber, CContextButtons &butt
         // 4. specific per album
         buttons.Add(CONTEXT_BUTTON_SET_CONTENT, 20195);
       }
-      if (item->HasMusicInfoTag() && item->GetMusicInfoTag()->GetArtist().size() > 0)
+      if (item->HasMusicInfoTag() && !item->GetMusicInfoTag()->GetArtistString().empty())
       {
         CVideoDatabase database;
         database.Open();
         if (database.GetMatchingMusicVideo(item->GetMusicInfoTag()->GetArtistString()) > -1)
           buttons.Add(CONTEXT_BUTTON_GO_TO_ARTIST, 20400);
       }
-      if (item->HasMusicInfoTag() && item->GetMusicInfoTag()->GetArtist().size() > 0 &&
-        item->GetMusicInfoTag()->GetAlbum().size() > 0 &&
-        item->GetMusicInfoTag()->GetTitle().size() > 0)
+      if (item->HasMusicInfoTag() && !item->GetMusicInfoTag()->GetArtistString().empty() &&
+         !item->GetMusicInfoTag()->GetAlbum().empty() &&
+         !item->GetMusicInfoTag()->GetTitle().empty())
       {
         CVideoDatabase database;
         database.Open();
@@ -646,7 +650,7 @@ bool CGUIWindowMusicNav::OnContextButton(int itemNumber, CONTEXT_BUTTON button)
         if (pWindow)
         {
           ADDON::ScraperPtr info;
-          pWindow->OnInfo(item.get(),info);
+          pWindow->OnItemInfo(item.get(),info);
           Refresh();
         }
       }
@@ -654,7 +658,7 @@ bool CGUIWindowMusicNav::OnContextButton(int itemNumber, CONTEXT_BUTTON button)
     }
 
   case CONTEXT_BUTTON_INFO_ALL:
-    OnInfoAll(itemNumber);
+    OnItemInfoAll(itemNumber);
     return true;
 
   case CONTEXT_BUTTON_SET_DEFAULT:
@@ -747,10 +751,10 @@ bool CGUIWindowMusicNav::OnContextButton(int itemNumber, CONTEXT_BUTTON button)
         m_musicdatabase.SetScraperForPath(path,scraper);
         if (CGUIDialogYesNo::ShowAndGetInput(CVariant{20442}, CVariant{20443}))
         {
-          OnInfoAll(itemNumber,true,true);
+          OnItemInfoAll(itemNumber,true,true);
         }
-
       }
+
       return true;
     }
 
