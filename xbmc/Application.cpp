@@ -2358,6 +2358,8 @@ bool CApplication::OnAction(const CAction &action)
       {
         // calculate the speed based on the amount the button is held down
         int iPower = (int)(action.GetAmount() * MAX_FFWD_SPEED + 0.5f);
+        // amount can be negative, for example rewind and forward share the same axis
+        iPower = std::abs(iPower);
         // returns 0 -> MAX_FFWD_SPEED
         int iSpeed = 1 << iPower;
         if (iSpeed != 1 && action.GetID() == ACTION_ANALOG_REWIND)
@@ -2958,7 +2960,7 @@ void CApplication::Stop(int exitCode)
 
     // stop scanning before we kill the network and so on
     if (m_musicInfoScanner->IsScanning())
-      m_musicInfoScanner->Stop();
+      m_musicInfoScanner->Stop(true);
 
     if (CVideoLibraryQueue::GetInstance().IsRunning())
       CVideoLibraryQueue::GetInstance().CancelAllJobs();
@@ -3894,12 +3896,12 @@ void CApplication::LoadVideoSettings(const CFileItem& item)
   CVideoDatabase dbs;
   if (dbs.Open())
   {
-    CLog::Log(LOGDEBUG, "Loading settings for %s", item.GetPath().c_str());
-    
+    CLog::Log(LOGDEBUG, "Loading settings for %s", CURL::GetRedacted(item.GetPath()).c_str());
+
     // Load stored settings if they exist, otherwise use default
     if (!dbs.GetVideoSettings(item, CMediaSettings::GetInstance().GetCurrentVideoSettings()))
       CMediaSettings::GetInstance().GetCurrentVideoSettings() = CMediaSettings::GetInstance().GetDefaultVideoSettings();
-    
+
     dbs.Close();
   }
 }
