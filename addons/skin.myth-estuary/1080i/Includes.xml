@@ -939,7 +939,7 @@
 							<animation effect="fade" time="300">Visible</animation>
 							<animation effect="fade" time="150">Hidden</animation>
 							<aspectratio>keep</aspectratio>
-							<visible>!Window.IsActive(volumebar)</visible>
+							<!--visible>!Window.IsActive(volumebar)</visible-->
 						</control>
 						<control type="label">
 							<top>40</top>
@@ -997,7 +997,7 @@
 				<visible>Player.HasAudio + String.IsEmpty(Window(Videos).Property(PlayingBackgroundMedia))</visible>
 			</control>
 			<control type="group">
-				<animation effect="zoom" center="960,540" end="102,102" time="0" condition="Integer.IsGreater(System.StereoscopicMode,0)">conditional</animation>
+				<animation effect="zoom" center="960,540" end="102,102" time="0" condition="Integer.IsGreater(System.StereoscopicMode,0)">conditional</animation>        
 				<control type="image">
 					<depth>DepthBackground</depth>
 					<include>FullScreenDimensions</include>
@@ -1017,6 +1017,11 @@
 					<texture background="true" colordiffuse="35FFFFFF">$VAR[MediaFanartVar]</texture>
 					<visible>!Player.HasMedia | !String.IsEmpty(Window(Videos).Property(PlayingBackgroundMedia))</visible>
 				</control>
+        <control type="image">
+					<include>FullScreenDimensions</include>
+          <colordiffuse>40ffffff</colordiffuse>
+          <texture>dialogs/dialog-bg-solid.png</texture>
+        </control>
 			</control>
 		</definition>
 	</include>

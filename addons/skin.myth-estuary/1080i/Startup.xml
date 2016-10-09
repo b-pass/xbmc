@@ -61,7 +61,7 @@
     <control type="button" id="10">
         <description>Wait for PVR recordings to load before starting</description>
         <onfocus condition="Skin.HasSetting(NoWaitForPVR) | Pvr.HasTVChannels">ReplaceWindow($INFO[System.StartupWindow])</onfocus>
-        <onfocus condition="!Pvr.HasTVChannels">AlarmClock(UpdateDelay,SetFocus(17),00:02,silent)</onfocus>
+        <onfocus condition="!Pvr.HasTVChannels">AlarmClock(UpdateDelay,SetFocus(17),00:01,silent)</onfocus>
         <visible allowhiddenfocus="true">false</visible>
     </control>
     <control type="button" id="17"><!-- loop -->
