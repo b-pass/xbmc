@@ -831,7 +831,7 @@
 						<control type="group" id="16678">
 							<description>Weather info</description>
 							<height>380</height>
-							<visible>!String.IsEmpty(Weather.plugin)</visible>
+							<visible>!String.IsEmpty(Weather.plugin) + Weather.IsFetched</visible>
 							<control type="image">
 								<top>2</top>
 								<left>480</left>
@@ -995,7 +995,7 @@
 						<left>1</left>
 						<top>1</top>
 						<width>382</width>
-						<height>920</height>
+						<height>890</height>
 						<pagecontrol>70</pagecontrol>
 						<onfocus>ClearProperty(listposition,home)</onfocus>
 						<onright condition="String.IsEqual(Container(9000).ListItem.Property(id),movies) + Control.IsVisible(5000)">5000</onright>
@@ -1158,7 +1158,7 @@
 							<item>
 								<label>$LOCALIZE[20007]</label>
 								<onclick>Skin.SetString(pvrCurrentDir, "Default")</onclick>
-                <onclick>ActivateWindow(tvrecordings,pvr://recordings/active/Default/,return)</onclick>
+                <onclick>ActivateWindow(tvrecordings,pvr://recordings/tv/active/Default/,return)</onclick>
 								<thumb>icons/home/tv.png</thumb>
 								<property name="id">tvrec</property>
 								<visible>!Skin.HasSetting(HomeMenuNoTVButton)</visible>
@@ -1169,6 +1169,18 @@
                 <property name="id">livetv</property>
                 <visible>!Skin.HasSetting(HomeMenuNoTVButton)</visible>
                 <onclick>ActivateWindow(TVGuide,,return)</onclick> <!-- short guide = TVChannels, full guide = TVGuide -->
+              </item>
+              <item>
+                  <label>Video Add-ons</label>
+                  <property name="id">videoaddons</property>
+                  <thumb>icons/home/videos.png</thumb>
+                  <onclick>ActivateWindow(Videos,Addons,return)</onclick>
+              </item>
+              <item>
+                  <label>Pandora Radio</label>
+                  <property name="id">pandora</property>
+                  <thumb>icons/home/radio.png</thumb>
+                  <onclick>RunScript(script.audio.pandora,)</onclick>
               </item>
 							<item>
 								<label>$LOCALIZE[19021]</label>
