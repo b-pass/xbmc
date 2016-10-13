@@ -5,10 +5,17 @@
 	<backgroundcolor>background</backgroundcolor>
 	<views>50</views>
   <onload>PlayerControl(stop)</onload>
-	<onload condition="!Skin.String(pvrCurrentDir)">Skin.SetString(pvrCurrentDir, "Default")</onload>
+  <onload condition="!Skin.String(pvrCurrentDir)">Skin.SetString(pvrCurrentDir, "Default")</onload>
 	<onload condition='StringCompare(Container(9950).ListItem.Label,"(Recent)") + Container.SortDirection(ascending)'>Container.SetSortDirection</onload>
 	<onload condition='!StringCompare(Container(9950).ListItem.Label,"(Recent)") + !Container.SortDirection(ascending)'>Container.SetSortDirection</onload>
 	<controls>
+    <control type="list" id="9951">
+      <preloaditems>true</preloaditems>
+      <content sortby="label" sortorder="ascending">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]</content>
+      <visible>false</visible>
+      <focusedlayout></focusedlayout>
+      <itemlayout></itemlayout>
+    </control>
 		<include>DefaultBackground</include>
 		<control type="group">
       
@@ -16,7 +23,7 @@
       <control type="group">
 				<left>60</left>
 				<top>100</top>
-				<!--include>OpenClose_Left</include-->
+				<include>OpenClose_Left</include>
 				<control type="image">
 					<description>background image</description>
 					<left>-20</left>
@@ -25,6 +32,14 @@
 					<height>676</height>
 					<texture border="22">dialogs/dialog-bg.png</texture>
 				</control>
+        <!--control type="button" id="9949">
+					<left>-50</left>
+					<top>3</top>
+          <width>500</width>
+          <label>Recent!</label>
+          <visible>true</visible>
+          <onfocus>ReplaceWindow(tvrecordings, "pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]?view=flat")</onfocus>
+        </control-->
 				<control type="list" id="9950">
 					<left>2</left>
 					<top>3</top>
@@ -38,7 +53,10 @@
 					<focusedlayout height="70" condition="Control.HasFocus(9950)">
             <control type="button">
               <visible allowhiddenfocus="true">false</visible>
-              <onfocus>ReplaceWindow(tvrecordings,"$INFO[Container(9950).ListItem.FolderPath]")</onfocus>
+              <!--onfocus>Container.Update("$INFO[Container(9950).ListItem.Property(path)]")</onfocus-->
+              <!--onfocus>ReplaceWindow(tvrecordings,"$INFO[Container(9950).ListItem.Property(path)]")</onfocus-->
+              <!--onfocus>ReplaceWindow(tvrecordings,"$INFO[Container(9950).ListItem.FolderPath]")</onfocus-->
+              <onfocus>Container.Update("$INFO[Container(9950).ListItem.FolderPath]", true)</onfocus>
             </control>
 						<control type="image">
 							<left>0</left>
@@ -115,7 +133,7 @@
 			<control type="group">
 				<left>600</left>
 				<top>100</top>
-				<!--include>OpenClose_Right</include-->
+				<include>OpenClose_Right</include>
 				<control type="image">
 					<description>background image</description>
 					<left>-20</left>
@@ -231,6 +249,7 @@
       <control type="group">
         <left>60</left>
         <top>750</top>
+        <include>OpenClose_Left</include>
         
         <control type="image">
           <left>-20</left>
@@ -249,6 +268,7 @@
           <aspectratio>keep</aspectratio>
           <texture>$INFO[Container(50).ListItem.Art(icon)]</texture>
           <visible>!Control.HasFocus(50) + !StringCompare(Container(9950).ListItem.Label,"..") + !StringCompare(Container(9950).ListItem.Label,"(Recent)")</visible>
+          <include>Visible_Fade</include>
         </control>
         
         <control type="image">
@@ -261,6 +281,7 @@
           <aspectratio>keep</aspectratio>
           <texture>$INFO[Container(50).ListItem.Art(thumb)]</texture>
           <visible>Control.HasFocus(50)</visible>
+          <include>Visible_Fade</include>
         </control>
         <control type="image">
           <visible>!IsEmpty(Container(50).ListItem.Art(fanart))</visible>
@@ -272,12 +293,14 @@
           <aspectratio>keep</aspectratio>
           <texture>$INFO[Container(50).ListItem.Art(fanart)]</texture>
           <visible>Control.HasFocus(50)</visible>
+          <include>Visible_Fade</include>
         </control>
       </control>
       
       <control type="group">
         <left>600</left>
         <top>750</top>
+        <include>OpenClose_Right</include>
         
         <control type="image">
           <posx>-20</posx>
@@ -288,6 +311,7 @@
         </control>
         
         <control type="group">
+          <include>Visible_Fade</include>
           <visible>!Control.HasFocus(50) + [StringCompare(Container(9950).ListItem.Label,"..") | StringCompare(Container(9950).ListItem.Label,"(Recent)")]</visible>
           <control type="label">
             <posx>10</posx>
@@ -296,11 +320,12 @@
             <height>50</height>
             <textcolor>button_focus</textcolor>
             <font>font24_title</font>
-            <label>$INFO[Container(50).ListItem.Label]</label>
+            <label>$INFO[Container(9950).ListItem.Label]</label>
           </control>
         </control>
         
         <control type="group">
+          <include>Visible_Fade</include>
           <visible>!Control.HasFocus(50) + !StringCompare(Container(9950).ListItem.Label,"..") + !StringCompare(Container(9950).ListItem.Label,"(Recent)")</visible>
           <control type="label">
             <posx>10</posx>
@@ -340,6 +365,7 @@
         </control>
         
         <control type="group">
+        <include>Visible_Fade</include>
           <visible>Control.HasFocus(50)</visible>
           <control type="label">
             <posx>10</posx>
@@ -413,7 +439,7 @@
 				<control type="label">
           <description>main sub-label</description>
 					<top>40</top>
-					<label>$INFO[Control.GetLabel(30)]</label>
+					<label>$INFO[Skin.String(pvrCurrentDir)]</label>
 					<font>font10</font>
 					<left>85</left>
 					<shadowcolor>text_shadow</shadowcolor>
