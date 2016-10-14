@@ -32,14 +32,6 @@
 					<height>676</height>
 					<texture border="22">dialogs/dialog-bg.png</texture>
 				</control>
-        <!--control type="button" id="9949">
-					<left>-50</left>
-					<top>3</top>
-          <width>500</width>
-          <label>Recent!</label>
-          <visible>true</visible>
-          <onfocus>ReplaceWindow(tvrecordings, "pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]?view=flat")</onfocus>
-        </control-->
 				<control type="list" id="9950">
 					<left>2</left>
 					<top>3</top>
@@ -53,9 +45,6 @@
 					<focusedlayout height="70" condition="Control.HasFocus(9950)">
             <control type="button">
               <visible allowhiddenfocus="true">false</visible>
-              <!--onfocus>Container.Update("$INFO[Container(9950).ListItem.Property(path)]")</onfocus-->
-              <!--onfocus>ReplaceWindow(tvrecordings,"$INFO[Container(9950).ListItem.Property(path)]")</onfocus-->
-              <!--onfocus>ReplaceWindow(tvrecordings,"$INFO[Container(9950).ListItem.FolderPath]")</onfocus-->
               <onfocus>Container.Update("$INFO[Container(9950).ListItem.FolderPath]", true)</onfocus>
             </control>
 						<control type="image">
