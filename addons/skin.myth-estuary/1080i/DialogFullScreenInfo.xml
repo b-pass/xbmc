@@ -46,7 +46,7 @@
 			<control type="grouplist">
 				<left>45</left>
 				<top>50</top>
-				<width>600</width>
+				<width>700</width>
 				<height>100</height>
 				<align>left</align>
 				<orientation>horizontal</orientation>

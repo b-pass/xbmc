@@ -39,7 +39,7 @@
 					<height>630</height>
 					<pagecontrol>9973</pagecontrol>
           <onright>50</onright>
-          <onclick>Control.SetFocus(50)</onclick>
+          <onclick>Control.SetFocus(50, 0)</onclick>
           <scrolltime>0</scrolltime>
           <content sortby="label" sortorder="ascending" target="noop">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]</content>
 					<focusedlayout height="70" condition="Control.HasFocus(9950)">
