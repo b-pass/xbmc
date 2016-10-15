@@ -46,6 +46,7 @@
 				<font>font12_title</font>
 				<textcolor>button_focus</textcolor>
 				<label>$LOCALIZE[31080]</label>
+        <visible>!Pvr.IsPlayingRecording</visible>
 			</control>
 			<control type="label">
 				<left>850</left>
@@ -56,6 +57,7 @@
 				<align>center</align>
 				<font>font13_title</font>
 				<label>$INFO[Player.FinishTime]</label>
+        <visible>!Pvr.IsPlayingRecording</visible>
 			</control>
 			<control type="label">
 				<top>40</top>
