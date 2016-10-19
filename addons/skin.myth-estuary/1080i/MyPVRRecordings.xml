@@ -6,12 +6,19 @@
 	<views>50</views>
   <onload>PlayerControl(stop)</onload>
   <onload condition="!Skin.String(pvrCurrentDir)">Skin.SetString(pvrCurrentDir, "Default")</onload>
-	<onload condition='StringCompare(Container(9950).ListItem.Label,"(Recent)") + Container.SortDirection(ascending)'>Container.SetSortDirection</onload>
-	<onload condition='!StringCompare(Container(9950).ListItem.Label,"(Recent)") + !Container.SortDirection(ascending)'>Container.SetSortDirection</onload>
+  <onload>Container.SetSortMethod(date)</onload>
+  <onload>Skin.SetBool(NeedSortFix)</onload>
 	<controls>
 		<include>DefaultBackground</include>
 		<control type="group">
       
+<control type="button" id="9949">
+  <visible allowhiddenfocus="true">false</visible>
+  <onfocus condition='!StringCompare(Container(9950).ListItem.Label,"(Recent)") + !Container.SortDirection(ascending)'>Container.SetSortDirection</onfocus>
+  <onfocus condition='StringCompare(Container(9950).ListItem.Label,"(Recent)") + Container.SortDirection(ascending)'>Container.SetSortDirection</onfocus>
+  <onfocus>Skin.Reset(NeedSortFix)</onfocus>
+  <onfocus>SetFocus(9950)</onfocus>
+</control>
       <!-- left side Show Folder/Group listing -->
       <control type="group">
 				<left>60</left>
@@ -35,10 +42,12 @@
           <onclick>Control.SetFocus(50, 0)</onclick>
           <scrolltime>0</scrolltime>
           <content sortby="label" sortorder="ascending" target="noop">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]</content>
-					<focusedlayout height="70" condition="Control.HasFocus(9950)">
+					<focusedlayout height="70" condition="!Control.HasFocus(50)">
             <control type="button">
               <visible allowhiddenfocus="true">false</visible>
               <onfocus>Container.Update("$INFO[Container(9950).ListItem.FolderPath]", true)</onfocus>
+              <onfocus condition='Skin.HasSetting(NeedSortFix)'>AlarmClock(FixSort,SetFocus(9949),00:00,true)</onfocus>
+              <onfocus condition='!Skin.HasSetting(NeedSortFix)'>Skin.SetBool(NeedSortFix)</onfocus> 
             </control>
 						<control type="image">
 							<left>0</left>
@@ -64,7 +73,7 @@
 							<label>$INFO[ListItem.Label]</label>
 						</control>
 					</focusedlayout>
-					<focusedlayout height="70" condition="!Control.HasFocus(9950)">
+					<focusedlayout height="70" condition="Control.HasFocus(50)">
 						<control type="image">
 							<left>0</left>
 							<top>0</top>
@@ -421,7 +430,7 @@
 				<control type="label">
           <description>main sub-label</description>
 					<top>40</top>
-					<label>$INFO[Skin.String(pvrCurrentDir)]</label>
+					<label>$INFO[Skin.String(pvrCurrentDir)] - $INFO[Container.SortOrder]</label>
 					<font>font10</font>
 					<left>85</left>
 					<shadowcolor>text_shadow</shadowcolor>
