@@ -9,13 +9,6 @@
 	<onload condition='StringCompare(Container(9950).ListItem.Label,"(Recent)") + Container.SortDirection(ascending)'>Container.SetSortDirection</onload>
 	<onload condition='!StringCompare(Container(9950).ListItem.Label,"(Recent)") + !Container.SortDirection(ascending)'>Container.SetSortDirection</onload>
 	<controls>
-    <control type="list" id="9951">
-      <preloaditems>true</preloaditems>
-      <content sortby="label" sortorder="ascending">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]</content>
-      <visible>false</visible>
-      <focusedlayout></focusedlayout>
-      <itemlayout></itemlayout>
-    </control>
 		<include>DefaultBackground</include>
 		<control type="group">
       
