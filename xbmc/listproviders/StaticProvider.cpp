@@ -78,7 +78,7 @@ bool CStaticListProvider::Update(bool forceRefresh)
   return changed; //! @todo Also returned changed if properties are changed (if so, need to update scroll to letter).
 }
 
-void CStaticListProvider::Fetch(std::vector<CGUIListItemPtr> &items) const
+void CStaticListProvider::Fetch(std::vector<CGUIListItemPtr> &items)
 {
   items.clear();
   for (std::vector<CGUIStaticItemPtr>::const_iterator i = m_items.begin(); i != m_items.end(); ++i)
