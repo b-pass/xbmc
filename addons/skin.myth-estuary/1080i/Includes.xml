@@ -1013,7 +1013,7 @@
 					<animation effect="fade" start="100" end="0" time="300">WindowClose</animation>
 					<animation effect="fade" time="400">VisibleChange</animation>
 					<texture background="true" colordiffuse="35FFFFFF">$VAR[MediaFanartVar]</texture>
-					<visible>!Skin.HasSetting(no_fanart) + !(Player.HasMedia + String.IsEmpty(Window(Videos).Property(PlayingBackgroundMedia)))</visible>
+					<visible>!Skin.HasSetting(no_fanart) + !Player.HasMedia</visible>
 				</control>
 			</control>
 		</definition>
