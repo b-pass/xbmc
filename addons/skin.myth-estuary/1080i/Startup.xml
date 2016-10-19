@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <window>
 	<!--onload>ReplaceWindow($INFO[System.StartupWindow])</onload-->
+	<onload>AlarmClock(NoPVR,ReplaceWindow($INFO[System.StartupWindow]),00:30,true)</onload>
 	<defaultcontrol always="true">10</defaultcontrol>
   <allowoverlay>yes</allowoverlay>
 	<backgroundcolor>background</backgroundcolor>
@@ -60,8 +61,9 @@
 		
     <control type="button" id="10">
         <description>Wait for PVR recordings to load before starting</description>
+        <onfocus condition="Skin.HasSetting(NoWaitForPVR) | Pvr.HasTVChannels">CancelAlarm(NoPVR,true)</onfocus>
         <onfocus condition="Skin.HasSetting(NoWaitForPVR) | Pvr.HasTVChannels">ReplaceWindow($INFO[System.StartupWindow])</onfocus>
-        <onfocus condition="!Pvr.HasTVChannels">AlarmClock(UpdateDelay,SetFocus(17),00:01,silent)</onfocus>
+        <onfocus condition="!Pvr.HasTVChannels">AlarmClock(UpdateDelay,SetFocus(17),00:01,true)</onfocus>
         <visible allowhiddenfocus="true">false</visible>
     </control>
     <control type="button" id="17"><!-- loop -->
