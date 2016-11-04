@@ -329,7 +329,9 @@ bool CPeripheralBusAddon::RequestRemoval(ADDON::AddonPtr addon)
 
 void CPeripheralBusAddon::OnEvent(const ADDON::AddonEvent& event)
 {
-  if (typeid(event) == typeid(AddonEvents::InstalledChanged))
+  if (typeid(event) == typeid(ADDON::AddonEvents::Enabled) ||
+      typeid(event) == typeid(ADDON::AddonEvents::Disabled) ||
+      typeid(event) == typeid(ADDON::AddonEvents::InstalledChanged))
     UpdateAddons();
 }
 
@@ -375,16 +377,16 @@ void CPeripheralBusAddon::UpdateAddons(void)
   std::set<std::string> added;
   std::set<std::string> removed;
 
+  // Get new add-ons
+  VECADDONS newAddons;
+  CAddonMgr::GetInstance().GetAddons(newAddons, ADDON_PERIPHERALDLL);
+  std::transform(newAddons.begin(), newAddons.end(), std::inserter(newIds, newIds.end()), GetAddonID);
+
   CSingleLock lock(m_critSection);
 
   // Get current add-ons
   std::transform(m_addons.begin(), m_addons.end(), std::inserter(currentIds, currentIds.end()), GetPeripheralAddonID);
   std::transform(m_failedAddons.begin(), m_failedAddons.end(), std::inserter(currentIds, currentIds.end()), GetPeripheralAddonID);
-
-  // Get new add-ons
-  VECADDONS newAddons;
-  CAddonMgr::GetInstance().GetAddons(newAddons, ADDON_PERIPHERALDLL);
-  std::transform(newAddons.begin(), newAddons.end(), std::inserter(newIds, newIds.end()), GetAddonID);
 
   // Differences
   std::set_difference(newIds.begin(), newIds.end(), currentIds.begin(), currentIds.end(), std::inserter(added, added.end()));

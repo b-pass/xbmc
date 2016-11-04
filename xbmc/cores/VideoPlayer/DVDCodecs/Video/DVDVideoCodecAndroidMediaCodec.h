@@ -63,8 +63,10 @@ public:
 
   // meat and potatos
   void                Validate(bool state);
+  bool                WaitForFrame(int millis);
   // MediaCodec related
   void                ReleaseOutputBuffer(bool render);
+  bool                IsReleased() { return m_isReleased; }
   // SurfaceTexture released
   ssize_t             GetIndex() const;
   int                 GetTextureID() const;
@@ -129,6 +131,7 @@ protected:
   bool            m_opened;
   bool            m_drop;
   int             m_codecControlFlags;
+  int             m_state;
 
   CJNISurface    *m_surface;
   unsigned int    m_textureId;
@@ -148,6 +151,7 @@ protected:
   CBitstreamConverter *m_bitstream;
   DVDVideoPicture m_videobuffer;
 
+  int             m_dec_retcode;
   bool            m_render_sw;
   bool            m_render_surface;
   int             m_src_offset[4];

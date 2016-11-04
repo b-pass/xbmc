@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([kodi], [16.9.804], [http://trac.kodi.tv])
+AC_INIT([kodi], [16.9.806], [http://trac.kodi.tv])
 AC_CONFIG_HEADERS([xbmc/config.h])
 AH_TOP([#pragma once])
 m4_include([m4/ax_prog_cc_for_build.m4])
@@ -626,9 +626,13 @@ case $host in
      ARCH="aarch64"
      use_arch="aarch64"
      use_neon=yes
-     use_gles=yes
-     use_gl=no
-     use_wayland=no
+     # Check whether --enable-gl was given.
+     if test "${enable_gl+set}" = set; then :
+       enableval=$enable_gl; use_gl=$enableval
+     else
+       use_gl=no
+       use_gles=yes
+     fi
      USE_STATIC_FFMPEG=1
      ;;
   arm*-*linux-android*)
@@ -2404,3 +2408,8 @@ AC_OUTPUT
 
 final_message="$final_message\n  prefix:\t$prefix\n$dashes"
 echo -e "$final_message\n"
+echo "#------------------------------------ WARNING ----------------------------------------#"
+echo "The autotools based build system is deprecated and will be removed in the next version!"
+echo "Please switch to cmake, see project/cmake/README.md"
+echo "#-------------------------------------------------------------------------------------#"
+echo -e "\n\n"

@@ -790,13 +790,13 @@ bool CVideoPlayer::OpenInputStream()
   m_pInputStream = CDVDFactoryInputStream::CreateInputStream(this, m_item, true);
   if(m_pInputStream == NULL)
   {
-    CLog::Log(LOGERROR, "CVideoPlayer::OpenInputStream - unable to create input stream for [%s]", m_item.GetPath().c_str());
+    CLog::Log(LOGERROR, "CVideoPlayer::OpenInputStream - unable to create input stream for [%s]", CURL::GetRedacted(m_item.GetPath()).c_str());
     return false;
   }
 
   if (!m_pInputStream->Open())
   {
-    CLog::Log(LOGERROR, "CVideoPlayer::OpenInputStream - error opening [%s]", m_item.GetPath().c_str());
+    CLog::Log(LOGERROR, "CVideoPlayer::OpenInputStream - error opening [%s]", CURL::GetRedacted(m_item.GetPath()).c_str());
     return false;
   }
 
@@ -3104,12 +3104,10 @@ void CVideoPlayer::Pause()
   if (GetSpeed() == 0)
   {
     SetSpeed(1);
-    m_callback.OnPlayBackResumed();
   }
   else
   {
     SetSpeed(0);
-    m_callback.OnPlayBackPaused();
   }
 }
 
@@ -3646,6 +3644,13 @@ void CVideoPlayer::SetSpeed(float speed)
     return;
   
   m_newPlaySpeed = speed * DVD_PLAYSPEED_NORMAL;
+  if (m_newPlaySpeed != m_playSpeed)
+  {
+    if (m_newPlaySpeed == DVD_PLAYSPEED_NORMAL)
+      m_callback.OnPlayBackResumed();
+    else if (m_newPlaySpeed == DVD_PLAYSPEED_PAUSE)
+      m_callback.OnPlayBackPaused();
+  }
   SetPlaySpeed(speed * DVD_PLAYSPEED_NORMAL);
 }
 
