@@ -39,7 +39,7 @@
 					<height>630</height>
 					<pagecontrol>9973</pagecontrol>
           <onright>50</onright>
-          <onclick>Control.SetFocus(50, 0)</onclick>
+          <onclick>Control.SetFocus(50)</onclick>
           <scrolltime>0</scrolltime>
           <content>
             <item>
@@ -391,7 +391,7 @@
             <height>75</height>
             <font>font12</font>
             <align>right</align>
-            <label>$INFO[Container(50).ListItem.ChannelName][CR]Length: $INFO[Container(50).ListItem.Duration][CR]$INFO[Container(50).ListItem.StartDate]</label>
+            <label>$INFO[Container(50).ListItem.ChannelName][CR]$INFO[Container(50).ListItem.StartDate][CR]Length: $INFO[Container(50).ListItem.Duration]</label>
           </control>
           <control type="textbox">
             <posx>10</posx>
