@@ -426,7 +426,7 @@
 	</variable>
   <variable name="PVR_Episode_List_Entry">
     <value condition="IsEmpty(ListItem.EpisodeName)">$INFO[ListItem.Label]$INFO[ListItem.Date, @ ,]</value>
-    <value condition="!StringCompare(Container(9950).ListItem.Label, &quot;(Recent)&quot;)">$INFO[ListItem.EpisodeName]</value>
+    <value condition="!StringCompare(Container(9950).ListItem.Property(id), all_flat)">$INFO[ListItem.EpisodeName]</value>
     <value>$INFO[ListItem.Label]$INFO[ListItem.EpisodeName, - ","]</value>
   </variable>
 </includes>
