@@ -165,7 +165,7 @@ if(NOT WIN32)
     set(NEED_SUDO TRUE)
     set(ADDON_INSTALL_DIR ${CMAKE_BINARY_DIR}/.install)
     list(APPEND BUILD_ARGS -DOVERRIDE_PATHS=ON)
-    message(STATUS "NEED_SUDO: ${NEED_SUDO}")
+    message(STATUS "NEED_SUDO: ${NEED_SUDO} (no write permission for ${CMAKE_INSTALL_PREFIX})")
   endif()
 endif()
 
@@ -206,6 +206,7 @@ if(NOT addons)
                                            -DCMAKE_INSTALL_PREFIX:PATH=${ADDONS_DEFINITION_DIR}
                                            -DBUILD_DIR:PATH=${BOOTSTRAP_BUILD_DIR}
                                            -DADDONS_TO_BUILD:STRING=${ADDONS_TO_BUILD_STR}
+                                           -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                   WORKING_DIRECTORY ${BOOTSTRAP_BUILD_DIR})
 
   # execute the generated bootstrap buildsystem
@@ -245,7 +246,7 @@ foreach(addon ${addons})
       message(STATUS "\n-- ---- Configuring addon ${addon} ----")
       set(SUPPORTED_ADDON_FOUND TRUE)
 
-      get_filename_component(dir ${addon} PATH)
+      get_filename_component(dir ${addon} DIRECTORY)
 
       # check if the addon has a platforms.txt
       set(platform_found FALSE)
@@ -253,9 +254,7 @@ foreach(addon ${addons})
 
       if(${platform_found})
         # make sure the output directory is clean
-        if(EXISTS "${CMAKE_INSTALL_PREFIX}/${id}")
-          file(REMOVE_RECURSE "${CMAKE_INSTALL_PREFIX}/${id}/")
-        endif()
+        file(REMOVE_RECURSE "${CMAKE_INSTALL_PREFIX}/${id}/")
 
         # get the URL and revision of the addon
         list(LENGTH def deflength)
@@ -333,9 +332,7 @@ foreach(addon ${addons})
           endif()
 
           # remove any previously extracted version of the addon
-          if(EXISTS "${BUILD_DIR}/${id}")
-            file(REMOVE_RECURSE "${BUILD_DIR}/${id}")
-          endif()
+          file(REMOVE_RECURSE "${BUILD_DIR}/${id}")
 
           # extract the addon from the archive
           execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzvf ${BUILD_DIR}/download/${archive_name}.tar.gz
