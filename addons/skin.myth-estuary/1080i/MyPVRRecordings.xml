@@ -39,7 +39,7 @@
 					<height>630</height>
 					<pagecontrol>9973</pagecontrol>
           <onright>50</onright>
-          <onclick>Control.SetFocus(50)</onclick>
+          <onclick>Control.SetFocus(50, 0)</onclick>
           <scrolltime>0</scrolltime>
           <content>
             <item>
@@ -259,10 +259,10 @@
         </control>
         
         <control type="image">
-          <left>0</left>
-          <top>0</top>
-          <height>280</height>
-          <width>500</width>
+          <left>7</left>
+          <top>2</top>
+          <height>276</height>
+          <width>490</width>
           <align>left</align>
           <aspectratio>keep</aspectratio>
           <texture fallback="$INFO[Container(50).ListItem.Art(icon)]">$INFO[Container(50).ListItem.Art(fanart)]</texture>
@@ -270,10 +270,10 @@
           <include>Visible_Fade</include>
         </control> 
         <control type="image">
-          <left>0</left>
-          <top>0</top>
-          <height>280</height>
-          <width>500</width>
+          <left>7</left>
+          <top>2</top>
+          <height>276</height>
+          <width>490</width>
           <align>left</align>
           <aspectratio>keep</aspectratio>
           <texture fallback="$INFO[Container(50).ListItem.Art(fanart)]">$INFO[Container(50).ListItem.Art(thumb)]</texture>
