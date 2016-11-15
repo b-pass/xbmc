@@ -125,6 +125,10 @@ bool CGUIControllerWindow::OnMessage(CGUIMessage& message)
         ShowHelp();
         return true;
       }
+      else if (controlId == CONTROL_FIX_SKIPPING)
+      {
+        ShowButtonCaptureDialog();
+      }
       else if (CONTROL_CONTROLLER_BUTTONS_START <= controlId && controlId < CONTROL_CONTROLLER_BUTTONS_END)
       {
         OnControllerSelected(controlId - CONTROL_CONTROLLER_BUTTONS_START);
@@ -221,23 +225,9 @@ void CGUIControllerWindow::OnInitWindow(void)
   CGUIMessage msgFocus(GUI_MSG_SETFOCUS, GetID(), CONTROL_CONTROLLER_BUTTONS_START);
   OnMessage(msgFocus);
 
-  // Check for button mapping support
-  //! @todo remove this
-  PeripheralBusAddonPtr bus = std::static_pointer_cast<CPeripheralBusAddon>(g_peripherals.GetBusByType(PERIPHERAL_BUS_ADDON));
-  if (bus && !bus->HasFeature(FEATURE_JOYSTICK))
-  {
-    //! @todo Move the XML implementation of button map storage from add-on to
-    //! Kodi while keeping support for add-on button-mapping
-
-    CLog::Log(LOGERROR, "Joystick support not found");
-
-    // "Joystick support not found"
-    // "Controller configuration is disabled. Install the proper joystick support add-on."
-    CGUIDialogOK::ShowAndGetInput(CVariant{35056}, CVariant{35057});
-
-    // close the window as there's nothing that can be done
-    Close();
-  }
+  // Enable button mapping support
+  if (!g_peripherals.GetInstance().EnableButtonMapping())
+    CLog::Log(LOGDEBUG, "Joystick support not found");
 
   // FIXME: not thread safe
 //  ADDON::CRepositoryUpdater::GetInstance().Events().Subscribe(this, &CGUIControllerWindow::OnEvent);
@@ -321,4 +311,10 @@ void CGUIControllerWindow::ShowHelp(void)
   // "Help"
   // <help text>
   CGUIDialogOK::ShowAndGetInput(CVariant{10043}, CVariant{35055});
+}
+
+void CGUIControllerWindow::ShowButtonCaptureDialog(void)
+{
+  if (m_controllerList)
+    m_controllerList->ShowButtonCaptureDialog();
 }
