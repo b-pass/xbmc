@@ -982,13 +982,6 @@
 				<control type="group">
 					<left>53</left>
 					<top>110</top>
-					<control type="image">
-						<left>-20</left>
-						<top>-20</top>
-						<width>424</width>
-						<height>930</height>
-						<texture border="22">dialogs/dialog-bg.png</texture>
-					</control>
 					<control type="list" id="9000">
 						<left>1</left>
 						<top>1</top>
@@ -1009,6 +1002,13 @@
 						<ondown>700</ondown-->
 						<scrolltime tween="cubic" easing="out">500</scrolltime>
 						<focusedlayout height="74">
+              <control type="image">
+                <left>-20</left>
+                <top>-20</top>
+                <width>422</width>
+                <height>114</height>
+                <texture border="22">dialogs/dialog-bg.png</texture>
+              </control>
 							<control type="image">
 								<left>0</left>
 								<top>0</top>
@@ -1101,6 +1101,13 @@
 							</control>
 						</focusedlayout>
 						<itemlayout height="74">
+              <control type="image">
+                <left>-20</left>
+                <top>-20</top>
+                <width>422</width>
+                <height>114</height>
+                <texture border="22">dialogs/dialog-bg.png</texture>
+              </control>
 							<control type="image">
 								<left>0</left>
 								<top>0</top>
@@ -1168,18 +1175,12 @@
                 <visible>!Skin.HasSetting(HomeMenuNoTVButton)</visible>
                 <onclick>ActivateWindow(TVGuide,,return)</onclick> <!-- short guide = TVChannels, full guide = TVGuide -->
               </item>
-              <item>
-                  <label>Video Add-ons</label>
-                  <property name="id">videoaddons</property>
-                  <thumb>icons/home/videos.png</thumb>
-                  <onclick>ActivateWindow(Videos,Addons,return)</onclick>
-              </item>
-              <item>
+              <!--item>
                   <label>Pandora Radio</label>
                   <property name="id">pandora</property>
                   <thumb>icons/home/radio.png</thumb>
                   <onclick>RunScript(script.audio.pandora,)</onclick>
-              </item>
+              </item-->
 							<item>
 								<label>$LOCALIZE[19021]</label>
 								<onclick>ActivateWindow(RadioChannels)</onclick>
