@@ -766,11 +766,15 @@ AVDictionary *CDVDDemuxFFmpeg::GetFFMpegOptionsFromInput()
     {
       static const std::map<std::string,std::string> optionmap =
       {{{"SWFPlayer", "rtmp_swfurl"},
+        {"swfplayer", "rtmp_swfurl"},
         {"PageURL", "rtmp_pageurl"},
+        {"pageurl", "rtmp_pageurl"},
         {"PlayPath", "rtmp_playpath"},
-        {"TcUrl",    "rtmp_tcurl"},
-        {"IsLive",   "rtmp_live"},
         {"playpath", "rtmp_playpath"},
+        {"TcUrl",    "rtmp_tcurl"},
+        {"tcurl",    "rtmp_tcurl"},
+        {"IsLive",   "rtmp_live"},
+        {"islive",   "rtmp_live"},
         {"swfurl",   "rtmp_swfurl"},
         {"swfvfy",   "rtmp_swfverify"},
       }};
@@ -792,7 +796,8 @@ AVDictionary *CDVDDemuxFFmpeg::GetFFMpegOptionsFromInput()
         bool swfvfy=false;
         for (size_t i = 1; i < opts.size(); ++i)
         {
-          std::vector<std::string> value = StringUtils::Split(opts[i], "=");
+          std::vector<std::string> value = StringUtils::Split(opts[i], "=", 2);
+          StringUtils::ToLower(value[0]);
           auto it = optionmap.find(value[0]);
           if (it != optionmap.end())
           {
@@ -1064,7 +1069,7 @@ DemuxPacket* CDVDDemuxFFmpeg::Read()
   return pPacket;
 }
 
-bool CDVDDemuxFFmpeg::SeekTime(int time, bool backwords, double *startpts)
+bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double *startpts)
 {
   bool hitEnd = false;
 
@@ -1109,7 +1114,7 @@ bool CDVDDemuxFFmpeg::SeekTime(int time, bool backwords, double *startpts)
   int ret;
   {
     CSingleLock lock(m_critSection);
-    ret = av_seek_frame(m_pFormatContext, -1, seek_pts, backwords ? AVSEEK_FLAG_BACKWARD : 0);
+    ret = av_seek_frame(m_pFormatContext, -1, seek_pts, backwards ? AVSEEK_FLAG_BACKWARD : 0);
 
     // demuxer can return failure, if seeking behind eof
     if (ret < 0 && m_pFormatContext->duration &&
