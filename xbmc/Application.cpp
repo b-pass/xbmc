@@ -144,6 +144,7 @@
 
 // Dialog includes
 #include "video/dialogs/GUIDialogVideoBookmarks.h"
+#include "video/dialogs/GUIDialogSubtitles.h"
 #include "dialogs/GUIDialogOK.h"
 #include "dialogs/GUIDialogKaiToast.h"
 #include "dialogs/GUIDialogSubMenu.h"
@@ -667,7 +668,6 @@ bool CApplication::Create()
   m_replayGainSettings.iType = CSettings::GetInstance().GetInt(CSettings::SETTING_MUSICPLAYER_REPLAYGAINTYPE);
   m_replayGainSettings.iPreAmp = CSettings::GetInstance().GetInt(CSettings::SETTING_MUSICPLAYER_REPLAYGAINPREAMP);
   m_replayGainSettings.iNoGainPreAmp = CSettings::GetInstance().GetInt(CSettings::SETTING_MUSICPLAYER_REPLAYGAINNOGAINPREAMP);
-  m_replayGainSettings.bAvoidClipping = CSettings::GetInstance().GetBool(CSettings::SETTING_MUSICPLAYER_REPLAYGAINAVOIDCLIPPING);
 
   // Create the Mouse, Keyboard, Remote, and Joystick devices
   // Initialize after loading settings to get joystick deadzone setting
@@ -1154,11 +1154,11 @@ bool CApplication::Initialize()
     event.Reset();
     std::atomic<bool> isMigratingAddons(false);
     CJobManager::GetInstance().Submit([&event, &incompatibleAddons, &isMigratingAddons]() {
-      incompatibleAddons = CAddonSystemSettings::GetInstance().MigrateAddons([&isMigratingAddons]() {
-        isMigratingAddons = true;
-      });
-      event.Set();
-    });
+        incompatibleAddons = CAddonSystemSettings::GetInstance().MigrateAddons([&isMigratingAddons]() {
+          isMigratingAddons = true;
+        });
+        event.Set();
+      }, CJob::PRIORITY_DEDICATED);
     localizedStr = g_localizeStrings.Get(24151);
     iDots = 1;
     while (!event.WaitMSec(1000))
@@ -1481,8 +1481,6 @@ void CApplication::OnSettingChanged(const CSetting *setting)
     m_replayGainSettings.iPreAmp = ((CSettingInt*)setting)->GetValue();
   else if (StringUtils::EqualsNoCase(settingId, CSettings::SETTING_MUSICPLAYER_REPLAYGAINNOGAINPREAMP))
     m_replayGainSettings.iNoGainPreAmp = ((CSettingInt*)setting)->GetValue();
-  else if (StringUtils::EqualsNoCase(settingId, CSettings::SETTING_MUSICPLAYER_REPLAYGAINAVOIDCLIPPING))
-    m_replayGainSettings.bAvoidClipping = ((CSettingBool*)setting)->GetValue();
 }
 
 void CApplication::OnSettingAction(const CSetting *setting)
@@ -3860,6 +3858,12 @@ void CApplication::StopPlaying()
   if ( m_pPlayer->IsPlaying() )
   {
     m_pPlayer->CloseFile();
+
+    // When playback stops we must clear the saved subtitle search from the SubtitleDialog since the dialog is preserved in memory
+    // Otherwise the next time the dialogs open any previous search from a previous movie will be shown
+    CGUIDialogSubtitles *dialog = (CGUIDialogSubtitles*)g_windowManager.GetWindow(WINDOW_DIALOG_SUBTITLES);
+    CGUIMessage msg(GUI_MSG_WINDOW_RESET, dialog->GetID(), 0);
+    dialog->OnMessage(msg);
 
     // turn off visualisation window when stopping
     if ((iWin == WINDOW_VISUALISATION
