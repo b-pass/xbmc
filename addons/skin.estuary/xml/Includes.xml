@@ -1031,18 +1031,28 @@
 		<width>auto</width>
 	</include>
 	<include name="ColoredBackgroundImages">
-		<control type="image">
-			<depth>DepthBackground</depth>
-			<include>FullScreenDimensions</include>
-			<aspectratio>scale</aspectratio>
-			<texture colordiffuse="primary_background">special://skin/extras/backgrounds/primary.jpg</texture>
-		</control>
-		<control type="image">
-			<depth>DepthBackground</depth>
-			<include>FullScreenDimensions</include>
-			<aspectratio>scale</aspectratio>
-			<texture colordiffuse="secondary_background" fallback="special://skin/extras/backgrounds/secondary1.png">$INFO[Skin.String(background_overlay),special://skin/extras/backgrounds/secondary,.png]</texture>
-		</control>
+                <control type="image">
+                        <depth>DepthBackground</depth>
+                        <include>FullScreenDimensions</include>
+                        <aspectratio>scale</aspectratio>
+                        <texture colordiffuse="35FFFFFF">$INFO[Skin.String(custom_background)]</texture>
+                        <visible>Skin.HasSetting(use_custom_bg) + !String.IsEmpty(Skin.String(custom_background))</visible>
+                </control>
+		<group>
+	                <visible>![Skin.HasSetting(use_custom_bg) + !String.IsEmpty(Skin.String(custom_background))]</visible>
+			<control type="image">
+				<depth>DepthBackground</depth>
+				<include>FullScreenDimensions</include>
+				<aspectratio>scale</aspectratio>
+				<texture colordiffuse="primary_background">special://skin/extras/backgrounds/primary.jpg</texture>
+			</control>
+			<control type="image">
+				<depth>DepthBackground</depth>
+				<include>FullScreenDimensions</include>
+				<aspectratio>scale</aspectratio>
+				<texture colordiffuse="secondary_background" fallback="special://skin/extras/backgrounds/secondary1.png">$INFO[Skin.String(background_overlay),special://skin/extras/backgrounds/secondary,.png]</texture>
+			</control>
+		</group>
 	</include>
 	<include name="DefaultBackground">
 		<definition>
