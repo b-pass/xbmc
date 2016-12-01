@@ -37,15 +37,15 @@ public:
   CMultiProvider(const TiXmlNode *first, int parentID);
   
   virtual bool Update(bool forceRefresh) override;
-  virtual void Fetch(std::vector<CGUIListItemPtr> &items) const override;
+  virtual void Fetch(std::vector<CGUIListItemPtr> &items) override;
   virtual bool IsUpdating() const override;
-  virtual void Reset(bool immediately = false) override;
+  virtual void Reset() override;
   virtual bool OnClick(const CGUIListItemPtr &item) override;
   virtual bool OnInfo(const CGUIListItemPtr &item) override;
   virtual bool OnContextMenu(const CGUIListItemPtr &item) override;
   
 protected:
   std::vector<IListProviderPtr> m_providers;
-  mutable std::map<CGUIListItem*, IListProviderPtr> m_itemMap; 
+  std::map<CGUIListItem*, IListProviderPtr> m_itemMap;
   CCriticalSection m_section; // protects m_itemMap
 };

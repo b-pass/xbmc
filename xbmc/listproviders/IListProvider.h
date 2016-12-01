@@ -59,7 +59,7 @@ public:
   /*! \brief Fetch the current list of items.
    \param items [out] the list to be filled.
    */
-  virtual void Fetch(std::vector<CGUIListItemPtr> &items) const=0;
+  virtual void Fetch(std::vector<CGUIListItemPtr> &items)=0;
 
   /*! \brief Check whether the list provider is updating content.
    \return true if in the processing of updating, false otherwise.

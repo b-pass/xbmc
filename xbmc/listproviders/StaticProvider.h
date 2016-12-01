@@ -33,7 +33,7 @@ public:
   virtual ~CStaticListProvider();
 
   virtual bool Update(bool forceRefresh) override;
-  virtual void Fetch(std::vector<CGUIListItemPtr> &items) const override;
+  virtual void Fetch(std::vector<CGUIListItemPtr> &items) override;
   virtual bool OnClick(const CGUIListItemPtr &item) override;
   bool OnInfo(const CGUIListItemPtr &item) override { return false; }
   bool OnContextMenu(const CGUIListItemPtr &item) override { return false; }

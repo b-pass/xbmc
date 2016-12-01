@@ -277,7 +277,7 @@ void CDirectoryProvider::Announce(AnnouncementFlag flag, const char *sender, con
   }
 }
 
-void CDirectoryProvider::Fetch(std::vector<CGUIListItemPtr> &items) const
+void CDirectoryProvider::Fetch(std::vector<CGUIListItemPtr> &items)
 {
   CSingleLock lock(m_section);
   items.clear();

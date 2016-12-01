@@ -41,7 +41,7 @@ bool CMultiProvider::Update(bool forceRefresh)
   return result;
 }
 
-void CMultiProvider::Fetch(std::vector<CGUIListItemPtr> &items) const
+void CMultiProvider::Fetch(std::vector<CGUIListItemPtr> &items)
 {
   CSingleLock lock(m_section);
   std::vector<CGUIListItemPtr> subItems;
@@ -67,16 +67,15 @@ bool CMultiProvider::IsUpdating() const
   return result;
 }
 
-void CMultiProvider::Reset(bool immediately)
+void CMultiProvider::Reset()
 {
-  if (immediately)
   {
     CSingleLock lock(m_section);
     m_itemMap.clear();
   }
 
   for (auto const& provider : m_providers)
-    provider->Reset(immediately);
+    provider->Reset();
 }
 
 bool CMultiProvider::OnClick(const CGUIListItemPtr &item)
