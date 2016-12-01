@@ -67,7 +67,7 @@
 						<height>100</height>
 						<width>auto</width>
 						<visible>!String.isempty(Player.Duration)</visible>
-						<visible>!VideoPlayer.Content(LiveTV) | VideoPlayer.HasEpg</visible>
+						<visible>!Pvr.IsPlayingRecording + [!VideoPlayer.Content(LiveTV) | VideoPlayer.HasEpg]</visible>
 					</control>
 					<control type="image">
 						<top>2</top>
