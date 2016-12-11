@@ -13,41 +13,45 @@
 			<animation effect="fade" start="100" end="0" time="200" tween="sine" condition="$EXP[infodialog_active]">Conditional</animation>
 			
 			<control type="button" id="9949">
+				<description>Fixes the sort direction of the main container and then passes focus back to the side list</description>
 				<visible allowhiddenfocus="true">false</visible>
 				<onfocus condition='!StringCompare(Container(9950).ListItem.Property(id),"all_flat") + !Container.SortDirection(ascending)'>Container.SetSortDirection</onfocus>
 				<onfocus condition='StringCompare(Container(9950).ListItem.Property(id),"all_flat") + Container.SortDirection(ascending)'>Container.SetSortDirection</onfocus>
 				<onfocus>Skin.Reset(NeedSortFix)</onfocus>
+				<onfocus>SetFocus(50, 0, absolute)</onfocus>
 				<onfocus>SetFocus(9950)</onfocus>
 			</control>
 
 			<control type="group">
 				<include>OpenClose_Left</include>
 				<control type="fixedlist" id="9950">
+					<description>side Show listing, changes what is displayed in the main episode listing</description>
 					<left>0</left>
 					<top>list_y_offset</top>
 					<right>550</right>
 					<bottom>list_y_offset</bottom>
 					<onright>50</onright>
-					<onclick>Control.SetFocus(50, 0)</onclick>
+					<onclick>Control.SetFocus(50, 0, absolute)</onclick>
 					<movement>3</movement>
 					<focusposition>5</focusposition>
 					<pagecontrol>73</pagecontrol>
-					<scrolltime>200</scrolltime>
-					<!--content>
+					<scrolltime>100</scrolltime>
+					<content>
 						<item>
 							<label>All Recordings - $INFO[Skin.String(pvrCurrentDir)]</label>
 							<property name="id">all_flat</property>
 							<onclick>-</onclick>
 						</item>
-					</content-->
+					</content>
 					<content sortby="label" sortorder="ascending" target="noop">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]</content>
 					<focusedlayout height="80" width="550">
 						<control type="button">
-							  <visible allowhiddenfocus="true">false</visible>
-							  <onfocus condition='String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")'>Container.Update("pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]?view=flat", true)</onfocus>
-							  <onfocus condition='!String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")'>Container.Update("$INFO[Container(9950).ListItem.FolderPath]", true)</onfocus>
-							  <onfocus condition='Skin.HasSetting(NeedSortFix)'>AlarmClock(FixSort,SetFocus(9949),00:00,true)</onfocus>
-							  <onfocus condition='!Skin.HasSetting(NeedSortFix)'>Skin.SetBool(NeedSortFix)</onfocus> 
+							<description>Updates the main content list with the proper listing and triggers a check on the content's sort order</description>
+							<visible allowhiddenfocus="true">false</visible>
+							<onfocus condition='String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")'>Container.Update("pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]?view=flat", replace)</onfocus>
+							<onfocus condition='!String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")'>Container.Update("$INFO[Container(9950).ListItem.FolderPath]", replace)</onfocus>
+							<onfocus condition='Skin.HasSetting(NeedSortFix)'>AlarmClock(FixSort,SetFocus(9949),00:00,true)</onfocus>
+							<onfocus condition='!Skin.HasSetting(NeedSortFix)'>Skin.SetBool(NeedSortFix)</onfocus> 
 						</control>
 						<control type="image">
 							<left>0</left>
@@ -65,7 +69,7 @@
 							<aligny>center</aligny>
 							<scroll>true</scroll>
 							<label>$INFO[ListItem.Label]</label>
-							<font>font32_title</font>
+							<font>font36_title</font>
 							<shadowcolor>text_shadow</shadowcolor>
 						</control>
 					</focusedlayout>
@@ -109,6 +113,7 @@
 					<top>150</top>
 					<left>-10</left>
 					<control type="list" id="50">
+						<description>Main content panel.  *Should* only ever show episodes...</description>
 						<visible>true</visible>
 						<left>0</left>
 						<width>widelist_width</width>
@@ -130,7 +135,7 @@
 								<left>10</left>
 								<aligny>center</aligny>
 								<font>font30_title</font>
-								<label>$INFO[ListItem.Label]$INFO[ListItem.EpisodeName, (,)]</label>
+								<label>$VAR[PVR_Episode_List_Entry]</label>
 								<shadowcolor>text_shadow</shadowcolor>
 							</control>
 							<control type="label">
@@ -147,7 +152,7 @@
 								<left>10</left>
 								<aligny>center</aligny>
 								<font>font13</font>
-								<label>$INFO[ListItem.Label]$INFO[ListItem.EpisodeName, (,)]</label>
+								<label>$VAR[PVR_Episode_List_Entry]</label>
 								<shadowcolor>text_shadow</shadowcolor>
 							</control>
 							<control type="label">
@@ -161,6 +166,13 @@
 							</control>
 						</itemlayout>
 					</control>
+					<control type="list" id="50">
+						<visible>false</visible>
+						<itemlayout>
+						</itemlayout>
+						<focusedlayout>
+						</focusedlayout>
+					</control>
 					<control type="scrollbar" id="9973">
 						<right>5</right>
 						<top>0</top>
@@ -173,10 +185,11 @@
 				</control>
 				
 				<control type="group">
+					<description>Current selection info area</description>
 					<top>670</top>
 					
 					<control type="image">
-						<description>Dialog Header image</description>
+						<description>separator between episode info and episode list</description>
 						<left>-34</left>
 						<right>0</right>
 						<top>-20</top>
@@ -185,75 +198,95 @@
 					</control>
 					
 					<control type="group">
+						<description>User is on side Show listing, with .. or All Episodes selected.  Very basic info only</description>
 						<bottom>34</bottom>
-						<height>276</height>
-						<include>Visible_Fade</include>
+						<height>401</height>
 						<visible>!Control.HasFocus(50) + [StringCompare(Container(9950).ListItem.Label,"..") | StringCompare(Container(9950).ListItem.Property(id),"all_flat")]</visible>
-						<control type="label">
-							<left>500</left>
-							<width>1000</width>
-							<height>50</height>
-							<textcolor>white</textcolor>
-							<font>font36_title</font>
-							<label>$INFO[Container(9950).ListItem.Label]</label>
-						</control>
+						
 						<control type="image">
+							<include>Visible_Fade</include>
 							<left>-10</left>
-							<top>0</top>
+							<bottom>0</bottom>
 							<height>276</height>
 							<width>490</width>
 							<align>center</align>
-							<aspectratio>keep</aspectratio>
+							<aspectratio>scale</aspectratio>
 							<texture>DefaultTVShows.png</texture>
+						</control>
+						
+						<control type="label">
+							<top>25</top>
+							<height>40</height>
+							<width>1000</width>
+							<font>font32_title</font>
+							<scroll>true</scroll>
+							<textcolor>button_focus</textcolor>
+							<label>$INFO[Container(9950).ListItem.Label]</label>
+						</control>
+						
+						<control type="textbox">
+							<bottom>0</bottom>
+							<height>276</height>
+							<left>500</left>
+							<right>25</right>
+							<font>font14</font>
+							<label>$INFO[Container(50).NumItems] items</label>
 						</control>
 					</control>
 					
 					<control type="group">
+						<description>User is on side Show listing, with a Show selected. Give general info about the show.</description>
+						
 						<bottom>34</bottom>
-						<height>276</height>
-						<include>Visible_Fade</include>
+						<height>401</height>
 						<visible>!Control.HasFocus(50) + !StringCompare(Container(9950).ListItem.Label,"..") + !StringCompare(Container(9950).ListItem.Property(id),"all_flat")</visible>
 						
 						<control type="image">
+							<include>Visible_Fade</include>
 							<left>-10</left>
-							<top>0</top>
+							<bottom>0</bottom>
 							<height>276</height>
 							<width>490</width>
 							<align>center</align>
-							<aspectratio>keep</aspectratio>
+							<aspectratio>scale</aspectratio>
 							<texture fallback="DefaultTVShows.png">$INFO[Container(50).ListItem.Art(fanart)]</texture>
 						</control> 
 						
 						<control type="label">
-							<left>500</left>
+							<top>25</top>
+							<height>40</height>
 							<width>1000</width>
-							<height>50</height>
-							<textcolor>white</textcolor>
 							<font>font32_title</font>
-							<label>$INFO[Container(9950).ListItem.Label]</label>
+							<scroll>true</scroll>
+							<textcolor>button_focus</textcolor>
+							<label>$INFO[Container(50).ListItem.Label]</label>
 						</control>
+						
 						<control type="label">
-							<top>50</top>
-							<left>500</left>
-							<width>1000</width>
-							<height>50</height>
-							<font>font13</font>
+							<top>30</top>
+							<right>10</right>
+							<width>400</width>
+							<height>90</height>
+							<font>font25_narrow</font>
+							<align>right</align>
+							<textcolor>grey</textcolor>
 							<label>$INFO[Container(50).ListItem.ChannelName]</label>
 						</control>
+						
 						<control type="textbox">
-							<top>100</top>
+							<bottom>0</bottom>
+							<height>276</height>
 							<left>500</left>
-							<width>1000</width>
-							<height>50</height>
+							<right>25</right>
 							<font>font14</font>
 							<visible>IntegerGreaterThan(Container(50).NumItems,1)</visible>
 							<label>$INFO[Container(50).NumItems] episodes</label>
 						</control>
 						<control type="label">
-							<top>100</top>
+							<bottom>0</bottom>
+							<height>276</height>
 							<left>500</left>
-							<width>1000</width>
-							<height>50</height>
+							<right>25</right>
 							<font>font14</font>
 							<visible>!IntegerGreaterThan(Container(50).NumItems,1) + IntegerGreaterThan(Container(50).NumItems,0)</visible>
 							<label>One episode</label>
@@ -261,18 +294,20 @@
 					</control>
 					
 					<control type="group">
+						<description>User is on Main episode listing.  Give the most detail Episode Info available.</description>
+						
 						<bottom>34</bottom>
 						<height>401</height>
-						<include>Visible_Fade</include>
 						<visible>Control.HasFocus(50)</visible>
 						
 						<control type="image">
+							<include>Visible_Fade</include>
 							<left>-10</left>
 							<bottom>0</bottom>
 							<height>276</height>
 							<width>490</width>
 							<align>center</align>
-							<aspectratio>keep</aspectratio>
+							<aspectratio>scale</aspectratio>
 							<texture fallback="$INFO[Container(50).ListItem.Art(fanart)]">$INFO[Container(50).ListItem.Art(thumb)]</texture>
 						</control>
 						
@@ -280,7 +315,7 @@
 							<top>25</top>
 							<height>40</height>
 							<width>1000</width>
-							<font>font32</font>
+							<font>font32_title</font>
 							<scroll>true</scroll>
 							<textcolor>button_focus</textcolor>
 							<label>$INFO[Container(50).ListItem.Label]</label>
@@ -324,6 +359,7 @@
 				<param name="sublabel" value="$INFO[Skin.String(pvrCurrentDir)]" />
 			</include>
 			<control type="group">
+				<description>Backend storage info on top bar</description>
 				<depth>DepthBars</depth>
 				<top>8</top>
 				<left>width_center</left>
