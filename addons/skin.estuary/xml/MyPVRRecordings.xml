@@ -3,10 +3,11 @@
 	<defaultcontrol always="true">9950</defaultcontrol>
 	<backgroundcolor>background</backgroundcolor>
 	<views>50</views>
-	<onload>PlayerControl(stop)</onload>
 	<onload condition="!Skin.String(pvrCurrentDir)">Skin.SetString(pvrCurrentDir, "Default")</onload>
+	<onload condition="Player.HasMedia">AlarmClock(StopPlayback,PlayerControl(stop),00:00,true)</onload>
 	<onload>Container.SetSortMethod(date)</onload>
 	<onload>Skin.SetBool(NeedSortFix)</onload>
+	<onload>SetFocus(9950, 0, absolute)</onload>
 	<controls>
 		<include>DefaultBackground</include>
 		<control type="group">
@@ -35,7 +36,7 @@
 					<movement>3</movement>
 					<focusposition>5</focusposition>
 					<pagecontrol>73</pagecontrol>
-					<scrolltime>100</scrolltime>
+					<scrolltime>200</scrolltime>
 					<content>
 						<item>
 							<label>All Recordings - $INFO[Skin.String(pvrCurrentDir)]</label>
@@ -122,6 +123,7 @@
 						<pagecontrol>9973</pagecontrol>
 						<scrolltime>200</scrolltime>
 						<orientation>vertical</orientation>
+						<scrolltime>100</scrolltime>
 						<focusedlayout height="60" width="widelist_width">
 							<control type="image">
 								<left>0</left>
@@ -134,7 +136,7 @@
 							<control type="label">
 								<left>10</left>
 								<aligny>center</aligny>
-								<font>font30_title</font>
+								<font>font30</font>
 								<label>$VAR[PVR_Episode_List_Entry]</label>
 								<shadowcolor>text_shadow</shadowcolor>
 							</control>
@@ -369,7 +371,7 @@
 					<width>500</width>
 					<height>20</height>
 					<left>-250</left>
-					<label>$INFO[PVR.backenddiskspace]</label>
+					<label>$VAR[PVRDiskSpacePercent] backend disk space used</label>
 					<shadowcolor>black</shadowcolor>
 					<align>center</align>
 					<font>font25_narrow</font>

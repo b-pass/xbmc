@@ -169,15 +169,15 @@
 					<onclick>ActivateWindow(filemanager)</onclick>
 					<icon>icons/settings/filemanager.png</icon>
 				</item>
-				<!-- <item>
+				<item>
 					<label>$LOCALIZE[24001]</label>
 					<onclick>ActivateWindow(addonbrowser)</onclick>
 					<icon>icons/settings/addons.png</icon>
-				</item> -->
+				</item>
 			</content>
 		</control>
 		<include content="TopBar">
-			<param name="breadcrumbs_label" value="$LOCALIZE[13000]" />
+			<param name="breadcrumbs_label" value="$LOCALIZE[21417]" />
 		</include>
 		<include>BottomBar</include>
 	</controls>
