@@ -50,7 +50,7 @@
 							<visible allowhiddenfocus="true">false</visible>
 							<onfocus condition='String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")'>Container.Update("pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]?view=flat", replace)</onfocus>
 							<onfocus condition='!String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")'>Container.Update("$INFO[Container(9950).ListItem.FolderPath]", replace)</onfocus>
-							<onfocus condition='Skin.HasSetting(NeedSortFix)'>AlarmClock(FixSort,SetFocus(9949),00:00,true)</onfocus>
+							<onfocus condition='!System.HasModalDialog + Skin.HasSetting(NeedSortFix)'>AlarmClock(FixSort,SetFocus(9949),00:00,true)</onfocus>
 							<onfocus condition='!Skin.HasSetting(NeedSortFix)'>Skin.SetBool(NeedSortFix)</onfocus> 
 						</control>
 						<control type="image">

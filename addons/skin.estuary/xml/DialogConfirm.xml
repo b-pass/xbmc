@@ -4,7 +4,7 @@
 	<include>Animation_DialogPopupOpenClose</include>
 	<depth>DepthDialog+</depth>
 	<controls>
-		<control type="group">
+		<control type="group" id="9001">
 			<height>390</height>
 			<centertop>50%</centertop>
 			<centerleft>50%</centerleft>
