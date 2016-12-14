@@ -7,7 +7,6 @@
 	<onload condition="Player.HasMedia">AlarmClock(StopPlayback,PlayerControl(stop),00:00,true)</onload>
 	<onload>Container.SetSortMethod(date)</onload>
 	<onload>Skin.SetBool(NeedSortFix)</onload>
-	<onload>SetFocus(9950, 0, absolute)</onload>
 	<controls>
 		<include>DefaultBackground</include>
 		<control type="group">
