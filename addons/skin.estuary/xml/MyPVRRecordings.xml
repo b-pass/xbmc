@@ -132,8 +132,17 @@
 								<texture colordiffuse="button_focus">lists/focus.png</texture>
 								<visible>Control.HasFocus(50)</visible>
 							</control>
+							<control type="image">
+								<left>0</left>
+								<top>14</top>
+								<width>32</width>
+								<height>32</height>
+								<texture colordiffuse="white">$VAR[ListWatchedIconVar]</texture>
+								<animation effect="fade" start="0" end="100" time="300" reversible="false">Focus</animation>
+							</control>
 							<control type="label">
-								<left>10</left>
+								<left>37</left>
+								<right>300</right>
 								<aligny>center</aligny>
 								<font>font30</font>
 								<label>$VAR[PVR_Episode_List_Entry]</label>
@@ -141,7 +150,7 @@
 							</control>
 							<control type="label">
 								<right>10</right>
-								<width>500</width>
+								<width>300</width>
 								<align>right</align>
 								<aligny>center</aligny>
 								<font>font12</font>
@@ -149,8 +158,17 @@
 							</control>
 						</focusedlayout>
 						<itemlayout height="60" width="widelist_width">
+							<control type="image">
+								<left>0</left>
+								<top>14</top>
+								<width>32</width>
+								<height>32</height>
+								<texture colordiffuse="white">$VAR[ListWatchedIconVar]</texture>
+								<animation effect="fade" start="0" end="100" time="300" reversible="false">Focus</animation>
+							</control>
 							<control type="label">
-								<left>10</left>
+								<left>37</left>
+								<right>300</right>
 								<aligny>center</aligny>
 								<font>font13</font>
 								<label>$VAR[PVR_Episode_List_Entry]</label>
@@ -158,7 +176,7 @@
 							</control>
 							<control type="label">
 								<right>10</right>
-								<width>500</width>
+								<width>300</width>
 								<align>right</align>
 								<aligny>center</aligny>
 								<font>font12</font>
