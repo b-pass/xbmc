@@ -407,7 +407,7 @@
 		<value>$INFO[ListItem.EpisodeName]</value>
 	</variable>
 	<variable name="PVR_Episode_List_Entry">
-		<value condition="!StringCompare(Container(9950).ListItem.Property(id), all_flat) + !IsEmpty(ListItem.EpisodeName)">$INFO[ListItem.EpisodeName]</value>
+		<value condition="!String.IsEqual(Container(9950).ListItem.Property(id), all_flat) + !String.IsEmpty(ListItem.EpisodeName)">$INFO[ListItem.EpisodeName]</value>
                 <value>$INFO[ListItem.Label]$INFO[ListItem.EpisodeName, - ","]</value>
 	</variable>
 	<variable name="PVRDiskSpacePercent">

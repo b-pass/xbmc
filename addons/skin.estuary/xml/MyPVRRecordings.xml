@@ -15,8 +15,8 @@
 			<control type="button" id="9949">
 				<description>Fixes the sort direction of the main container and then passes focus back to the side list</description>
 				<visible allowhiddenfocus="true">false</visible>
-				<onfocus condition='!StringCompare(Container(9950).ListItem.Property(id),"all_flat") + !Container.SortDirection(ascending)'>Container.SetSortDirection</onfocus>
-				<onfocus condition='StringCompare(Container(9950).ListItem.Property(id),"all_flat") + Container.SortDirection(ascending)'>Container.SetSortDirection</onfocus>
+				<onfocus condition='!String.IsEqual(Container(9950).ListItem.Property(id),"all_flat") + !Container.SortDirection(ascending)'>Container.SetSortDirection</onfocus>
+				<onfocus condition='String.IsEqual(Container(9950).ListItem.Property(id),"all_flat") + Container.SortDirection(ascending)'>Container.SetSortDirection</onfocus>
 				<onfocus>Skin.Reset(NeedSortFix)</onfocus>
 				<onfocus>SetFocus(50, 0, absolute)</onfocus>
 				<onfocus>SetFocus(9950)</onfocus>
@@ -220,7 +220,7 @@
 						<description>User is on side Show listing, with .. or All Episodes selected.  Very basic info only</description>
 						<bottom>34</bottom>
 						<height>401</height>
-						<visible>!Control.HasFocus(50) + [StringCompare(Container(9950).ListItem.Label,"..") | StringCompare(Container(9950).ListItem.Property(id),"all_flat")]</visible>
+						<visible>!Control.HasFocus(50) + [String.IsEqual(Container(9950).ListItem.Label,"..") | String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")]</visible>
 						
 						<control type="image">
 							<include>Visible_Fade</include>
@@ -258,7 +258,7 @@
 						
 						<bottom>34</bottom>
 						<height>401</height>
-						<visible>!Control.HasFocus(50) + !StringCompare(Container(9950).ListItem.Label,"..") + !StringCompare(Container(9950).ListItem.Property(id),"all_flat")</visible>
+						<visible>!Control.HasFocus(50) + !String.IsEqual(Container(9950).ListItem.Label,"..") + !String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")</visible>
 						
 						<control type="image">
 							<include>Visible_Fade</include>
