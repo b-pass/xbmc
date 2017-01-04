@@ -237,12 +237,12 @@
 					</include>
 					<control type="grouplist" id="8001">
 						<include>WidgetGroupListCommon</include>
-						<include content="WidgetListCategories">
+						<!--include content="WidgetListCategories">
 							<param name="widget_header" value="$LOCALIZE[31148]"/>
 							<param name="list_id" value="8900"/>
 							<param name="visible" value="Integer.IsGreater(Container(8100).NumItems,0) | Integer.IsGreater(Container(8200).NumItems,0) | Integer.IsGreater(Container(8300).NumItems,0) | Integer.IsGreater(Container(8400).NumItems,0) | Integer.IsGreater(Container(8500).NumItems,0)"/>
 							<param name="addon_submenu" value="true"/>
-						</include>
+						</include-->
 						<include content="WidgetListSquare">
 							<param name="content_path" value="addons://sources/video/"/>
 							<param name="widget_header" value="$LOCALIZE[1037]"/>
@@ -409,6 +409,17 @@
 						<param name="button_id" value="22400"/>
 						<param name="button2_onclick" value="Skin.SetBool(HomeMenuNoTVButton)"/>
 					</include>
+          <!--control type="button" id="22200">
+            <left>700</left>
+            <top>200</top>
+            <width>300</width>
+            <height>100</height>
+            <label>  Reload</label>
+            <onclick>PVR.RecordingsUpdate</onclick>
+            <onclick>Notification("PVR Manager", "Kick?")</onclick>
+            <onleft>22100</onleft>
+            <onright>22100</onright>
+          </control-->
           <control type="list" id="22100">
             <visible>System.HasPVRAddon</visible>
             <left>100</left>
@@ -418,8 +429,8 @@
             <scrolltime tween="cubic" easing="out">500</scrolltime>
             <orientation>vertical</orientation>
             <onleft>9000</onleft>
-            <onright>-</onright>
             <onback>SetFocus(9000)</onback>
+            <!--onright>22200</onright-->
             <preloaditems>1</preloaditems>
             <content sortby="label" target="noop">pvr://recordings/tv/active/</content>
             <onclick>Skin.SetString(pvrCurrentDir, "$INFO[ListItem.Label]")</onclick>
