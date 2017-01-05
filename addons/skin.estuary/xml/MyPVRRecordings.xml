@@ -124,6 +124,11 @@
 						<orientation>vertical</orientation>
 						<scrolltime>100</scrolltime>
 						<focusedlayout height="60" width="widelist_width">
+                                                        <control type="button">
+                                                                <description>Never let this container show folders</description>
+                                                                <visible allowhiddenfocus="true">false</visible>
+                                                                <onfocus condition='ListItem.IsFolder | String.IsEqual(ListItem.Label, "..")'>Control.SetFocus(9950)</onfocus>
+                                                        </control>
 							<control type="image">
 								<left>0</left>
 								<right>0</right>
