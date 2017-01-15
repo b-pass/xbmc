@@ -54,6 +54,7 @@ if(UNIX)
   if(CORE_SYSTEM_NAME STREQUAL linux OR CORE_SYSTEM_NAME STREQUAL freebsd)
     option(ENABLE_X11         "Enable X11 support?" ON)
     option(ENABLE_AML         "Enable AML?" OFF)
+    option(ENABLE_IMX         "Enable IMX?" OFF)
   endif()
 endif()
 # System options
@@ -102,7 +103,7 @@ list(APPEND DEPLIBS ${CMAKE_THREAD_LIBS_INIT})
 
 # Required dependencies
 set(required_deps Sqlite3 FreeType PCRE Cpluff LibDvd
-                  TinyXML Python Yajl
+                  TinyXML Python Yajl Cdio
                   Lzo2 Fribidi TagLib FFMPEG CrossGUID)
 if(NOT WIN32)
   list(APPEND required_deps ZLIB)
@@ -170,7 +171,6 @@ endif()
 
 if(ENABLE_OPTICAL)
   list(APPEND DEP_DEFINES -DHAS_DVD_DRIVE)
-  core_require_dep(Cdio)
 endif()
 
 if(ENABLE_LIRC)
@@ -211,6 +211,7 @@ endif()
 
 if(CORE_SYSTEM_NAME STREQUAL android OR CORE_SYSTEM_NAME STREQUAL linux)
   core_optional_dep(AML)
+  core_optional_dep(IMX)
 elseif(CORE_SYSTEM_NAME STREQUAL rbpi)
   core_require_dep(MMAL)
 endif()
