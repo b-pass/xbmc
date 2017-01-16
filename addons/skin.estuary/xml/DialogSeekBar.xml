@@ -105,7 +105,7 @@
 			</control>
 			<control type="group" id="6000">
 				<top>-5</top>
-				<visible>PVR.IsTimeShift + !Player.ChannelPreviewActive</visible>
+				<visible>PVR.IsPlayingLiveTV + PVR.IsTimeShift + !Player.ChannelPreviewActive</visible>
 				<animation effect="fade" time="300">VisibleChange</animation>
 				<control type="label">
 					<top>0</top>
