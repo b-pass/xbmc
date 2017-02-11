@@ -2,6 +2,8 @@
 <window>
 	<depth>DepthOSD</depth>
 	<defaultcontrol always="true">5553</defaultcontrol>
+        <onload>AlarmClock(FSAutoClose,Dialog.Close(FullScreenInfo),00:30,true)</onload>
+        <onunload>CancelAlarm(FSAutoClose,true)</onunload>
 	<controls>
 		<control type="button">
 			<description>background close area</description>

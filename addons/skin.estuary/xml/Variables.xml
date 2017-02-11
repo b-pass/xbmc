@@ -45,7 +45,7 @@
 		<value condition="Player.HasAudio">$INFO[MusicPlayer.Artist]</value>
 	</variable>
 	<variable name="FullScreenInfoTextBoxVar">
-		<value condition="Control.HasFocus(5553)">$INFO[VideoPlayer.Tagline,[B],[/B][CR]]$INFO[VideoPlayer.Plot]</value>
+		<value condition="Control.HasFocus(5553)">[B]$INFO[VideoPlayer.Title]$INFO[VideoPlayer.EpisodeName, - ,]$INFO[VideoPlayer.Tagline, - ,][/B] [CR]$INFO[VideoPlayer.Plot]</value>
 		<value condition="Control.HasFocus(5555)">$INFO[VideoPlayer.NextTitle,[B],[/B][CR]]$INFO[VideoPlayer.NextPlot]</value>
 		<value>$INFO[VideoPlayer.CastAndRole]</value>
 	</variable>
@@ -253,7 +253,7 @@
 		<value>$INFO[ListItem.Genre]</value>
 	</variable>
 	<variable name="NowPlayingBreadcrumbsVar">
-		<value condition="VideoPlayer.Content(livetv)">$INFO[VideoPlayer.Title]</value>
+		<value condition="VideoPlayer.Content(livetv) | PVR.IsPlayingRecording">$INFO[VideoPlayer.Title]$INFO[VideoPlayer.EpisodeName, - ,]</value>
 		<value condition="Window.IsActive(fullscreenvideo)">$INFO[VideoPlayer.Title]$INFO[VideoPlayer.Year, ([COLOR button_focus],[/COLOR])]</value>
 		<value condition="MusicPartyMode.Enabled">$LOCALIZE[589]</value>
 		<value>$LOCALIZE[31000]...</value>
