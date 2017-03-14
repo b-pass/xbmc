@@ -2,7 +2,7 @@
 <window>
 	<depth>DepthOSD</depth>
 	<defaultcontrol always="true">5553</defaultcontrol>
-        <onload>AlarmClock(FSAutoClose,Dialog.Close(FullScreenInfo),00:30,true)</onload>
+        <onload>AlarmClock(FSAutoClose,Dialog.Close(FullScreenInfo),00:15,true)</onload>
         <onunload>CancelAlarm(FSAutoClose,true)</onunload>
 	<controls>
 		<control type="button">
