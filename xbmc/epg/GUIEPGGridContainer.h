@@ -84,14 +84,13 @@ namespace EPG
     void SetTimelineItems(const std::unique_ptr<CFileItemList> &items, const CDateTime &gridStart, const CDateTime &gridEnd);
     void SetChannel(const PVR::CPVRChannelPtr &channel);
     void SetChannel(const std::string &channel);
-    void ResetCoordinates();
 
   protected:
     bool OnClick(int actionID);
     bool SelectItemFromPoint(const CPoint &point, bool justGrid = true);
 
-    void SetChannel(int channel, bool bFindClosestItem = true);
-    void SetBlock(int block);
+    void SetChannel(int channel);
+    void SetBlock(int block, bool bUpdateBlockTravelAxis = true);
     void ChannelScroll(int amount);
     void ProgrammesScroll(int amount);
     void ValidateOffset();
@@ -100,9 +99,7 @@ namespace EPG
     GridItem *GetItem(int channel);
     GridItem *GetNextItem(int channel);
     GridItem *GetPrevItem(int channel);
-    GridItem *GetClosestItem(int channel);
 
-    int GetItemSize(GridItem *item);
     int GetBlock(const CGUIListItemPtr &item, int channel);
     int GetRealBlock(const CGUIListItemPtr &item, int channel);
     void MoveToRow(int row);
@@ -155,6 +152,8 @@ namespace EPG
 
     EPG::CEpgInfoTagPtr GetSelectedEpgInfoTag() const;
 
+    unsigned int GetPageNowOffset() const;
+
     int m_rulerUnit; //! number of blocks that makes up one element of the ruler
     int m_channelsPerPage;
     int m_programmesPerPage;
@@ -163,6 +162,7 @@ namespace EPG
     int m_blocksPerPage;
     int m_blockCursor;
     int m_blockOffset;
+    int m_blockTravelAxis;
     int m_cacheChannelItems;
     int m_cacheProgrammeItems;
     int m_cacheRulerItems;

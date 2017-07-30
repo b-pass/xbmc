@@ -262,7 +262,7 @@ void CAdvancedSettings::Initialize()
   m_imageRes = 720;
   m_imageScalingAlgorithm = CPictureScalingAlgorithm::Default;
 
-  m_sambaclienttimeout = 10;
+  m_sambaclienttimeout = 30;
   m_sambadoscodepage = "";
   m_sambastatfiles = true;
 
@@ -279,7 +279,7 @@ void CAdvancedSettings::Initialize()
   m_strMusicLibraryAlbumFormat = "";
   m_prioritiseAPEv2tags = false;
   m_musicItemSeparator = " / ";
-  m_musicArtistSeparators = { ";", ":", "|", " feat. ", " ft. " };
+  m_musicArtistSeparators = { ";", " feat. ", " ft. " };
   m_videoItemSeparator = " / ";
   m_iMusicLibraryDateAdded = 1; // prefer mtime over ctime and current time
 
@@ -316,7 +316,7 @@ void CAdvancedSettings::Initialize()
   m_screenAlign_xStretchFactor = 1.0;
   m_screenAlign_yStretchFactor = 1.0;
 
-  m_curlconnecttimeout = 10;
+  m_curlconnecttimeout = 30;
   m_curllowspeedtime = 20;
   m_curlretries = 2;
   m_curlDisableIPV6 = false;      //Certain hardware/OS combinations have trouble
@@ -1010,7 +1010,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     }
   }
 
-  XMLUtils::GetInt(pRootElement, "remotedelay", m_remoteDelay, 1, 20);
+  XMLUtils::GetInt(pRootElement, "remotedelay", m_remoteDelay, 0, 20);
   XMLUtils::GetFloat(pRootElement, "controllerdeadzone", m_controllerDeadzone, 0.0f, 1.0f);
   XMLUtils::GetUInt(pRootElement, "fanartres", m_fanartRes, 0, 1080);
   XMLUtils::GetUInt(pRootElement, "imageres", m_imageRes, 0, 1080);

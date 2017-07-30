@@ -331,9 +331,9 @@ bool CApplication::OnEvent(XBMC_Event& newEvent)
     case XBMC_VIDEORESIZE:
       if (g_windowManager.Initialized())
       {
-        g_Windowing.SetWindowResolution(newEvent.resize.w, newEvent.resize.h);
         if (!g_advancedSettings.m_fullScreen)
         {
+          g_Windowing.SetWindowResolution(newEvent.resize.w, newEvent.resize.h);
           g_graphicsContext.SetVideoResolution(RES_WINDOW, true);
           CSettings::GetInstance().SetInt(CSettings::SETTING_WINDOW_WIDTH, newEvent.resize.w);
           CSettings::GetInstance().SetInt(CSettings::SETTING_WINDOW_HEIGHT, newEvent.resize.h);
@@ -2752,11 +2752,14 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
       CSingleExit ex(g_graphicsContext);
       m_frameMoveGuard.unlock();
       // Calculate a window size between 2 and 10ms, 4 continuous requests let the window grow by 1ms
-      unsigned int sleepTime = std::max(static_cast<unsigned int>(2), std::min(m_ProcessedExternalCalls >> 2, static_cast<unsigned int>(10)));
+      // WHen not playing video we allow it to increase to 80ms
+      unsigned int max_sleep = m_pPlayer->IsPlayingVideo() && !m_pPlayer->IsPausedPlayback() ? 10 : 80;
+      unsigned int sleepTime = std::max(static_cast<unsigned int>(2), std::min(m_ProcessedExternalCalls >> 2, max_sleep));
       Sleep(sleepTime);
       m_frameMoveGuard.lock();
+      m_ProcessedExternalDecay = 5;
     }
-    else
+    if (m_ProcessedExternalDecay && --m_ProcessedExternalDecay == 0)
       m_ProcessedExternalCalls = 0;
   }
 
@@ -2928,6 +2931,9 @@ void CApplication::Stop(int exitCode)
 
     CLog::Log(LOGNOTICE, "stop player");
     m_pPlayer->ClosePlayer();
+
+    // quick and dirty Krypton-only fix for http://trac.kodi.tv/ticket/17374
+    g_PVRManager.SetWakeupCommand();
 
     StopServices();
 

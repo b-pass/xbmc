@@ -816,7 +816,7 @@ CPVRTimerInfoTagPtr CPVRTimerInfoTag::CreateFromEpg(const CEpgInfoTagPtr &tag, b
     // create epg-based timer rule
     timerType = CPVRTimerType::CreateFromAttributes(
       PVR_TIMER_TYPE_IS_REPEATING,
-      PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_FORBIDS_NEW_INSTANCES, channel->ClientID());
+      PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_FORBIDS_NEW_INSTANCES | PVR_TIMER_TYPE_FORBIDS_EPG_TAG_ON_CREATE, channel->ClientID());
 
     if (timerType)
     {
@@ -838,7 +838,7 @@ CPVRTimerInfoTagPtr CPVRTimerInfoTag::CreateFromEpg(const CEpgInfoTagPtr &tag, b
     // create one-shot epg-based timer
     timerType = CPVRTimerType::CreateFromAttributes(
       PVR_TIMER_TYPE_ATTRIBUTE_NONE,
-      PVR_TIMER_TYPE_IS_REPEATING | PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_FORBIDS_NEW_INSTANCES, channel->ClientID());
+      PVR_TIMER_TYPE_IS_REPEATING | PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_FORBIDS_NEW_INSTANCES | PVR_TIMER_TYPE_FORBIDS_EPG_TAG_ON_CREATE, channel->ClientID());
   }
 
   if (!timerType)
@@ -976,12 +976,22 @@ CEpgInfoTagPtr CPVRTimerInfoTag::GetEpgInfoTag(bool bCreate /* = true */) const
           {
             m_epgTag = epg->GetTagByBroadcastId(m_iEpgUid);
           }
-          else if (!m_bStartAnyTime && !m_bEndAnyTime)
+          else
           {
-            // if no epg uid present, try to find a tag according to timer's start/end time
-            m_epgTag = epg->GetTagBetween(StartAsUTC() - CDateTimeSpan(0, 0, 2, 0), EndAsUTC() + CDateTimeSpan(0, 0, 2, 0));
-            if (m_epgTag)
-              m_iEpgUid = m_epgTag->UniqueBroadcastID();
+            time_t startTime = 0;
+            time_t endTime = 0;
+
+            StartAsUTC().GetAsTime(startTime);
+            if (startTime > 0)
+              EndAsUTC().GetAsTime(endTime);
+
+            if (startTime > 0 && endTime > 0)
+            {
+              // if no epg uid present, try to find a tag according to timer's start/end time
+              m_epgTag = epg->GetTagBetween(StartAsUTC() - CDateTimeSpan(0, 0, 2, 0), EndAsUTC() + CDateTimeSpan(0, 0, 2, 0));
+              if (m_epgTag)
+                m_iEpgUid = m_epgTag->UniqueBroadcastID();
+            }
           }
         }
       }
