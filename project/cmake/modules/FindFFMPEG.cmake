@@ -33,21 +33,24 @@
 #
 
 # required ffmpeg library versions
+# note to distro maintainers:
+# only ffmpeg 3.1 is supported for Krypton!
+# our ffmpeg 3.1 version carries two important patches: https://github.com/xbmc/FFmpeg/commits/release/3.1-xbmc
 set(REQUIRED_FFMPEG_VERSION 3.1)
-set(_avcodec_ver ">=57.48.101")
-set(_avfilter_ver ">=6.47.100")
-set(_avformat_ver ">=57.41.100")
-set(_avutil_ver ">=55.28.100")
-set(_swscale_ver ">=4.1.100")
-set(_swresample_ver ">=2.1.100")
-set(_postproc_ver ">=54.0.100")
+set(_avcodec_ver "=57.48.101")
+set(_avfilter_ver "=6.47.100")
+set(_avformat_ver "=57.41.100")
+set(_avutil_ver "=55.28.100")
+set(_swscale_ver "=4.1.100")
+set(_swresample_ver "=2.1.100")
+set(_postproc_ver "=54.0.100")
 
 
 # Allows building with external ffmpeg not found in system paths,
 # without library version checks
 if(WITH_FFMPEG)
   set(FFMPEG_PATH ${WITH_FFMPEG})
-  message(STATUS "Warning: FFmpeg version checking disabled")
+  message(STATUS "Warning: FFmpeg version checking disabled, resulting build is unsupported!")
   set(REQUIRED_FFMPEG_VERSION undef)
   unset(_avcodec_ver)
   unset(_avfilter_ver)
@@ -235,14 +238,10 @@ if(NOT FFMPEG_FOUND)
                    -DPKG_CONFIG_EXECUTABLE=${PKG_CONFIG_EXECUTABLE}
                    -DCROSSCOMPILING=${CMAKE_CROSSCOMPILING}
                    -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-                   -DCORE_SYSTEM_NAME=${CORE_SYSTEM_NAME}
-                   -DCPU=${WITH_CPU}
                    -DOS=${OS}
                    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                   -DCMAKE_AR=${CMAKE_AR}
-                   -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                   -DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS})
+                   -DCMAKE_AR=${CMAKE_AR})
   endif()
 
   externalproject_add(ffmpeg
@@ -254,6 +253,11 @@ if(NOT FFMPEG_FOUND)
                                  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                                  -DFFMPEG_VER=${FFMPEG_VER}
                                  -DCORE_SYSTEM_NAME=${CORE_SYSTEM_NAME}
+                                 -DCPU=${CPU}
+                                 -DENABLE_NEON=${ENABLE_NEON}
+                                 -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+                                 -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                                 -DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}
                                  ${CROSS_ARGS}
                       PATCH_COMMAND ${CMAKE_COMMAND} -E copy
                                     ${CORE_SOURCE_DIR}/tools/depends/target/ffmpeg/CMakeLists.txt
