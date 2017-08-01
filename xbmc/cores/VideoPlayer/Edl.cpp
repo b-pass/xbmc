@@ -46,7 +46,7 @@ void CEdl::Clear()
   m_vecCuts.clear();
   m_vecSceneMarkers.clear();
   m_iTotalCutTime = 0;
-  m_lastQueryTime = 0;
+  m_lastCutTime = -1;
 }
 
 bool CEdl::ReadEditDecisionLists(const std::string& strMovie, const float fFrameRate, const int iHeight)
@@ -823,10 +823,8 @@ std::string CEdl::GetInfo() const
   return strInfo.empty() ? "-" : strInfo;
 }
 
-bool CEdl::InCut(const int iSeek, Cut *pCut)
+bool CEdl::InCut(const int iSeek, Cut *pCut) const
 {
-  m_lastQueryTime = iSeek;
-
   for (int i = 0; i < (int)m_vecCuts.size(); i++)
   {
     if (iSeek < m_vecCuts[i].start) // Early exit if not even up to the cut start time.
@@ -843,9 +841,19 @@ bool CEdl::InCut(const int iSeek, Cut *pCut)
   return false;
 }
 
-int CEdl::GetLastQueryTime() const
+bool CEdl::QueryCut(const int iSeek, Cut *pCut)
 {
-  return m_lastQueryTime;
+  if (InCut(iSeek, pCut))
+  {
+    m_lastCutTime = pCut->start;
+    return true;
+  }
+  return false;
+}
+
+int CEdl::GetLastCutTime() const
+{
+  return m_lastCutTime;
 }
 
 bool CEdl::GetNearestCut(bool bPlus, const int iSeek, Cut *pCut) const

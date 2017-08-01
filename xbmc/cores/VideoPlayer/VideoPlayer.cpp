@@ -2336,10 +2336,10 @@ void CVideoPlayer::CheckAutoSceneSkip()
     return;
 
   const int64_t clock = GetTime();
-  int lastPos = m_Edl.GetLastQueryTime();
+  int lastCut = m_Edl.GetLastCutTime();
 
   CEdl::Cut cut;
-  if (!m_Edl.InCut(clock, &cut))
+  if (!m_Edl.QueryCut(clock, &cut))
     return;
 
   if (cut.action == CEdl::CUT)
@@ -2367,7 +2367,7 @@ void CVideoPlayer::CheckAutoSceneSkip()
   else if (cut.action == CEdl::COMM_BREAK)
   {
     // marker for commbrak may be inaccurate. allow user to skip into break from the back
-    if (GetPlaySpeed() >= 0 && lastPos <= cut.start && clock < cut.end - 1000)
+    if (GetPlaySpeed() >= 0 && lastCut != cut.start && clock < cut.end - 1000)
     {
       std::string strTimeString = StringUtils::SecondsToTimeString((cut.end - cut.start) / 1000, TIME_FORMAT_MM_SS);
       CGUIDialogKaiToast::QueueNotification(g_localizeStrings.Get(25011), strTimeString);
