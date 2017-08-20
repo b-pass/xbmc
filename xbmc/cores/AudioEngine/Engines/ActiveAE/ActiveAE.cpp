@@ -2900,6 +2900,7 @@ uint8_t **CActiveAE::AllocSoundSample(SampleConfig &config, int &samples, int &b
   uint8_t **buffer;
   planes = av_sample_fmt_is_planar(config.fmt) ? config.channels : 1;
   buffer = new uint8_t*[planes];
+  memset(buffer, 0, sizeof(*buffer)*planes);
 
   // align buffer to 16 in order to be compatible with sse in CAEConvert
   av_samples_alloc(buffer, &linesize, config.channels,
@@ -2910,7 +2911,8 @@ uint8_t **CActiveAE::AllocSoundSample(SampleConfig &config, int &samples, int &b
 
 void CActiveAE::FreeSoundSample(uint8_t **data)
 {
-  av_freep(data);
+  if (data && *data)
+    av_freep(data);
   delete [] data;
 }
 
