@@ -2411,7 +2411,16 @@ int CApplication::GetMessageMask()
 
 void CApplication::OnApplicationMessage(ThreadMessage* pMsg)
 {
-  switch (pMsg->dwMessage)
+  uint32_t msg = pMsg->dwMessage;
+  if (msg == TMSG_SYSTEM_POWERDOWN)
+  {
+    if (CServiceBroker::GetPVRManager().CanSystemPowerdown())
+      msg = pMsg->param1; // perform requested shutdown action
+    else
+      return; // no shutdown
+  }
+
+  switch (msg)
   {
   case TMSG_POWERDOWN:
     Stop(EXITCODE_POWERDOWN);
@@ -2659,7 +2668,7 @@ void CApplication::OnApplicationMessage(ThreadMessage* pMsg)
     break;
 
   default:
-    CLog::Log(LOGERROR, "%s: Unhandled threadmessage sent, %u", __FUNCTION__, pMsg->dwMessage);
+    CLog::Log(LOGERROR, "%s: Unhandled threadmessage sent, %u", __FUNCTION__, msg);
     break;
   }
 }
@@ -3275,14 +3284,6 @@ PlayBackRet CApplication::PlayFile(CFileItem item, const std::string& player, bo
     return PLAYBACK_FAIL;
   }
 
-  // a disc image might be Blu-Ray disc
-  if (item.IsBDFile() || item.IsDiscImage())
-  {
-    //check if we must show the simplified bd menu
-    if (!CGUIDialogSimpleMenu::ShowPlaySelection(const_cast<CFileItem&>(item)))
-      return PLAYBACK_CANCELED;
-  }
-
 #ifdef HAS_UPNP
   if (URIUtils::IsUPnP(item.GetPath()))
   {
@@ -3378,6 +3379,14 @@ PlayBackRet CApplication::PlayFile(CFileItem item, const std::string& player, bo
 
       dbs.Close();
     }
+  }
+
+  // a disc image might be Blu-Ray disc
+  if (!(options.startpercent > 0.0f || options.starttime > 0.0f) && (item.IsBDFile() || item.IsDiscImage()))
+  {
+    //check if we must show the simplified bd menu
+    if (!CGUIDialogSimpleMenu::ShowPlaySelection(const_cast<CFileItem&>(item)))
+      return PLAYBACK_CANCELED;
   }
 
   // this really aught to be inside !bRestart, but since PlayStack
