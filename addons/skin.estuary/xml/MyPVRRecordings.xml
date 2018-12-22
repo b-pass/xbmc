@@ -116,14 +116,14 @@
 						<description>Main content panel.  *Should* only ever show episodes...</description>
 						<visible>true</visible>
 						<left>0</left>
-						<width>widelist_width</width>
+						<width>1325</width>
 						<height>480</height>
 						<onleft>9950</onleft>
 						<pagecontrol>9973</pagecontrol>
 						<scrolltime>200</scrolltime>
 						<orientation>vertical</orientation>
 						<scrolltime>100</scrolltime>
-						<focusedlayout height="60" width="widelist_width">
+						<focusedlayout height="60" width="1325">
                                                         <control type="button">
                                                                 <description>Never let this container show folders</description>
                                                                 <visible allowhiddenfocus="true">false</visible>
@@ -161,7 +161,7 @@
 								<label>$INFO[ListItem.Date]</label>
 							</control>
 						</focusedlayout>
-						<itemlayout height="60" width="widelist_width">
+						<itemlayout height="60" width="1325">
 							<control type="image">
 								<left>0</left>
 								<top>14</top>
@@ -395,7 +395,7 @@
 				<description>Backend storage info on top bar</description>
 				<depth>DepthBars</depth>
 				<top>8</top>
-				<left>width_center</left>
+				<left>960</left>
 				<include>OpenClose_Right</include>
 				<control type="label">
 					<description>Disk usage text</description>
