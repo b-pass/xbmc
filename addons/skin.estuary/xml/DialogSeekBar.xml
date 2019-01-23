@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <window>
-	<visible>Player.Seeking | Player.DisplayAfterSeek | [Player.Paused + !Player.Caching] | Player.Forwarding | Player.Rewinding | Player.ShowInfo | Player.ShowTime | Window.IsActive(videoosd) | Window.IsActive(musicosd) | Window.IsActive(playerprocessinfo) | !String.IsEmpty(Player.SeekNumeric) | !String.IsEmpty(PVR.ChannelNumberInput)</visible>
+	<visible>Player.Seeking | Player.DisplayAfterSeek | [Player.Paused + !Player.Caching] | Player.Forwarding | Player.Rewinding | Player.ShowInfo | Window.IsActive(videoosd) | Window.IsActive(musicosd) | Window.IsActive(playerprocessinfo) | !String.IsEmpty(Player.SeekNumeric) | !String.IsEmpty(PVR.ChannelNumberInput)</visible>
 	<visible>![Window.IsActive(sliderdialog) | Window.IsActive(pvrosdchannels)]</visible>
 	<visible>Window.IsActive(fullscreenvideo) | Window.IsActive(visualisation)</visible>
 	<include>Animation_BottomSlide</include>
@@ -63,6 +63,9 @@
 					<include content="MediaFlag">
 						<param name="texture" value="$INFO[VideoPlayer.VideoCodec,flags/videocodec/,.png]" />
 					</include>
+					<include content="MediaFlag">
+						<param name="texture" value="$INFO[VideoPlayer.VideoResolution,flags/videoresolution/,.png]" />
+					</include>
 				</control>
 				<control type="grouplist">
 					<right>20</right>
@@ -113,7 +116,7 @@
 					<wrapmultiline>true</wrapmultiline>
 					<animation effect="fade" time="200">VisibleChange</animation>
 					<label>$INFO[Player.TimeRemaining,[COLOR button_focus]$LOCALIZE[31134]:[CR][/COLOR]]</label>
-					<visible>![Player.ShowInfo | Window.IsVisible(playerprocessinfo) | VideoPlayer.HasEpg]</visible>
+					<visible>![Player.ShowInfo | Window.IsVisible(playerprocessinfo) | VideoPlayer.HasEpg | Pvr.IsPlayingRecording]</visible>
 				</control>
 				<control type="label">
 					<top>110</top>
