@@ -301,7 +301,7 @@
 							<left>500</left>
 							<right>25</right>
 							<font>font14</font>
-							<visible>IntegerGreaterThan(Container(50).NumItems,1)</visible>
+							<visible>Integer.IsGreater(Container(50).NumItems,1)</visible>
 							<label>$INFO[Container(50).NumItems] episodes</label>
 						</control>
 						<control type="label">
@@ -310,7 +310,7 @@
 							<left>500</left>
 							<right>25</right>
 							<font>font14</font>
-							<visible>!IntegerGreaterThan(Container(50).NumItems,1) + IntegerGreaterThan(Container(50).NumItems,0)</visible>
+							<visible>Integer.IsEqual(Container(50).NumItems,1)</visible>
 							<label>One episode</label>
 						</control>
 					</control>

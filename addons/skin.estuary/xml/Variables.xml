@@ -442,7 +442,7 @@
 		<value>$INFO[ListItem.EpisodeName]</value>
 	</variable>
 	<variable name="PVR_Episode_List_Entry">
-		<value condition='Integer.IsEqual(Container(9950).CurrentItem, 1)'>$INFO[ListItem.Label]$INFO[ListItem.EpisodeName, - ","]</value>
+		<value condition='Integer.IsEqual(Container(9950).CurrentItem, 1)'>$INFO[ListItem.Title]$INFO[ListItem.EpisodeName, - ","]</value>
 		<value condition='!String.IsEmpty(ListItem.EpisodeName)'>$INFO[ListItem.EpisodeName]</value>
 		<value condition='!String.IsEmpty(ListItem.Episode)'>$INFO[ListItem.Season,Season ,$COMMA ]$INFO[ListItem.Episode,Episode ]</value>
 		<value condition='String.IsEmpty(ListItem.EpisodeName) + !String.IsEmpty(ListItem.Episode)'>$INFO[ListItem.Label]$INFO[ListItem.Season, - Season ,$COMMA ]$INFO[ListItem.Episode,Episode ]</value>
