@@ -7,21 +7,22 @@
  */
 
 #include "GUIAudioManager.h"
+
 #include "ServiceBroker.h"
-#include "input/actions/ActionIDs.h"
-#include "input/actions/ActionTranslator.h"
-#include "input/Key.h"
-#include "input/WindowTranslator.h"
-#include "settings/lib/Setting.h"
-#include "settings/Settings.h"
-#include "settings/SettingsComponent.h"
-#include "threads/SingleLock.h"
-#include "utils/URIUtils.h"
-#include "utils/XBMCTinyXML.h"
-#include "filesystem/Directory.h"
 #include "addons/AddonManager.h"
 #include "addons/Skin.h"
 #include "cores/AudioEngine/Interfaces/AE.h"
+#include "filesystem/Directory.h"
+#include "input/Key.h"
+#include "input/WindowTranslator.h"
+#include "input/actions/ActionIDs.h"
+#include "input/actions/ActionTranslator.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
+#include "settings/lib/Setting.h"
+#include "threads/SingleLock.h"
+#include "utils/URIUtils.h"
+#include "utils/XBMCTinyXML.h"
 #include "utils/log.h"
 
 CGUIAudioManager::CGUIAudioManager()
@@ -40,7 +41,7 @@ CGUIAudioManager::~CGUIAudioManager()
   m_settings->UnregisterCallback(this);
 }
 
-void CGUIAudioManager::OnSettingChanged(std::shared_ptr<const CSetting> setting)
+void CGUIAudioManager::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
   if (setting == NULL)
     return;
@@ -53,7 +54,9 @@ void CGUIAudioManager::OnSettingChanged(std::shared_ptr<const CSetting> setting)
   }
 }
 
-bool CGUIAudioManager::OnSettingUpdate(std::shared_ptr<CSetting> setting, const char *oldSettingId, const TiXmlNode *oldSettingNode)
+bool CGUIAudioManager::OnSettingUpdate(const std::shared_ptr<CSetting>& setting,
+                                       const char* oldSettingId,
+                                       const TiXmlNode* oldSettingNode)
 {
   if (setting == NULL)
     return false;
@@ -83,15 +86,17 @@ void CGUIAudioManager::DeInitialize()
 void CGUIAudioManager::Stop()
 {
   CSingleLock lock(m_cs);
-  for (windowSoundMap::iterator it = m_windowSoundMap.begin(); it != m_windowSoundMap.end(); ++it)
+  for (auto& it : m_windowSoundMap)
   {
-    if (it->second.initSound  ) it->second.initSound  ->Stop();
-    if (it->second.deInitSound) it->second.deInitSound->Stop();
+    if (it.second.initSound)
+      it.second.initSound->Stop();
+    if (it.second.deInitSound)
+      it.second.deInitSound->Stop();
   }
 
-  for (pythonSoundsMap::iterator it = m_pythonSounds.begin(); it != m_pythonSounds.end(); ++it)
+  for (auto& it : m_pythonSounds)
   {
-    IAESound* sound = it->second;
+    IAESound* sound = it.second;
     sound->Stop();
   }
 }
@@ -224,9 +229,10 @@ std::string GetSoundSkinPath()
     return "";
 
   ADDON::AddonPtr addon;
-  if (!CServiceBroker::GetAddonMgr().GetAddon(value, addon, ADDON::ADDON_RESOURCE_UISOUNDS))
+  if (!CServiceBroker::GetAddonMgr().GetAddon(value, addon, ADDON::ADDON_RESOURCE_UISOUNDS,
+                                              ADDON::OnlyEnabled::YES))
   {
-    CLog::Log(LOGNOTICE, "Unknown sounds addon '%s'. Setting default sounds.", value.c_str());
+    CLog::Log(LOGINFO, "Unknown sounds addon '%s'. Setting default sounds.", value.c_str());
     setting->Reset();
   }
   return URIUtils::AddFileToFolder("resource://", setting->GetValue());
@@ -254,7 +260,8 @@ bool CGUIAudioManager::Load()
   //  Load the config file
   if (!xmlDoc.LoadFile(strSoundsXml))
   {
-    CLog::Log(LOGNOTICE, "%s, Line %d\n%s", strSoundsXml.c_str(), xmlDoc.ErrorRow(), xmlDoc.ErrorDesc());
+    CLog::Log(LOGINFO, "%s, Line %d\n%s", strSoundsXml.c_str(), xmlDoc.ErrorRow(),
+              xmlDoc.ErrorDesc());
     return false;
   }
 
@@ -262,7 +269,7 @@ bool CGUIAudioManager::Load()
   std::string strValue = pRoot->Value();
   if ( strValue != "sounds")
   {
-    CLog::Log(LOGNOTICE, "%s Doesn't contain <sounds>", strSoundsXml.c_str());
+    CLog::Log(LOGINFO, "%s Doesn't contain <sounds>", strSoundsXml.c_str());
     return false;
   }
 
@@ -420,29 +427,26 @@ void CGUIAudioManager::SetVolume(float level)
   CSingleLock lock(m_cs);
 
   {
-    actionSoundMap::iterator it = m_actionSoundMap.begin();
-    while (it!=m_actionSoundMap.end())
+    for (auto& it : m_actionSoundMap)
     {
-      if (it->second)
-        it->second->SetVolume(level);
-      ++it;
+      if (it.second)
+        it.second->SetVolume(level);
     }
   }
 
-  for(windowSoundMap::iterator it = m_windowSoundMap.begin(); it != m_windowSoundMap.end(); ++it)
+  for (auto& it : m_windowSoundMap)
   {
-    if (it->second.initSound  ) it->second.initSound  ->SetVolume(level);
-    if (it->second.deInitSound) it->second.deInitSound->SetVolume(level);
+    if (it.second.initSound)
+      it.second.initSound->SetVolume(level);
+    if (it.second.deInitSound)
+      it.second.deInitSound->SetVolume(level);
   }
 
   {
-    pythonSoundsMap::iterator it = m_pythonSounds.begin();
-    while (it != m_pythonSounds.end())
+    for (auto& it : m_pythonSounds)
     {
-      if (it->second)
-        it->second->SetVolume(level);
-
-      ++it;
+      if (it.second)
+        it.second->SetVolume(level);
     }
   }
 }

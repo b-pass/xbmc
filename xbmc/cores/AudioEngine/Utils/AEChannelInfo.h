@@ -8,11 +8,11 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <vector>
-#include <string>
-
 #include "AEChannelData.h"
+
+#include <stdint.h>
+#include <string>
+#include <vector>
 
 class CHelper_libKODI_audioengine;
 
@@ -23,7 +23,7 @@ public:
   CAEChannelInfo();
   explicit CAEChannelInfo(const enum AEChannel* rhs);
   CAEChannelInfo(const enum AEStdChLayout rhs);
-  ~CAEChannelInfo();
+  ~CAEChannelInfo() = default;
   CAEChannelInfo& operator=(const CAEChannelInfo& rhs);
   CAEChannelInfo& operator=(const enum AEChannel* rhs);
   CAEChannelInfo& operator=(const enum AEStdChLayout rhs);

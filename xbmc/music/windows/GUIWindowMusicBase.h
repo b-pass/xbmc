@@ -13,14 +13,14 @@
 \brief
 */
 
-#include <vector>
-
-#include "windows/GUIMediaWindow.h"
-#include "music/MusicDatabase.h"
-#include "music/infoscanner/MusicInfoScraper.h"
 #include "PlayListPlayer.h"
+#include "music/MusicDatabase.h"
 #include "music/MusicInfoLoader.h"
 #include "music/MusicThumbLoader.h"
+#include "music/infoscanner/MusicInfoScraper.h"
+#include "windows/GUIMediaWindow.h"
+
+#include <vector>
 
 enum MusicSelectAction
 {
@@ -90,7 +90,7 @@ protected:
 
   void RetrieveMusicInfo();
   void OnItemInfo(int iItem);
-  void OnItemInfoAll(const std::string strPath, bool refresh = false);
+  void OnItemInfoAll(const std::string& strPath, bool refresh = false);
   virtual void OnQueueItem(int iItem, bool first = false);
   enum ALLOW_SELECTION { SELECTION_ALLOWED = 0, SELECTION_AUTO, SELECTION_FORCED };
 

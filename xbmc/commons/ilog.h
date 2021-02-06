@@ -17,12 +17,10 @@
 // ones we use in the code
 #define LOGDEBUG   0
 #define LOGINFO    1
-#define LOGNOTICE  2
-#define LOGWARNING 3
-#define LOGERROR   4
-#define LOGSEVERE  5
-#define LOGFATAL   6
-#define LOGNONE    7
+#define LOGWARNING 2
+#define LOGERROR   3
+#define LOGFATAL   4
+#define LOGNONE    5
 
 // extra masks - from bit 5
 #define LOGMASKBIT    5
@@ -44,6 +42,7 @@
 #define LOGWINDOWING  (1 << (LOGMASKBIT + 14))
 #define LOGPVR        (1 << (LOGMASKBIT + 15))
 #define LOGEPG        (1 << (LOGMASKBIT + 16))
+#define LOGANNOUNCE   (1 << (LOGMASKBIT + 17))
 
 #include "utils/params_check_macros.h"
 

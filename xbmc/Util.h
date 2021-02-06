@@ -8,13 +8,14 @@
 
 #pragma once
 
-#include <climits>
-#include <cmath>
-#include <vector>
-#include <string.h>
-#include <stdint.h>
 #include "MediaSource.h" // Definition of VECSOURCES
 #include "utils/Digest.h"
+
+#include <climits>
+#include <cmath>
+#include <stdint.h>
+#include <string.h>
+#include <vector>
 
 #define ARRAY_SIZE(X)         (sizeof(X)/sizeof((X)[0]))
 
@@ -47,11 +48,8 @@ public:
   static std::string GetTitleFromPath(const std::string& strFileNameAndPath, bool bIsFolder = false);
   static void GetQualifiedFilename(const std::string &strBasePath, std::string &strFilename);
   static void RunShortcut(const char* szPath);
-  static std::string GetHomePath(std::string strTarget = "KODI_HOME"); // default target is "KODI_HOME"
-  static bool IsPVR(const std::string& strFile);
-  static bool IsHTSP(const std::string& strFile);
-  static bool IsLiveTV(const std::string& strFile);
-  static bool IsTVRecording(const std::string& strFile);
+  static std::string GetHomePath(
+      const std::string& strTarget = "KODI_HOME"); // default target is "KODI_HOME"
   static bool ExcludeFileOrFolder(const std::string& strFileOrFolder, const std::vector<std::string>& regexps);
   static void GetFileAndProtocol(const std::string& strURL, std::string& strDir);
   static int GetDVDIfoTitle(const std::string& strPathFile);
@@ -171,7 +169,7 @@ public:
   // return -1 on error, valid range is 1-3999
   static int TranslateRomanNumeral(const char* roman_numeral);
 
-#ifdef TARGET_POSIX
+#if defined(TARGET_POSIX) && !defined(TARGET_DARWIN_TVOS)
   //
   // Forks to execute a shell command.
   //
@@ -197,6 +195,12 @@ public:
   static double ConvertMilliSecsToSecs(int64_t offset) { return offset / 1000.0; }
   static int64_t ConvertMilliSecsToSecsInt(int64_t offset) { return offset / 1000; }
   static int64_t ConvertMilliSecsToSecsIntRounded(int64_t offset) { return ConvertMilliSecsToSecsInt(offset + 499); }
+
+  /** \brief Copy files from the application bundle over to the user data directory in Application Support/Kodi.
+  */
+  static void CopyUserDataIfNeeded(const std::string& strPath,
+                                   const std::string& file,
+                                   const std::string& destname = "");
 
 #if !defined(TARGET_WINDOWS)
 private:

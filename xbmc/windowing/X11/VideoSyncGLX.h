@@ -8,13 +8,24 @@
 
 #pragma once
 
-#include "windowing/VideoSync.h"
-#include "system_gl.h"
-#include <X11/X.h>
-#include <X11/Xlib.h>
-#include <GL/glx.h>
 #include "guilib/DispResource.h"
 #include "threads/Event.h"
+#include "windowing/VideoSync.h"
+
+#include <GL/glx.h>
+#include <X11/X.h>
+#include <X11/Xlib.h>
+
+#include "system_gl.h"
+
+
+
+namespace KODI
+{
+namespace WINDOWING
+{
+namespace X11
+{
 
 class CWinSystemX11GLContext;
 
@@ -43,3 +54,7 @@ private:
   volatile bool m_displayReset;
   CEvent m_lostEvent;
 };
+
+}
+}
+}

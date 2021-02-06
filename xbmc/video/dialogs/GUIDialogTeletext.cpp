@@ -7,16 +7,17 @@
  */
 
 #include "GUIDialogTeletext.h"
-#include "utils/log.h"
+
 #include "Application.h"
 #include "ServiceBroker.h"
-#include "guilib/GUITexture.h"
-#include "guilib/Texture.h"
-#include "guilib/LocalizeStrings.h"
 #include "dialogs/GUIDialogKaiToast.h"
+#include "guilib/GUITexture.h"
+#include "guilib/LocalizeStrings.h"
+#include "guilib/Texture.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/Color.h"
+#include "utils/log.h"
 
 static int teletextFadeAmount = 0;
 
@@ -134,7 +135,8 @@ void CGUIDialogTeletext::OnInitWindow()
     Close();
   }
 
-  m_pTxtTexture = new CTexture(m_TextDecoder.GetWidth(), m_TextDecoder.GetHeight(), XB_FMT_A8R8G8B8);
+  m_pTxtTexture =
+      CTexture::CreateTexture(m_TextDecoder.GetWidth(), m_TextDecoder.GetHeight(), XB_FMT_A8R8G8B8);
   if (!m_pTxtTexture)
   {
     CLog::Log(LOGERROR, "%s: failed to create texture", __FUNCTION__);

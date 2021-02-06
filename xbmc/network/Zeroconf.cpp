@@ -7,9 +7,10 @@
  */
 #include "Zeroconf.h"
 
-#include <cassert>
-
 #include "ServiceBroker.h"
+#if defined(HAS_MDNS)
+#include "mdns/ZeroconfMDNS.h"
+#endif
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "threads/Atomics.h"
@@ -17,16 +18,17 @@
 #include "threads/SingleLock.h"
 #include "utils/JobManager.h"
 
-#if defined(HAS_AVAHI)
-#include "platform/linux/network/ZeroconfAvahi.h"
+#if defined(TARGET_ANDROID)
+#include "platform/android/network/ZeroconfAndroid.h"
 #elif defined(TARGET_DARWIN)
 //on osx use the native implementation
-#include "platform/darwin/osx/network/ZeroconfOSX.h"
-#elif defined(TARGET_ANDROID)
-#include "platform/android/network/ZeroconfAndroid.h"
-#elif defined(HAS_MDNS)
-#include "mdns/ZeroconfMDNS.h"
+#include "platform/darwin/network/ZeroconfDarwin.h"
+#elif defined(HAS_AVAHI)
+#include "platform/linux/network/zeroconf/ZeroconfAvahi.h"
 #endif
+
+#include <cassert>
+#include <utility>
 
 #ifndef HAS_ZEROCONF
 //dummy implementation used if no zeroconf is present
@@ -63,7 +65,7 @@ bool CZeroconf::PublishService(const std::string& fcr_identifier,
                                std::vector<std::pair<std::string, std::string> > txt /* = std::vector<std::pair<std::string, std::string> >() */)
 {
   CSingleLock lock(*mp_crit_sec);
-  CZeroconf::PublishInfo info = {fcr_type, fcr_name, f_port, txt};
+  CZeroconf::PublishInfo info = {fcr_type, fcr_name, f_port, std::move(txt)};
   std::pair<tServiceMap::const_iterator, bool> ret = m_service_map.insert(std::make_pair(fcr_identifier, info));
   if(!ret.second) //identifier exists
     return false;
@@ -138,7 +140,7 @@ CZeroconf*  CZeroconf::GetInstance()
     smp_instance = new CZeroconfDummy;
 #else
 #if defined(TARGET_DARWIN)
-    smp_instance = new CZeroconfOSX;
+    smp_instance = new CZeroconfDarwin;
 #elif defined(HAS_AVAHI)
     smp_instance  = new CZeroconfAvahi;
 #elif defined(TARGET_ANDROID)
@@ -171,8 +173,9 @@ CZeroconf::CPublish::CPublish(const tServiceMap& servmap)
 
 bool CZeroconf::CPublish::DoWork()
 {
-  for(tServiceMap::const_iterator it = m_servmap.begin(); it != m_servmap.end(); ++it)
-    CZeroconf::GetInstance()->doPublishService(it->first, it->second.type, it->second.name, it->second.port, it->second.txt);
+  for (const auto& it : m_servmap)
+    CZeroconf::GetInstance()->doPublishService(it.first, it.second.type, it.second.name,
+                                               it.second.port, it.second.txt);
 
   return true;
 }

@@ -6,18 +6,25 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "cores/DataCacheCore.h"
-#include "threads/SingleLock.h"
+#include "DataCacheCore.h"
+
 #include "ServiceBroker.h"
+#include "cores/Cut.h"
+#include "threads/SingleLock.h"
+
+#include <utility>
 
 CDataCacheCore::CDataCacheCore() :
   m_playerVideoInfo {},
   m_playerAudioInfo {},
+  m_contentInfo {},
   m_renderInfo {},
   m_stateInfo {}
 {
   m_hasAVInfoChanges = false;
 }
+
+CDataCacheCore::~CDataCacheCore() = default;
 
 CDataCacheCore& CDataCacheCore::GetInstance()
 {
@@ -26,14 +33,23 @@ CDataCacheCore& CDataCacheCore::GetInstance()
 
 void CDataCacheCore::Reset()
 {
-  CSingleLock lock(m_stateSection);
+  {
+    CSingleLock lock(m_stateSection);
 
-  m_stateInfo.m_speed = 1.0;
-  m_stateInfo.m_tempo = 1.0;
-  m_stateInfo.m_stateSeeking = false;
-  m_stateInfo.m_renderGuiLayer = false;
-  m_stateInfo.m_renderVideoLayer = false;
-  m_playerStateChanged = false;
+    m_stateInfo.m_speed = 1.0;
+    m_stateInfo.m_tempo = 1.0;
+    m_stateInfo.m_stateSeeking = false;
+    m_stateInfo.m_renderGuiLayer = false;
+    m_stateInfo.m_renderVideoLayer = false;
+    m_playerStateChanged = false;
+  }
+
+  {
+    CSingleLock lock(m_contentSection);
+
+    m_contentInfo.m_chapters.clear();
+    m_contentInfo.m_cutList.clear();
+  }
 }
 
 bool CDataCacheCore::HasAVInfoChanges()
@@ -62,7 +78,7 @@ void CDataCacheCore::SetVideoDecoderName(std::string name, bool isHw)
 {
   CSingleLock lock(m_videoPlayerSection);
 
-  m_playerVideoInfo.decoderName = name;
+  m_playerVideoInfo.decoderName = std::move(name);
   m_playerVideoInfo.isHwDecoder = isHw;
 }
 
@@ -85,7 +101,7 @@ void CDataCacheCore::SetVideoDeintMethod(std::string method)
 {
   CSingleLock lock(m_videoPlayerSection);
 
-  m_playerVideoInfo.deintMethod = method;
+  m_playerVideoInfo.deintMethod = std::move(method);
 }
 
 std::string CDataCacheCore::GetVideoDeintMethod()
@@ -99,7 +115,7 @@ void CDataCacheCore::SetVideoPixelFormat(std::string pixFormat)
 {
   CSingleLock lock(m_videoPlayerSection);
 
-  m_playerVideoInfo.pixFormat = pixFormat;
+  m_playerVideoInfo.pixFormat = std::move(pixFormat);
 }
 
 std::string CDataCacheCore::GetVideoPixelFormat()
@@ -113,7 +129,7 @@ void CDataCacheCore::SetVideoStereoMode(std::string mode)
 {
   CSingleLock lock(m_videoPlayerSection);
 
-  m_playerVideoInfo.stereoMode = mode;
+  m_playerVideoInfo.stereoMode = std::move(mode);
 }
 
 std::string CDataCacheCore::GetVideoStereoMode()
@@ -178,7 +194,7 @@ void CDataCacheCore::SetAudioDecoderName(std::string name)
 {
   CSingleLock lock(m_audioPlayerSection);
 
-  m_playerAudioInfo.decoderName = name;
+  m_playerAudioInfo.decoderName = std::move(name);
 }
 
 std::string CDataCacheCore::GetAudioDecoderName()
@@ -192,7 +208,7 @@ void CDataCacheCore::SetAudioChannels(std::string channels)
 {
   CSingleLock lock(m_audioPlayerSection);
 
-  m_playerAudioInfo.channels = channels;
+  m_playerAudioInfo.channels = std::move(channels);
 }
 
 std::string CDataCacheCore::GetAudioChannels()
@@ -228,6 +244,30 @@ int CDataCacheCore::GetAudioBitsPerSample()
   CSingleLock lock(m_audioPlayerSection);
 
   return m_playerAudioInfo.bitsPerSample;
+}
+
+void CDataCacheCore::SetCutList(const std::vector<EDL::Cut>& cutList)
+{
+  CSingleLock lock(m_contentSection);
+  m_contentInfo.m_cutList = cutList;
+}
+
+std::vector<EDL::Cut> CDataCacheCore::GetCutList() const
+{
+  CSingleLock lock(m_contentSection);
+  return m_contentInfo.m_cutList;
+}
+
+void CDataCacheCore::SetChapters(const std::vector<std::pair<std::string, int64_t>>& chapters)
+{
+  CSingleLock lock(m_contentSection);
+  m_contentInfo.m_chapters = chapters;
+}
+
+std::vector<std::pair<std::string, int64_t>> CDataCacheCore::GetChapters() const
+{
+  CSingleLock lock(m_contentSection);
+  return m_contentInfo.m_chapters;
 }
 
 void CDataCacheCore::SetRenderClockSync(bool enable)

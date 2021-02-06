@@ -7,6 +7,7 @@
  */
 
 #include "Locale.h"
+
 #include "utils/StringUtils.h"
 
 const CLocale CLocale::Empty;
@@ -174,6 +175,28 @@ std::string CLocale::FindBestMatch(const std::set<std::string>& locales) const
   return bestMatch;
 }
 
+std::string CLocale::FindBestMatch(const std::unordered_map<std::string, std::string>& locales) const
+{
+  std::string bestMatch = "";
+  int bestMatchRank = -1;
+
+  for (auto const& locale : locales)
+  {
+    // check if there is an exact match
+    if (Equals(locale.first))
+      return locale.first;
+
+    int matchRank = GetMatchRank(locale.first);
+    if (matchRank > bestMatchRank)
+    {
+      bestMatchRank = matchRank;
+      bestMatch = locale.first;
+    }
+  }
+
+  return bestMatch;
+}
+
 bool CLocale::CheckValidity(const std::string& language, const std::string& territory, const std::string& codeset, const std::string& modifier)
 {
   static_cast<void>(territory);
@@ -197,7 +220,7 @@ bool CLocale::ParseLocale(const std::string &locale, std::string &language, std:
   std::string tmp = locale;
 
   // look for the modifier after @
-  size_t pos = tmp.find("@");
+  size_t pos = tmp.find('@');
   if (pos != std::string::npos)
   {
     modifier = tmp.substr(pos + 1);
@@ -205,7 +228,7 @@ bool CLocale::ParseLocale(const std::string &locale, std::string &language, std:
   }
 
   // look for the codeset after .
-  pos = tmp.find(".");
+  pos = tmp.find('.');
   if (pos != std::string::npos)
   {
     codeset = tmp.substr(pos + 1);
@@ -213,7 +236,7 @@ bool CLocale::ParseLocale(const std::string &locale, std::string &language, std:
   }
 
   // look for the codeset after _
-  pos = tmp.find("_");
+  pos = tmp.find('_');
   if (pos != std::string::npos)
   {
     territory = tmp.substr(pos + 1);

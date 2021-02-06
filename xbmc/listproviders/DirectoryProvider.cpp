@@ -8,35 +8,37 @@
 
 #include "DirectoryProvider.h"
 
-#include <memory>
-#include <utility>
-#include "ServiceBroker.h"
-#include "addons/GUIDialogAddonInfo.h"
 #include "ContextMenuManager.h"
 #include "FileItem.h"
-#include "filesystem/Directory.h"
+#include "ServiceBroker.h"
+#include "addons/gui/GUIDialogAddonInfo.h"
 #include "favourites/FavouritesService.h"
+#include "filesystem/Directory.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "interfaces/AnnouncementManager.h"
-#include "music/dialogs/GUIDialogMusicInfo.h"
 #include "music/MusicThumbLoader.h"
+#include "music/dialogs/GUIDialogMusicInfo.h"
 #include "pictures/PictureThumbLoader.h"
 #include "pvr/PVRManager.h"
+#include "pvr/PVRThumbLoader.h"
 #include "pvr/dialogs/GUIDialogPVRGuideInfo.h"
 #include "pvr/dialogs/GUIDialogPVRRecordingInfo.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "threads/SingleLock.h"
 #include "utils/JobManager.h"
-#include "utils/log.h"
 #include "utils/SortUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
 #include "utils/XMLUtils.h"
+#include "utils/log.h"
 #include "video/VideoThumbLoader.h"
 #include "video/dialogs/GUIDialogVideoInfo.h"
 #include "video/windows/GUIWindowVideoBase.h"
+
+#include <memory>
+#include <utility>
 
 using namespace XFILE;
 using namespace KODI::MESSAGING;
@@ -110,6 +112,11 @@ public:
       initThumbLoader<CPictureThumbLoader>(InfoTagType::PICTURE);
       return m_thumbloaders[InfoTagType::PICTURE];
     }
+    if (item->IsPVRChannelGroup())
+    {
+      initThumbLoader<CPVRThumbLoader>(InfoTagType::PVR);
+      return m_thumbloaders[InfoTagType::PVR];
+    }
     initThumbLoader<CProgramThumbLoader>(InfoTagType::PROGRAM);
     return m_thumbloaders[InfoTagType::PROGRAM];
   }
@@ -130,9 +137,8 @@ public:
   std::vector<InfoTagType> GetItemTypes(std::vector<InfoTagType> &itemTypes) const
   {
     itemTypes.clear();
-    for (std::map<InfoTagType, std::shared_ptr<CThumbLoader> >::const_iterator
-         i = m_thumbloaders.begin(); i != m_thumbloaders.end(); ++i)
-      itemTypes.push_back(i->first);
+    for (const auto& i : m_thumbloaders)
+      itemTypes.push_back(i.first);
     return itemTypes;
   }
 private:
@@ -190,6 +196,7 @@ bool CDirectoryProvider::Update(bool forceRefresh)
   fireJob |= UpdateURL();
   fireJob |= UpdateSort();
   fireJob |= UpdateLimit();
+  fireJob &= !m_currentUrl.empty();
 
   CSingleLock lock(m_section);
   if (m_updateState == INVALIDATED)
@@ -209,13 +216,16 @@ bool CDirectoryProvider::Update(bool forceRefresh)
 
   if (!changed)
   {
-    for (std::vector<CGUIStaticItemPtr>::iterator i = m_items.begin(); i != m_items.end(); ++i)
-      changed |= (*i)->UpdateVisibility(m_parentID);
+    for (auto& i : m_items)
+      changed |= i->UpdateVisibility(m_parentID);
   }
   return changed; //! @todo Also returned changed if properties are changed (if so, need to update scroll to letter).
 }
 
-void CDirectoryProvider::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data)
+void CDirectoryProvider::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                                  const std::string& sender,
+                                  const std::string& message,
+                                  const CVariant& data)
 {
   // we are only interested in library, player and GUI changes
   if ((flag & (ANNOUNCEMENT::VideoLibrary | ANNOUNCEMENT::AudioLibrary | ANNOUNCEMENT::Player | ANNOUNCEMENT::GUI)) == 0)
@@ -233,9 +243,7 @@ void CDirectoryProvider::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const cha
 
     if (flag & ANNOUNCEMENT::Player)
     {
-      if (strcmp(message, "OnPlay") == 0 ||
-          strcmp(message, "OnResume") == 0 ||
-          strcmp(message, "OnStop") == 0)
+      if (message == "OnPlay" || message == "OnResume" || message == "OnStop")
       {
         if (m_currentSort.sortBy == SortByNone || // not nice, but many directories that need to be refreshed on start/stop have no special sort order (e.g. in progress movies)
             m_currentSort.sortBy == SortByLastPlayed ||
@@ -252,11 +260,8 @@ void CDirectoryProvider::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const cha
 
       // if there was a database update, we set the update state
       // to PENDING to fire off a new job in the next update
-      if (strcmp(message, "OnScanFinished") == 0 ||
-          strcmp(message, "OnCleanFinished") == 0 ||
-          strcmp(message, "OnUpdate") == 0 ||
-          strcmp(message, "OnRemove") == 0 ||
-          strcmp(message, "OnRefresh") == 0)
+      if (message == "OnScanFinished" || message == "OnCleanFinished" || message == "OnUpdate" ||
+          message == "OnRemove" || message == "OnRefresh")
         m_updateState = INVALIDATED;
     }
   }
@@ -266,10 +271,10 @@ void CDirectoryProvider::Fetch(std::vector<CGUIListItemPtr> &items)
 {
   CSingleLock lock(m_section);
   items.clear();
-  for (std::vector<CGUIStaticItemPtr>::const_iterator i = m_items.begin(); i != m_items.end(); ++i)
+  for (const auto& i : m_items)
   {
-    if ((*i)->IsVisible())
-      items.push_back(*i);
+    if (i->IsVisible())
+      items.push_back(i);
   }
 }
 
@@ -282,8 +287,18 @@ void CDirectoryProvider::OnAddonEvent(const ADDON::AddonEvent& event)
         typeid(event) == typeid(ADDON::AddonEvents::Disabled) ||
         typeid(event) == typeid(ADDON::AddonEvents::ReInstalled) ||
         typeid(event) == typeid(ADDON::AddonEvents::UnInstalled) ||
-        typeid(event) == typeid(ADDON::AddonEvents::MetadataChanged))
+        typeid(event) == typeid(ADDON::AddonEvents::MetadataChanged) ||
+        typeid(event) == typeid(ADDON::AddonEvents::AutoUpdateStateChanged))
       m_updateState = INVALIDATED;
+  }
+}
+
+void CDirectoryProvider::OnAddonRepositoryEvent(const ADDON::CRepositoryUpdater::RepositoryUpdated& event)
+{
+  CSingleLock lock(m_section);
+  if (URIUtils::IsProtocol(m_currentUrl, "addons"))
+  {
+    m_updateState = INVALIDATED;
   }
 }
 
@@ -296,7 +311,9 @@ void CDirectoryProvider::OnPVRManagerEvent(const PVR::PVREvent& event)
         event == PVR::PVREvent::ManagerStopped ||
         event == PVR::PVREvent::ManagerError ||
         event == PVR::PVREvent::ManagerInterrupted ||
-        event == PVR::PVREvent::RecordingsInvalidated)
+        event == PVR::PVREvent::RecordingsInvalidated ||
+        event == PVR::PVREvent::TimersInvalidated ||
+        event == PVR::PVREvent::ChannelGroupsInvalidated)
       m_updateState = INVALIDATED;
   }
 }
@@ -328,6 +345,7 @@ void CDirectoryProvider::Reset()
     m_isAnnounced = false;
     CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
     CServiceBroker::GetFavouritesService().Events().Unsubscribe(this);
+    CServiceBroker::GetRepositoryUpdater().Events().Unsubscribe(this);
     CServiceBroker::GetAddonMgr().Events().Unsubscribe(this);
     CServiceBroker::GetPVRManager().Events().Unsubscribe(this);
   }
@@ -347,6 +365,19 @@ void CDirectoryProvider::OnJobComplete(unsigned int jobID, bool success, CJob *j
   m_jobID = 0;
 }
 
+std::string CDirectoryProvider::GetTarget(const CFileItem& item) const
+{
+  std::string target = item.GetProperty("node.target").asString();
+
+  CSingleLock lock(m_section);
+  if (target.empty())
+    target = m_currentTarget;
+  if (target.empty())
+    target = m_target.GetLabel(m_parentID, false);
+
+  return target;
+}
+
 bool CDirectoryProvider::OnClick(const CGUIListItemPtr &item)
 {
   CFileItem fileItem(*std::static_pointer_cast<CFileItem>(item));
@@ -356,18 +387,11 @@ bool CDirectoryProvider::OnClick(const CGUIListItemPtr &item)
       && OnInfo(item))
     return true;
 
-  std::string target = fileItem.GetProperty("node.target").asString();
-  {
-    CSingleLock lock(m_section);
-    if (target.empty())
-      target = m_currentTarget;
-    if (target.empty())
-      target = m_target.GetLabel(m_parentID, false);
-    if (fileItem.HasProperty("node.target_url"))
-      fileItem.SetPath(fileItem.GetProperty("node.target_url").asString());
-  }
+  if (fileItem.HasProperty("node.target_url"))
+    fileItem.SetPath(fileItem.GetProperty("node.target_url").asString());
+
   // grab the execute string
-  std::string execute = CServiceBroker::GetFavouritesService().GetExecutePath(fileItem, target);
+  std::string execute = CServiceBroker::GetFavouritesService().GetExecutePath(fileItem, GetTarget(fileItem));
   if (!execute.empty())
   {
     CGUIMessage message(GUI_MSG_EXECUTE, 0, 0);
@@ -403,7 +427,7 @@ bool CDirectoryProvider::OnInfo(const CGUIListItemPtr& item)
         mediaType == MediaTypeVideo ||
         mediaType == MediaTypeMusicVideo)
     {
-      CGUIDialogVideoInfo::ShowFor(*fileItem.get());
+      CGUIDialogVideoInfo::ShowFor(*fileItem);
       return true;
     }
   }
@@ -418,6 +442,11 @@ bool CDirectoryProvider::OnInfo(const CGUIListItemPtr& item)
 bool CDirectoryProvider::OnContextMenu(const CGUIListItemPtr& item)
 {
   auto fileItem = std::static_pointer_cast<CFileItem>(item);
+
+  const std::string target = GetTarget(*fileItem);
+  if (!target.empty())
+    fileItem->SetProperty("targetwindow", target);
+
   return CONTEXTMENU::ShowFor(fileItem);
 }
 
@@ -441,6 +470,7 @@ bool CDirectoryProvider::UpdateURL()
     m_isAnnounced = true;
     CServiceBroker::GetAnnouncementManager()->AddAnnouncer(this);
     CServiceBroker::GetAddonMgr().Events().Subscribe(this, &CDirectoryProvider::OnAddonEvent);
+    CServiceBroker::GetRepositoryUpdater().Events().Subscribe(this, &CDirectoryProvider::OnAddonRepositoryEvent);
     CServiceBroker::GetPVRManager().Events().Subscribe(this, &CDirectoryProvider::OnPVRManagerEvent);
     CServiceBroker::GetFavouritesService().Events().Subscribe(this, &CDirectoryProvider::OnFavouritesEvent);
   }

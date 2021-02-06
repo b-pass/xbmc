@@ -7,7 +7,8 @@
  */
 
 #include "DrmCryptoSession.h"
-#include "drm/CryptoSession.h"
+
+#include "media/drm/CryptoSession.h"
 
 using namespace XbmcCommons;
 
@@ -15,10 +16,12 @@ namespace XBMCAddon
 {
   namespace xbmcdrm
   {
-    CryptoSession::CryptoSession(String UUID, String cipherAlgorithm, String macAlgorithm)
-      : m_cryptoSession(DRM::CCryptoSession::GetCryptoSession(UUID, cipherAlgorithm, macAlgorithm))
-    {
-    }
+  CryptoSession::CryptoSession(const String& UUID,
+                               const String& cipherAlgorithm,
+                               const String& macAlgorithm)
+    : m_cryptoSession(DRM::CCryptoSession::GetCryptoSession(UUID, cipherAlgorithm, macAlgorithm))
+  {
+  }
 
     CryptoSession::~CryptoSession()
     {
@@ -55,7 +58,7 @@ namespace XBMCAddon
         m_cryptoSession->RemoveKeys();
     }
 
-    void CryptoSession::RestoreKeys(String keySetId)
+    void CryptoSession::RestoreKeys(const String& keySetId)
     {
       if (m_cryptoSession)
         m_cryptoSession->RestoreKeys(keySetId);

@@ -27,13 +27,6 @@ bool OPTIONALS::ALSARegister()
 }
 #endif
 
-#ifdef TARGET_LINUX
-bool OPTIONALS::OSSRegister()
-{
-  return false;
-}
-#endif
-
 //-----------------------------------------------------------------------------
 // PulseAudio
 //-----------------------------------------------------------------------------

@@ -7,25 +7,23 @@
  */
 
 #include "Song.h"
-#include "music/tags/MusicInfoTag.h"
-#include "utils/Variant.h"
-#include "utils/StringUtils.h"
-#include "utils/log.h"
+
 #include "FileItem.h"
 #include "ServiceBroker.h"
+#include "music/tags/MusicInfoTag.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
+#include "utils/StringUtils.h"
+#include "utils/Variant.h"
+#include "utils/log.h"
 
 using namespace MUSIC_INFO;
 
 CSong::CSong(CFileItem& item)
 {
   CMusicInfoTag& tag = *item.GetMusicInfoTag();
-  SYSTEMTIME stTime;
-  tag.GetReleaseDate(stTime);
   strTitle = tag.GetTitle();
   genre = tag.GetGenre();
-  std::vector<std::string> artist = tag.GetArtist();
   strArtistDesc = tag.GetArtistString();
   //Set sort string before processing artist credits
   strArtistSort = tag.GetArtistSort();
@@ -55,7 +53,9 @@ CSong::CSong(CFileItem& item)
   rating = tag.GetRating();
   userrating = tag.GetUserrating();
   votes = tag.GetVotes();
-  iYear = stTime.wYear;
+  strOrigReleaseDate = tag.GetOriginalDate();
+  strReleaseDate = tag.GetReleaseDate();
+  strDiscSubtitle = tag.GetDiscSubtitle();
   iTrack = tag.GetTrackAndDiscNumber();
   iDuration = tag.GetDuration();
   strRecordLabel = tag.GetRecordLabel();
@@ -66,11 +66,15 @@ CSong::CSong(CFileItem& item)
   dateAdded = tag.GetDateAdded();
   replayGain = tag.GetReplayGain();
   strThumb = item.GetUserMusicThumb(true);
-  iStartOffset = item.m_lStartOffset;
-  iEndOffset = item.m_lEndOffset;
+  iStartOffset = static_cast<int>(item.m_lStartOffset);
+  iEndOffset = static_cast<int>(item.m_lEndOffset);
   idSong = -1;
   iTimesPlayed = 0;
   idAlbum = -1;
+  iBPM = tag.GetBPM();
+  iSampleRate = tag.GetSampleRate();
+  iBitRate = tag.GetBitRate();
+  iChannels = tag.GetNoOfChannels();
 }
 
 CSong::CSong()
@@ -219,7 +223,7 @@ void CSong::Serialize(CVariant& value) const
   value["genre"] = genre;
   value["duration"] = iDuration;
   value["track"] = iTrack;
-  value["year"] = iYear;
+  value["year"] = atoi(strReleaseDate.c_str());;
   value["musicbrainztrackid"] = strMusicBrainzTrackID;
   value["comment"] = strComment;
   value["mood"] = strMood;
@@ -230,6 +234,11 @@ void CSong::Serialize(CVariant& value) const
   value["lastplayed"] = lastPlayed.IsValid() ? lastPlayed.GetAsDBDateTime() : "";
   value["dateadded"] = dateAdded.IsValid() ? dateAdded.GetAsDBDateTime() : "";
   value["albumid"] = idAlbum;
+  value["albumreleasedate"] = strReleaseDate;
+  value["bpm"] = iBPM;
+  value["bitrate"] = iBitRate;
+  value["samplerate"] = iSampleRate;
+  value["channels"] = iChannels;
 }
 
 void CSong::Clear()
@@ -252,25 +261,34 @@ void CSong::Clear()
   votes = 0;
   iTrack = 0;
   iDuration = 0;
-  iYear = 0;
+  strOrigReleaseDate.clear();
+  strReleaseDate.clear();
+  strDiscSubtitle.clear();
   iStartOffset = 0;
   iEndOffset = 0;
   idSong = -1;
   iTimesPlayed = 0;
   lastPlayed.Reset();
   dateAdded.Reset();
+  dateUpdated.Reset();
+  dateNew.Reset();
   idAlbum = -1;
   bCompilation = false;
   embeddedArt.Clear();
+  iBPM = 0;
+  iBitRate = 0;
+  iSampleRate = 0;
+  iChannels =  0;
+  
   replayGain = ReplayGain();
 }
 const std::vector<std::string> CSong::GetArtist() const
 {
   //Get artist names as vector from artist credits
   std::vector<std::string> songartists;
-  for (VECARTISTCREDITS::const_iterator artistCredit = artistCredits.begin(); artistCredit != artistCredits.end(); ++artistCredit)
+  for (const auto& artistCredit : artistCredits)
   {
-    songartists.push_back(artistCredit->GetArtist());
+    songartists.push_back(artistCredit.GetArtist());
   }
   //When artist credits have not been populated attempt to build an artist vector from the description string
   //This is a temporary fix, in the longer term other areas should query the song_artist table and populate
@@ -287,7 +305,7 @@ const std::string CSong::GetArtistSort() const
   if (!strArtistSort.empty())
     return strArtistSort;
   std::vector<std::string> artistvector;
-  for (auto artistcredit: artistCredits)
+  for (const auto& artistcredit : artistCredits)
     if (!artistcredit.GetSortName().empty())
       artistvector.emplace_back(artistcredit.GetSortName());
   std::string artistString;
@@ -300,9 +318,9 @@ const std::vector<std::string> CSong::GetMusicBrainzArtistID() const
 {
   //Get artist MusicBrainz IDs as vector from artist credits
   std::vector<std::string> musicBrainzID;
-  for (VECARTISTCREDITS::const_iterator artistCredit = artistCredits.begin(); artistCredit != artistCredits.end(); ++artistCredit)
+  for (const auto& artistCredit : artistCredits)
   {
-    musicBrainzID.push_back(artistCredit->GetMusicBrainzArtistID());
+    musicBrainzID.push_back(artistCredit.GetMusicBrainzArtistID());
   }
   return musicBrainzID;
 }
@@ -314,8 +332,8 @@ const std::string CSong::GetArtistString() const
   if (!strArtistDesc.empty())
     return strArtistDesc;
   std::vector<std::string> artistvector;
-  for (VECARTISTCREDITS::const_iterator i = artistCredits.begin(); i != artistCredits.end(); ++i)
-    artistvector.push_back(i->GetArtist());
+  for (const auto& i : artistCredits)
+    artistvector.push_back(i.GetArtist());
   std::string artistString;
   if (!artistvector.empty())
     artistString = StringUtils::Join(artistvector, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator);
@@ -326,8 +344,8 @@ const std::vector<int> CSong::GetArtistIDArray() const
 {
   // Get song artist IDs for json rpc
   std::vector<int> artistids;
-  for (VECARTISTCREDITS::const_iterator artistCredit = artistCredits.begin(); artistCredit != artistCredits.end(); ++artistCredit)
-    artistids.push_back(artistCredit->GetArtistId());
+  for (const auto& artistCredit : artistCredits)
+    artistids.push_back(artistCredit.GetArtistId());
   return artistids;
 }
 
@@ -347,4 +365,9 @@ bool CSong::ArtMatches(const CSong &right) const
 {
   return (right.strThumb == strThumb &&
           embeddedArt.Matches(right.embeddedArt));
+}
+
+const std::string CSong::GetDiscSubtitle() const
+{
+  return strDiscSubtitle;
 }

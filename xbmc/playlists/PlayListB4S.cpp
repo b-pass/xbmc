@@ -6,18 +6,19 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <iostream>
-#include <string>
-
 #include "PlayListB4S.h"
+
 #include "Util.h"
-#include "utils/XBMCTinyXML.h"
-#include "music/tags/MusicInfoTag.h"
 #include "filesystem/File.h"
-#include "utils/log.h"
+#include "music/tags/MusicInfoTag.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
+#include "utils/XBMCTinyXML.h"
 #include "utils/XMLUtils.h"
+#include "utils/log.h"
+
+#include <iostream>
+#include <string>
 
 using namespace XFILE;
 using namespace PLAYLIST;
@@ -68,7 +69,7 @@ bool CPlayListB4S::LoadData(std::istream& stream)
   while (pEntryElement)
   {
     std::string strFileName = XMLUtils::GetAttribute(pEntryElement, "Playstring");
-    size_t iColon = strFileName.find(":");
+    size_t iColon = strFileName.find(':');
     if (iColon != std::string::npos)
     {
       iColon++;

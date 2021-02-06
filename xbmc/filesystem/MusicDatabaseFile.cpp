@@ -7,8 +7,9 @@
  */
 
 #include "MusicDatabaseFile.h"
-#include "music/MusicDatabase.h"
+
 #include "URL.h"
+#include "music/MusicDatabase.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 
@@ -34,7 +35,7 @@ std::string CMusicDatabaseFile::TranslateUrl(const CURL& url)
   if (!StringUtils::IsNaturalNumber(strFileName))
     return "";
 
-  long idSong=atol(strFileName.c_str());
+  int idSong = atoi(strFileName.c_str());
 
   CSong song;
   if (!musicDatabase.GetSong(idSong, song))

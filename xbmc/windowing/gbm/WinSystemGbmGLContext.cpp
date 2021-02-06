@@ -6,18 +6,26 @@
  *  See LICENSES/README.md for more information.
  */
 
+#include "WinSystemGbmGLContext.h"
+
+#include "OptionalsReg.h"
 #include "cores/RetroPlayer/process/gbm/RPProcessInfoGbm.h"
-#include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererGBM.h"
+#include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererDMA.h"
 #include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererOpenGL.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
 #include "cores/VideoPlayer/VideoRenderers/LinuxRendererGL.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
-#include "EGL/egl.h"
-#include "EGL/eglext.h"
-#include "WinSystemGbmGLContext.h"
-#include "OptionalsReg.h"
-#include "platform/linux/XTimeUtils.h"
+#include "rendering/gl/ScreenshotSurfaceGL.h"
+#include "utils/BufferObjectFactory.h"
+#include "utils/DMAHeapBufferObject.h"
+#include "utils/DumbBufferObject.h"
+#include "utils/GBMBufferObject.h"
+#include "utils/UDMABufferObject.h"
+#include "utils/XTimeUtils.h"
 #include "utils/log.h"
+#include "windowing/WindowSystemFactory.h"
+
+#include <EGL/eglext.h>
 
 using namespace KODI::WINDOWING::GBM;
 
@@ -25,10 +33,14 @@ CWinSystemGbmGLContext::CWinSystemGbmGLContext()
 : CWinSystemGbmEGLContext(EGL_PLATFORM_GBM_MESA, "EGL_MESA_platform_gbm")
 {}
 
-std::unique_ptr<CWinSystemBase> CWinSystemBase::CreateWinSystem()
+void CWinSystemGbmGLContext::Register()
 {
-  std::unique_ptr<CWinSystemBase> winSystem(new CWinSystemGbmGLContext());
-  return winSystem;
+  CWindowSystemFactory::RegisterWindowSystem(CreateWinSystem, "gbm");
+}
+
+std::unique_ptr<CWinSystemBase> CWinSystemGbmGLContext::CreateWinSystem()
+{
+  return std::make_unique<CWinSystemGbmGLContext>();
 }
 
 bool CWinSystemGbmGLContext::InitWindowSystem()
@@ -37,6 +49,7 @@ bool CWinSystemGbmGLContext::InitWindowSystem()
   CDVDFactoryCodec::ClearHWAccels();
   CLinuxRendererGL::Register();
   RETRO::CRPProcessInfoGbm::Register();
+  RETRO::CRPProcessInfoGbm::RegisterRendererFactory(new RETRO::CRendererFactoryDMA);
   RETRO::CRPProcessInfoGbm::RegisterRendererFactory(new RETRO::CRendererFactoryOpenGL);
 
   if (!CWinSystemGbmEGLContext::InitWindowSystemEGL(EGL_OPENGL_BIT, EGL_OPENGL_API))
@@ -54,6 +67,20 @@ bool CWinSystemGbmGLContext::InitWindowSystem()
     VAAPIRegister(m_vaapiProxy.get(), deepColor);
   }
 
+  CScreenshotSurfaceGL::Register();
+
+  CBufferObjectFactory::ClearBufferObjects();
+  CDumbBufferObject::Register();
+#if defined(HAS_GBM_BO_MAP)
+  CGBMBufferObject::Register();
+#endif
+#if defined(HAVE_LINUX_MEMFD) && defined(HAVE_LINUX_UDMABUF)
+  CUDMABufferObject::Register();
+#endif
+#if defined(HAVE_LINUX_DMA_HEAP)
+  CDMAHeapBufferObject::Register();
+#endif
+
   return true;
 }
 
@@ -68,20 +95,12 @@ bool CWinSystemGbmGLContext::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res
 
   if (!m_eglContext.TrySwapBuffers())
   {
-    CEGLUtils::LogError("eglSwapBuffers failed");
+    CEGLUtils::Log(LOGERROR, "eglSwapBuffers failed");
     throw std::runtime_error("eglSwapBuffers failed");
   }
 
   CWinSystemGbm::SetFullScreen(fullScreen, res, blankOtherDisplays);
   CRenderSystemGL::ResetRenderSystem(res.iWidth, res.iHeight);
-
-  if (!m_delayDispReset)
-  {
-    CSingleLock lock(m_resourceSection);
-
-    for (auto resource : m_resources)
-      resource->OnResetDisplay();
-  }
 
   return true;
 }
@@ -97,24 +116,26 @@ void CWinSystemGbmGLContext::PresentRender(bool rendered, bool videoLayer)
     {
       if (!m_eglContext.TrySwapBuffers())
       {
-        CEGLUtils::LogError("eglSwapBuffers failed");
+        CEGLUtils::Log(LOGERROR, "eglSwapBuffers failed");
         throw std::runtime_error("eglSwapBuffers failed");
       }
     }
     CWinSystemGbm::FlipPage(rendered, videoLayer);
+
+    if (m_dispReset && m_dispResetTimer.IsTimePast())
+    {
+      CLog::Log(LOGDEBUG, "CWinSystemGbmGLContext::%s - Sending display reset to all clients",
+                __FUNCTION__);
+      m_dispReset = false;
+      CSingleLock lock(m_resourceSection);
+
+      for (auto resource : m_resources)
+        resource->OnResetDisplay();
+    }
   }
   else
   {
-    Sleep(10);
-  }
-
-  if (m_delayDispReset && m_dispResetTimer.IsTimePast())
-  {
-    m_delayDispReset = false;
-    CSingleLock lock(m_resourceSection);
-
-    for (auto resource : m_resources)
-      resource->OnResetDisplay();
+    KODI::TIME::Sleep(10);
   }
 }
 

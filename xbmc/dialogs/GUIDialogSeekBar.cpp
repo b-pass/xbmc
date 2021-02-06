@@ -6,14 +6,15 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <math.h>
-
 #include "GUIDialogSeekBar.h"
+
 #include "Application.h"
 #include "GUIInfoManager.h"
-#include "guilib/GUIComponent.h"
 #include "SeekHandler.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/guiinfo/GUIInfoLabels.h"
+
+#include <math.h>
 
 #define POPUP_SEEK_PROGRESS           401
 #define POPUP_SEEK_EPG_EVENT_PROGRESS 402
@@ -115,23 +116,7 @@ int CGUIDialogSeekBar::GetTimeshiftProgress() const
   CGUIInfoManager& infoMgr = CServiceBroker::GetGUI()->GetInfoManager();
 
   int progress = 0;
-  infoMgr.GetInt(progress, PVR_TIMESHIFT_PROGRESS_PLAY_POS);
-
-  int seekSize = g_application.GetAppPlayer().GetSeekHandler().GetSeekSize();
-  if (seekSize != 0)
-  {
-    int total = 0;
-    infoMgr.GetInt(total, PVR_TIMESHIFT_PROGRESS_DURATION);
-
-    float totalTime = static_cast<float>(total);
-    if (totalTime == 0.0f)
-      return 0;
-
-    float percentPerSecond = 100.0f / totalTime;
-    float percent = progress + percentPerSecond * seekSize;
-    percent = std::max(0.0f, std::min(percent, 100.0f));
-    return std::lrintf(percent);
-  }
+  infoMgr.GetInt(progress, PVR_TIMESHIFT_SEEKBAR);
 
   return progress;
 }

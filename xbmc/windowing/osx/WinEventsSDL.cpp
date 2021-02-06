@@ -7,20 +7,21 @@
  */
 
 #include "WinEventsSDL.h"
-#include "Application.h"
+
 #include "AppInboundProtocol.h"
-#include "ServiceBroker.h"
-#include "messaging/ApplicationMessenger.h"
+#include "Application.h"
 #include "GUIUserMessages.h"
-#include "settings/DisplaySettings.h"
+#include "ServiceBroker.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "input/mouse/MouseStat.h"
-#include "input/Key.h"
 #include "input/InputManager.h"
+#include "input/Key.h"
+#include "input/mouse/MouseStat.h"
+#include "messaging/ApplicationMessenger.h"
+#include "settings/DisplaySettings.h"
 #include "windowing/WinSystem.h"
+
 #include "platform/darwin/osx/CocoaInterface.h"
-#include "ServiceBroker.h"
 
 using namespace KODI::MESSAGING;
 
@@ -205,7 +206,8 @@ bool CWinEventsSDL::ProcessOSXShortcuts(SDL_Event& event)
     // use this instead for getting the real
     // character based on the used keyboard layout
     // see http://lists.libsdl.org/pipermail/sdl-libsdl.org/2004-May/043716.html
-    if (!(event.key.keysym.unicode & 0xff80))
+    bool isControl = (event.key.keysym.mod & KMOD_CTRL) != 0;
+    if (!isControl && !(event.key.keysym.unicode & 0xff80))
       keysymbol = event.key.keysym.unicode;
 
     switch(keysymbol)
@@ -215,7 +217,9 @@ bool CWinEventsSDL::ProcessOSXShortcuts(SDL_Event& event)
         CApplicationMessenger::GetInstance().PostMsg(TMSG_QUIT);
       return true;
 
-    case SDLK_f: // CMD-f to toggle fullscreen
+    case SDLK_f: // CMD-Ctrl-f to toggle fullscreen
+      if (!isControl)
+        return false;
       g_application.OnAction(CAction(ACTION_TOGGLE_FULLSCREEN));
       return true;
 

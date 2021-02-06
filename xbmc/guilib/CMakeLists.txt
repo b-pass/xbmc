@@ -39,6 +39,7 @@ set(SOURCES DDSImage.cpp
             GUIPanelContainer.cpp
             GUIProgressControl.cpp
             GUIRadioButtonControl.cpp
+            GUIRangesControl.cpp
             GUIRenderingControl.cpp
             GUIResizeControl.cpp
             GUIRSSControl.cpp
@@ -114,6 +115,7 @@ set(HEADERS DDSImage.h
             GUIPanelContainer.h
             GUIProgressControl.h
             GUIRadioButtonControl.h
+            GUIRangesControl.h
             GUIRenderingControl.h
             GUIResizeControl.h
             GUIRSSControl.h
@@ -173,11 +175,6 @@ if(OPENGLES_FOUND)
                       GUITextureGLES.h
                       Shader.h
                       TextureGL.h)
-endif()
-
-if(CORE_PLATFORM_NAME_LC STREQUAL rbpi)
-  list(APPEND SOURCES TexturePi.cpp)
-  list(APPEND HEADERS TexturePi.h)
 endif()
 
 if(CORE_SYSTEM_NAME STREQUAL windows OR CORE_SYSTEM_NAME STREQUAL windowsstore)

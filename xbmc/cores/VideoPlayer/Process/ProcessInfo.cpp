@@ -7,6 +7,7 @@
  */
 
 #include "ProcessInfo.h"
+
 #include "ServiceBroker.h"
 #include "cores/DataCacheCore.h"
 #include "settings/AdvancedSettings.h"
@@ -16,7 +17,7 @@
 CCriticalSection createSection;
 std::map<std::string, CreateProcessControl> CProcessInfo::m_processControls;
 
-void CProcessInfo::RegisterProcessControl(std::string id, CreateProcessControl createFunc)
+void CProcessInfo::RegisterProcessControl(const std::string& id, CreateProcessControl createFunc)
 {
   CSingleLock lock(createSection);
 
@@ -667,7 +668,7 @@ CVideoSettings CProcessInfo::GetVideoSettings()
 CVideoSettingsLocked& CProcessInfo::UpdateVideoSettings()
 {
   CSingleLock lock(m_settingsSection);
-  return *m_videoSettingsLocked.get();
+  return *m_videoSettingsLocked;
 }
 
 void CProcessInfo::SetVideoSettings(CVideoSettings &settings)

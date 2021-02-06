@@ -7,11 +7,13 @@
  */
 
 #include "SettingPath.h"
+
 #include "settings/lib/SettingsManager.h"
-#include "utils/log.h"
+#include "utils/FileExtensionProvider.h"
 #include "utils/StringUtils.h"
 #include "utils/XBMCTinyXML.h"
 #include "utils/XMLUtils.h"
+#include "utils/log.h"
 
 #define XML_ELM_DEFAULT     "default"
 #define XML_ELM_CONSTRAINTS "constraints"
@@ -43,7 +45,7 @@ bool CSettingPath::Deserialize(const TiXmlNode *node, bool update /* = false */)
     return false;
 
   if (m_control != nullptr &&
-     (m_control->GetType() != "button" || (m_control->GetFormat() != "path" && m_control->GetFormat() != "file")))
+     (m_control->GetType() != "button" || (m_control->GetFormat() != "path" && m_control->GetFormat() != "file" && m_control->GetFormat() != "image")))
   {
     CLog::Log(LOGERROR, "CSettingPath: invalid <control> of \"%s\"", m_id.c_str());
     return false;
@@ -63,9 +65,13 @@ bool CSettingPath::Deserialize(const TiXmlNode *node, bool update /* = false */)
       auto source = sources->FirstChild("source");
       while (source != nullptr)
       {
-        std::string strSource = source->FirstChild()->ValueStr();
-        if (!strSource.empty())
-          m_sources.push_back(strSource);
+        auto child = source->FirstChild();
+        if (child != nullptr)
+        {
+          const std::string& strSource = child->ValueStr();
+          if (!strSource.empty())
+            m_sources.push_back(strSource);
+        }
 
         source = source->NextSibling("source");
       }
@@ -90,7 +96,40 @@ bool CSettingPath::SetValue(const std::string &value)
   return CSettingString::SetValue(value);
 }
 
-void CSettingPath::copy(const CSettingPath &setting)
+std::string CSettingPath::GetMasking(const CFileExtensionProvider& fileExtensionProvider) const
+{
+  if (m_masking.empty())
+    return m_masking;
+
+  // setup masking
+  auto audioMask = fileExtensionProvider.GetMusicExtensions();
+  auto videoMask = fileExtensionProvider.GetVideoExtensions();
+  auto imageMask = fileExtensionProvider.GetPictureExtensions();
+  auto execMask = "";
+#if defined(TARGET_WINDOWS)
+  execMask = ".exe|.bat|.cmd|.py";
+#endif // defined(TARGET_WINDOWS)
+
+  std::string masking = m_masking;
+  if (masking == "video")
+    return videoMask;
+  if (masking == "audio")
+    return audioMask;
+  if (masking == "image")
+    return imageMask;
+  if (masking == "executable")
+    return execMask;
+
+  // convert mask qualifiers
+  StringUtils::Replace(masking, "$AUDIO", audioMask);
+  StringUtils::Replace(masking, "$VIDEO", videoMask);
+  StringUtils::Replace(masking, "$IMAGE", imageMask);
+  StringUtils::Replace(masking, "$EXECUTABLE", execMask);
+
+  return masking;
+}
+
+void CSettingPath::copy(const CSettingPath& setting)
 {
   CSettingString::Copy(setting);
 

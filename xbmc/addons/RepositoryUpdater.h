@@ -8,13 +8,14 @@
 
 #pragma once
 
+#include "XBDateTime.h"
 #include "addons/AddonEvents.h"
 #include "addons/Repository.h"
 #include "settings/lib/ISettingCallback.h"
 #include "threads/CriticalSection.h"
 #include "threads/Timer.h"
 #include "utils/EventStream.h"
-#include "XBDateTime.h"
+
 #include <vector>
 
 namespace ADDON
@@ -56,7 +57,7 @@ public:
   CDateTime LastUpdated() const;
 
 
-  void OnSettingChanged(std::shared_ptr<const CSetting> setting) override;
+  void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
 
   struct RepositoryUpdated { };
 
@@ -73,6 +74,8 @@ private:
   void OnTimeout() override;
 
   void OnEvent(const ADDON::AddonEvent& event);
+
+  CDateTime ClosestNextCheck() const;
 
   CCriticalSection m_criticalSection;
   CTimer m_timer;

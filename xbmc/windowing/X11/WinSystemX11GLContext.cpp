@@ -6,74 +6,44 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-
 #include "WinSystemX11GLContext.h"
-#include "GLContextEGL.h"
-#include "utils/log.h"
-#include "utils/StringUtils.h"
-#include "windowing/GraphicContext.h"
-#include "guilib/DispResource.h"
-#include "threads/SingleLock.h"
-#include <vector>
-#include "Application.h"
-#include "VideoSyncOML.h"
 
+#include "Application.h"
+#include "GLContextEGL.h"
+#include "OptionalsReg.h"
+#include "VideoSyncOML.h"
+#include "X11DPMSSupport.h"
 #include "cores/RetroPlayer/process/X11/RPProcessInfoX11.h"
 #include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererOpenGL.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
 #include "cores/VideoPlayer/Process/X11/ProcessInfoX11.h"
 #include "cores/VideoPlayer/VideoRenderers/LinuxRendererGL.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
+#include "guilib/DispResource.h"
+#include "rendering/gl/ScreenshotSurfaceGL.h"
+#include "threads/SingleLock.h"
+#include "utils/StringUtils.h"
+#include "utils/log.h"
+#include "windowing/GraphicContext.h"
+#include "windowing/WindowSystemFactory.h"
 
-#include "OptionalsReg.h"
-#include "platform/linux/OptionalsReg.h"
+#include <vector>
+
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 
 using namespace KODI;
+using namespace KODI::WINDOWING::X11;
 
-std::unique_ptr<CWinSystemBase> CWinSystemBase::CreateWinSystem()
+
+void CWinSystemX11GLContext::Register()
 {
-  std::unique_ptr<CWinSystemBase> winSystem(new CWinSystemX11GLContext());
-  return winSystem;
+  KODI::WINDOWING::CWindowSystemFactory::RegisterWindowSystem(CreateWinSystem, "x11");
 }
 
-CWinSystemX11GLContext::CWinSystemX11GLContext()
+std::unique_ptr<CWinSystemBase> CWinSystemX11GLContext::CreateWinSystem()
 {
-  std::string envSink;
-  if (getenv("KODI_AE_SINK"))
-    envSink = getenv("KODI_AE_SINK");
-  if (StringUtils::EqualsNoCase(envSink, "ALSA"))
-  {
-    OPTIONALS::ALSARegister();
-  }
-  else if (StringUtils::EqualsNoCase(envSink, "PULSE"))
-  {
-    OPTIONALS::PulseAudioRegister();
-  }
-  else if (StringUtils::EqualsNoCase(envSink, "OSS"))
-  {
-    OPTIONALS::OSSRegister();
-  }
-  else if (StringUtils::EqualsNoCase(envSink, "SNDIO"))
-  {
-    OPTIONALS::SndioRegister();
-  }
-  else
-  {
-    if (!OPTIONALS::PulseAudioRegister())
-    {
-      if (!OPTIONALS::ALSARegister())
-      {
-        if (!OPTIONALS::SndioRegister())
-        {
-          OPTIONALS::OSSRegister();
-        }
-      }
-    }
-  }
-
-  m_lirc.reset(OPTIONALS::LircRegister());
+  return std::make_unique<CWinSystemX11GLContext>();
 }
 
 CWinSystemX11GLContext::~CWinSystemX11GLContext()
@@ -111,12 +81,12 @@ bool CWinSystemX11GLContext::IsExtSupported(const char* extension) const
 
 XID CWinSystemX11GLContext::GetWindow() const
 {
-  return X11::GLXGetWindow(m_pGLContext);
+  return GLXGetWindow(m_pGLContext);
 }
 
 void* CWinSystemX11GLContext::GetGlxContext() const
 {
-  return X11::GLXGetContext(m_pGLContext);
+  return GLXGetContext(m_pGLContext);
 }
 
 EGLDisplay CWinSystemX11GLContext::GetEGLDisplay() const
@@ -260,12 +230,15 @@ bool CWinSystemX11GLContext::RefreshGLContext(bool force)
     return success;
   }
 
+  m_dpms = std::make_shared<CX11DPMSSupport>();
   VIDEOPLAYER::CProcessInfoX11::Register();
   RETRO::CRPProcessInfoX11::Register();
   RETRO::CRPProcessInfoX11::RegisterRendererFactory(new RETRO::CRendererFactoryOpenGL);
   CDVDFactoryCodec::ClearHWAccels();
   VIDEOPLAYER::CRendererFactory::ClearRenderer();
   CLinuxRendererGL::Register();
+
+  CScreenshotSurfaceGL::Register();
 
   std::string gpuvendor;
   const char* vend = (const char*) glGetString(GL_VENDOR);
@@ -278,20 +251,21 @@ bool CWinSystemX11GLContext::RefreshGLContext(bool force)
 
   if (gli != "GLX")
   {
-    m_pGLContext = new CGLContextEGL(m_dpy);
+    m_pGLContext = new CGLContextEGL(m_dpy, EGL_OPENGL_API);
     success = m_pGLContext->Refresh(force, m_screen, m_glWindow, m_newGlContext);
     if (success)
     {
       if (!isNvidia)
       {
-        m_vaapiProxy.reset(X11::VaapiProxyCreate());
-        X11::VaapiProxyConfig(m_vaapiProxy.get(), GetDisplay(),
+        m_vaapiProxy.reset(VaapiProxyCreate());
+        VaapiProxyConfig(m_vaapiProxy.get(), GetDisplay(),
                               static_cast<CGLContextEGL*>(m_pGLContext)->m_eglDisplay);
-        bool general, deepColor;
-        X11::VAAPIRegisterRender(m_vaapiProxy.get(), general, deepColor);
+        bool general = false;
+        bool deepColor = false;
+        VAAPIRegisterRender(m_vaapiProxy.get(), general, deepColor);
         if (general)
         {
-          X11::VAAPIRegister(m_vaapiProxy.get(), deepColor);
+          VAAPIRegister(m_vaapiProxy.get(), deepColor);
           return true;
         }
         if (isIntel || gli == "EGL")
@@ -309,12 +283,12 @@ bool CWinSystemX11GLContext::RefreshGLContext(bool force)
   delete m_pGLContext;
 
   // fallback for vdpau
-  m_pGLContext = X11::GLXContextCreate(m_dpy);
+  m_pGLContext = GLXContextCreate(m_dpy);
   success = m_pGLContext->Refresh(force, m_screen, m_glWindow, m_newGlContext);
   if (success)
   {
-    X11::VDPAURegister();
-    X11::VDPAURegisterRender();
+    VDPAURegister();
+    VDPAURegisterRender();
   }
   return success;
 }
@@ -329,7 +303,7 @@ std::unique_ptr<CVideoSync> CWinSystemX11GLContext::GetVideoSync(void *clock)
   }
   else
   {
-    pVSync.reset(X11::GLXVideoSyncCreate(clock, *this));
+    pVSync.reset(GLXVideoSyncCreate(clock, *this));
   }
 
   return pVSync;
@@ -360,5 +334,5 @@ uint64_t CWinSystemX11GLContext::GetVblankTiming(uint64_t &msc, uint64_t &interv
 
 void CWinSystemX11GLContext::delete_CVaapiProxy::operator()(CVaapiProxy *p) const
 {
-  X11::VaapiProxyDelete(p);
+  VaapiProxyDelete(p);
 }

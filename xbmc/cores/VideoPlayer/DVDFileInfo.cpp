@@ -33,8 +33,8 @@
 #include "DVDDemuxers/DVDDemuxVobsub.h"
 #include "Process/ProcessInfo.h"
 
-#include "libavcodec/avcodec.h"
-#include "libswscale/swscale.h"
+#include <libavcodec/avcodec.h>
+#include <libswscale/swscale.h>
 #include "filesystem/File.h"
 #include "cores/FFmpeg.h"
 #include "TextureCache.h"
@@ -45,7 +45,7 @@
 #include <memory>
 
 extern "C" {
-#include "libavformat/avformat.h"
+#include <libavformat/avformat.h>
 }
 
 bool CDVDFileInfo::GetFileDuration(const std::string &path, int& duration)
@@ -61,7 +61,7 @@ bool CDVDFileInfo::GetFileDuration(const std::string &path, int& duration)
     return false;
 
   demux.reset(CDVDFactoryDemuxer::CreateDemuxer(input, true));
-  if (!demux.get())
+  if (!demux)
     return false;
 
   duration = demux->GetStreamLength();
@@ -132,7 +132,7 @@ bool CDVDFileInfo::ExtractThumb(const CFileItem& fileItem,
   if (pStreamDetails)
   {
 
-    const std::string strPath = item.GetPath();
+    const std::string& strPath = item.GetPath();
     DemuxerToStreamDetails(pInputStream, pDemuxer, *pStreamDetails, strPath);
 
     //extern subtitles
@@ -200,10 +200,10 @@ bool CDVDFileInfo::ExtractThumb(const CFileItem& fileItem,
     if (pVideoCodec)
     {
       int nTotalLen = pDemuxer->GetStreamLength();
-      int nSeekTo = (pos == -1) ? nTotalLen / 3 : pos;
+      int64_t nSeekTo = (pos == -1) ? nTotalLen / 3 : pos;
 
-      CLog::Log(LOGDEBUG,"%s - seeking to pos %dms (total: %dms) in %s", __FUNCTION__, nSeekTo, nTotalLen, redactPath.c_str());
-      if (pDemuxer->SeekTime(nSeekTo, true))
+      CLog::Log(LOGDEBUG, "%s - seeking to pos %lldms (total: %dms) in %s", __FUNCTION__, nSeekTo, nTotalLen, redactPath.c_str());
+      if (pDemuxer->SeekTime(static_cast<double>(nSeekTo), true))
       {
         CDVDVideoCodec::VCReturn iDecoderState = CDVDVideoCodec::VC_NONE;
         VideoPicture picture = {};
@@ -250,7 +250,9 @@ bool CDVDFileInfo::ExtractThumb(const CFileItem& fileItem,
               aspect = hint.aspect;
             unsigned int nHeight = (unsigned int)((double)nWidth / aspect);
 
-            uint8_t *pOutBuf = (uint8_t*)av_malloc(nWidth * nHeight * 4);
+            // We pass the buffers to sws_scale uses 16 aligned widths when using intrinsics
+            int sizeNeeded = FFALIGN(nWidth, 16) * nHeight * 4;
+            uint8_t *pOutBuf = static_cast<uint8_t*>(av_malloc(sizeNeeded));
             struct SwsContext *context = sws_getContext(picture.iWidth, picture.iHeight,
                   AV_PIX_FMT_YUV420P, nWidth, nHeight, AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, NULL, NULL, NULL);
 
@@ -349,7 +351,10 @@ bool CDVDFileInfo::GetFileStreamDetails(CFileItem *pItem)
   }
 }
 
-bool CDVDFileInfo::DemuxerToStreamDetails(std::shared_ptr<CDVDInputStream> pInputStream, CDVDDemux *pDemuxer, const std::vector<CStreamDetailSubtitle> &subs, CStreamDetails &details)
+bool CDVDFileInfo::DemuxerToStreamDetails(const std::shared_ptr<CDVDInputStream>& pInputStream,
+                                          CDVDDemux* pDemuxer,
+                                          const std::vector<CStreamDetailSubtitle>& subs,
+                                          CStreamDetails& details)
 {
   bool result = DemuxerToStreamDetails(pInputStream, pDemuxer, details);
   for (unsigned int i = 0; i < subs.size(); i++)
@@ -363,7 +368,10 @@ bool CDVDFileInfo::DemuxerToStreamDetails(std::shared_ptr<CDVDInputStream> pInpu
 }
 
 /* returns true if details have been added */
-bool CDVDFileInfo::DemuxerToStreamDetails(std::shared_ptr<CDVDInputStream> pInputStream, CDVDDemux *pDemux, CStreamDetails &details, const std::string &path)
+bool CDVDFileInfo::DemuxerToStreamDetails(const std::shared_ptr<CDVDInputStream>& pInputStream,
+                                          CDVDDemux* pDemux,
+                                          CStreamDetails& details,
+                                          const std::string& path)
 {
   bool retVal = false;
   details.Reset();
@@ -377,7 +385,7 @@ bool CDVDFileInfo::DemuxerToStreamDetails(std::shared_ptr<CDVDInputStream> pInpu
       CDemuxStreamVideo* vstream = static_cast<CDemuxStreamVideo*>(stream);
       p->m_iWidth = vstream->iWidth;
       p->m_iHeight = vstream->iHeight;
-      p->m_fAspect = vstream->fAspect;
+      p->m_fAspect = static_cast<float>(vstream->fAspect);
       if (p->m_fAspect == 0.0f)
         p->m_fAspect = (float)p->m_iWidth / p->m_iHeight;
       p->m_strCodec = pDemux->GetStreamCodecName(stream->demuxerId, stream->uniqueId);

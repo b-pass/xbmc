@@ -9,17 +9,15 @@
 #pragma once
 
 #include "IFile.h"
+#include "utils/HttpHeader.h"
 #include "utils/RingBuffer.h"
+
 #include <map>
 #include <string>
-#include "utils/HttpHeader.h"
 
-namespace XCURL
-{
-  typedef void CURL_HANDLE;
-  typedef void CURLM;
-  struct curl_slist;
-}
+typedef void CURL_HANDLE;
+typedef void CURLM;
+struct curl_slist;
 
 namespace XFILE
 {
@@ -73,7 +71,7 @@ namespace XFILE
       void SetPostData(const std::string& postdata) { m_postdata = postdata; }
       void SetReferer(const std::string& referer) { m_referer = referer; }
       void SetCookie(const std::string& cookie) { m_cookie = cookie; }
-      void SetMimeType(std::string mimetype) { SetRequestHeader("Content-Type", mimetype); }
+      void SetMimeType(const std::string& mimetype) { SetRequestHeader("Content-Type", mimetype); }
       void SetRequestHeader(const std::string& header, const std::string& value);
       void SetRequestHeader(const std::string& header, long value);
 
@@ -97,8 +95,8 @@ namespace XFILE
       public:
           CReadState();
           ~CReadState();
-          XCURL::CURL_HANDLE* m_easyHandle;
-          XCURL::CURLM* m_multiHandle;
+          CURL_HANDLE* m_easyHandle;
+          CURLM* m_multiHandle;
 
           CRingBuffer m_buffer; // our ringhold buffer
           unsigned int m_bufferSize;
@@ -121,8 +119,8 @@ namespace XFILE
           CHttpHeader m_httpheader;
           bool IsHeaderDone(void) { return m_httpheader.IsHeaderDone(); }
 
-          struct XCURL::curl_slist* m_curlHeaderList;
-          struct XCURL::curl_slist* m_curlAliasList;
+          curl_slist* m_curlHeaderList;
+          curl_slist* m_curlAliasList;
 
           size_t ReadCallback(char *buffer, size_t size, size_t nitems);
           size_t WriteCallback(char *buffer, size_t size, size_t nitems);
@@ -187,6 +185,7 @@ namespace XFILE
       bool m_allowRetry;
       bool m_verifyPeer = true;
       bool m_failOnError = true;
+      curl_slist* m_dnsCacheList = nullptr;
 
       CRingBuffer m_buffer; // our ringhold buffer
       char* m_overflowBuffer; // in the rare case we would overflow the above buffer

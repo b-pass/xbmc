@@ -8,9 +8,10 @@
 
 #pragma once
 
+#include "TextureBundleXBT.h"
+
 #include <string>
 #include <vector>
-#include "TextureBundleXBT.h"
 
 class CTextureBundle
 {
@@ -24,10 +25,15 @@ public:
   void GetTexturesFromPath(const std::string &path, std::vector<std::string> &textures);
   static std::string Normalize(const std::string &name);
 
-  bool LoadTexture(const std::string& Filename, CBaseTexture** ppTexture, int &width, int &height);
+  bool LoadTexture(const std::string& Filename, CTexture** ppTexture, int& width, int& height);
 
-  int LoadAnim(const std::string& Filename, CBaseTexture*** ppTextures, int &width, int &height, int& nLoops, int** ppDelays);
-
+  int LoadAnim(const std::string& Filename,
+               CTexture*** ppTextures,
+               int& width,
+               int& height,
+               int& nLoops,
+               int** ppDelays);
+  void Close();
 private:
   CTextureBundleXBT m_tbXBT;
 

@@ -11,10 +11,10 @@
 #include <stdint.h>
 
 extern "C" {
-#include "libavutil/avutil.h"
-#include "libavformat/avformat.h"
-#include "libavfilter/avfilter.h"
-#include "libavcodec/avcodec.h"
+#include <libavutil/avutil.h>
+#include <libavformat/avformat.h>
+#include <libavfilter/avfilter.h>
+#include <libavcodec/avcodec.h>
 }
 
 typedef struct
@@ -73,7 +73,7 @@ class CBitstreamParser
 {
 public:
   CBitstreamParser();
-  ~CBitstreamParser();
+  ~CBitstreamParser() = default;
 
   static bool Open(){ return true; };
   static void Close();

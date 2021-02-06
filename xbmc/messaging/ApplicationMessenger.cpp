@@ -8,13 +8,13 @@
 
 #include "ApplicationMessenger.h"
 
-#include <memory>
-#include <utility>
-
-#include "windowing/GraphicContext.h"
 #include "guilib/GUIMessage.h"
 #include "messaging/IMessageTarget.h"
 #include "threads/SingleLock.h"
+#include "windowing/GraphicContext.h"
+
+#include <memory>
+#include <utility>
 
 namespace KODI
 {
@@ -41,7 +41,7 @@ CDelayedMessage::CDelayedMessage(ThreadMessage& msg, unsigned int delay) : CThre
 
 void CDelayedMessage::Process()
 {
-  Sleep(m_delay);
+  CThread::Sleep(m_delay);
 
   if (!m_bStop)
     CApplicationMessenger::GetInstance().PostMsg(m_msg.dwMessage, m_msg.param1, m_msg.param1, m_msg.lpVoid, m_msg.strParam, m_msg.params);
@@ -99,7 +99,7 @@ int CApplicationMessenger::SendMsg(ThreadMessage&& message, bool wait)
     message.result = std::make_shared<int>(-1);
     // check that we're not being called from our application thread, else we'll be waiting
     // forever!
-    if (!CThread::IsCurrentThread(m_guiThreadId))
+    if (m_guiThreadId != CThread::GetCurrentThreadId())
     {
       message.waitEvent.reset(new CEvent(true));
       waitEvent = message.waitEvent;
@@ -136,8 +136,15 @@ int CApplicationMessenger::SendMsg(ThreadMessage&& message, bool wait)
                  //  waitEvent ... just for such contingencies :)
   {
     // ensure the thread doesn't hold the graphics lock
-    CSingleExit exit(CServiceBroker::GetWinSystem()->GetGfxContext());
-    waitEvent->Wait();
+    CWinSystemBase* winSystem = CServiceBroker::GetWinSystem();
+    //! @todo This won't really help as winSystem can die every single
+    // moment on shutdown. A shared ptr would be a more valid solution
+    // depending on the design dependencies.
+    if (winSystem)
+    {
+      CSingleExit exit(winSystem->GetGfxContext());
+      waitEvent->Wait();
+    }
     return *result;
   }
 
@@ -156,12 +163,16 @@ int CApplicationMessenger::SendMsg(uint32_t messageId, int param1, int param2, v
 
 int CApplicationMessenger::SendMsg(uint32_t messageId, int param1, int param2, void* payload, std::string strParam)
 {
-  return SendMsg(ThreadMessage{ messageId, param1, param2, payload, strParam, std::vector<std::string>{} }, true);
+  return SendMsg(ThreadMessage{messageId, param1, param2, payload, std::move(strParam),
+                               std::vector<std::string>{}},
+                 true);
 }
 
 int CApplicationMessenger::SendMsg(uint32_t messageId, int param1, int param2, void* payload, std::string strParam, std::vector<std::string> params)
 {
-  return SendMsg(ThreadMessage{ messageId, param1, param2, payload, strParam, params }, true);
+  return SendMsg(
+      ThreadMessage{messageId, param1, param2, payload, std::move(strParam), std::move(params)},
+      true);
 }
 
 void CApplicationMessenger::PostMsg(uint32_t messageId)
@@ -181,12 +192,15 @@ void CApplicationMessenger::PostMsg(uint32_t messageId, int param1, int param2, 
 
 void CApplicationMessenger::PostMsg(uint32_t messageId, int param1, int param2, void* payload, std::string strParam)
 {
-  SendMsg(ThreadMessage{ messageId, param1, param2, payload, strParam, std::vector<std::string>{} }, false);
+  SendMsg(ThreadMessage{messageId, param1, param2, payload, std::move(strParam),
+                        std::vector<std::string>{}},
+          false);
 }
 
 void CApplicationMessenger::PostMsg(uint32_t messageId, int param1, int param2, void* payload, std::string strParam, std::vector<std::string> params)
 {
-  SendMsg(ThreadMessage{ messageId, param1, param2, payload, strParam, params }, false);
+  SendMsg(ThreadMessage{messageId, param1, param2, payload, std::move(strParam), std::move(params)},
+          false);
 }
 
 void CApplicationMessenger::ProcessMessages()

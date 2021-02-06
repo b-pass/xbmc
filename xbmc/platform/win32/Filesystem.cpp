@@ -7,6 +7,7 @@
  */
 
 #include "platform/Filesystem.h"
+
 #include "platform/win32/CharsetConverter.h"
 
 #include <Windows.h>
@@ -88,7 +89,7 @@ std::string create_temp_directory(std::error_code &ec)
   return win::FromW(lpTempPathBuffer);
 }
 
-std::string temp_file_path(std::string, std::error_code &ec)
+std::string temp_file_path(const std::string&, std::error_code& ec)
 {
   wchar_t lpTempPathBuffer[MAX_PATH + 1];
 

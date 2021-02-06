@@ -8,8 +8,9 @@
 
 #pragma once
 
-#include <string>
 #include "FileItem.h"
+
+#include <string>
 
 class CFileUtils
 {
@@ -26,4 +27,5 @@ public:
   \return Returns the file date, can return a invalid date if problems occur
   */
   static CDateTime GetModificationDate(const std::string& strFileNameAndPath, const bool& bUseLatestDate);
+  static CDateTime GetModificationDate(const int& code, const std::string& strFileNameAndPath);
 };

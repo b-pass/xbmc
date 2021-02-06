@@ -15,6 +15,7 @@
 
 #include "threads/Event.h"
 
+
 enum ECAPTURESTATE
 {
   CAPTURESTATE_WORKING,
@@ -99,40 +100,14 @@ class CRenderCaptureBase
     bool m_asyncChecked;
 };
 
-#if defined(TARGET_RASPBERRY_PI)
-#include "platform/linux/RBP.h"
-
-class CRenderCaptureDispmanX : public CRenderCaptureBase
-{
-  public:
-    CRenderCaptureDispmanX();
-    ~CRenderCaptureDispmanX();
-
-    int   GetCaptureFormat();
-
-    void  BeginRender();
-    void  EndRender();
-    void  ReadOut();
-
-    void* GetRenderBuffer();
-};
-
-//used instead of typedef CRenderCaptureGL CRenderCapture
-//since C++ doesn't allow you to forward declare a typedef
-class CRenderCapture : public CRenderCaptureDispmanX
-{
-  public:
-    CRenderCapture() {};
-};
-
-#elif defined(HAS_GL) || defined(HAS_GLES)
+#if defined(HAS_GL) || defined(HAS_GLES)
 #include "system_gl.h"
 
 class CRenderCaptureGL : public CRenderCaptureBase
 {
   public:
     CRenderCaptureGL();
-    ~CRenderCaptureGL();
+    ~CRenderCaptureGL() override;
 
     int   GetCaptureFormat();
 
@@ -173,7 +148,7 @@ class CRenderCaptureDX : public CRenderCaptureBase, public ID3DResource
 
     void OnDestroyDevice(bool fatal) override;
     void OnCreateDevice() override {};
-    CD3DTexture* GetTarget() { return &m_renderTex; }
+    CD3DTexture& GetTarget() { return m_renderTex; }
 
   private:
     void SurfaceToBuffer();

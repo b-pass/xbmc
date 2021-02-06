@@ -8,13 +8,13 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-
 #include "GUIComponent.h"
 #include "cores/AudioEngine/Interfaces/AESound.h"
 #include "settings/lib/ISettingCallback.h"
 #include "threads/CriticalSection.h"
+
+#include <map>
+#include <string>
 
 // forward definitions
 class CAction;
@@ -44,8 +44,10 @@ public:
   CGUIAudioManager();
   ~CGUIAudioManager() override;
 
-  void OnSettingChanged(std::shared_ptr<const CSetting> setting) override;
-  bool OnSettingUpdate(std::shared_ptr<CSetting> setting, const char *oldSettingId, const TiXmlNode *oldSettingNode) override;
+  void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
+  bool OnSettingUpdate(const std::shared_ptr<CSetting>& setting,
+                       const char* oldSettingId,
+                       const TiXmlNode* oldSettingNode) override;
 
   void Initialize();
   void DeInitialize();

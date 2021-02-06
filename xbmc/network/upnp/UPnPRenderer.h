@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <Platinum/Source/Devices/MediaRenderer/PltMediaRenderer.h>
-
 #include "interfaces/IAnnouncer.h"
+
+#include <Platinum/Source/Devices/MediaRenderer/PltMediaRenderer.h>
 
 class CVariant;
 
@@ -34,7 +34,10 @@ public:
 
     ~CUPnPRenderer() override;
 
-    void Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data) override;
+    void Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                  const std::string& sender,
+                  const std::string& message,
+                  const CVariant& data) override;
     void UpdateState();
 
     // Http server handler

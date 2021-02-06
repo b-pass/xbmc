@@ -7,21 +7,22 @@
  */
 
 #include "ContextMenuManager.h"
+
 #include "ContextMenuItem.h"
+#include "ContextMenus.h"
+#include "ServiceBroker.h"
 #include "addons/Addon.h"
 #include "addons/ContextMenuAddon.h"
 #include "addons/ContextMenus.h"
 #include "addons/IAddon.h"
+#include "dialogs/GUIDialogContextMenu.h"
 #include "favourites/ContextMenus.h"
 #include "music/ContextMenus.h"
 #include "pvr/PVRContextMenus.h"
-#include "video/ContextMenus.h"
 #include "utils/log.h"
-#include "ServiceBroker.h"
+#include "video/ContextMenus.h"
 
 #include <iterator>
-#include "ContextMenus.h"
-#include "dialogs/GUIDialogContextMenu.h"
 
 using namespace ADDON;
 using namespace PVR;
@@ -54,6 +55,9 @@ void CContextMenuManager::Init()
   m_items = {
       std::make_shared<CONTEXTMENU::CResume>(),
       std::make_shared<CONTEXTMENU::CPlay>(),
+      std::make_shared<CONTEXTMENU::CPlayAndQueue>(),
+      std::make_shared<CONTEXTMENU::CPlayNext>(),
+      std::make_shared<CONTEXTMENU::CQueue>(),
       std::make_shared<CONTEXTMENU::CAddonInfo>(),
       std::make_shared<CONTEXTMENU::CEnableAddon>(),
       std::make_shared<CONTEXTMENU::CDisableAddon>(),
@@ -74,6 +78,7 @@ void CContextMenuManager::Init()
       std::make_shared<CONTEXTMENU::CRemoveFavourite>(),
       std::make_shared<CONTEXTMENU::CRenameFavourite>(),
       std::make_shared<CONTEXTMENU::CChooseThumbnailForFavourite>(),
+      std::make_shared<CONTEXTMENU::CAddRemoveFavourite>(),
   };
 
   ReloadAddonItems();
@@ -116,7 +121,7 @@ void CContextMenuManager::OnEvent(const ADDON::AddonEvent& event)
   else if (typeid(event) == typeid(AddonEvents::Enabled))
   {
     AddonPtr addon;
-    if (m_addonMgr.GetAddon(event.id, addon, ADDON_CONTEXT_ITEM))
+    if (m_addonMgr.GetAddon(event.id, addon, ADDON_CONTEXT_ITEM, OnlyEnabled::YES))
     {
       CSingleLock lock(m_criticalSection);
       auto items = std::static_pointer_cast<CContextMenuAddon>(addon)->GetItems();

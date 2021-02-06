@@ -7,18 +7,17 @@
  */
 
 #include "GUIDialogYesNo.h"
+
+#include "ServiceBroker.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
 #include "messaging/helpers/DialogHelper.h"
-#include "ServiceBroker.h"
 
 CGUIDialogYesNo::CGUIDialogYesNo(int overrideId /* = -1 */)
     : CGUIDialogBoxBase(overrideId == -1 ? WINDOW_DIALOG_YES_NO : overrideId, "DialogConfirm.xml")
 {
-  m_bConfirmed = false;
-  m_bCanceled = false;
-  m_bCustom = false;
+  Reset();
 }
 
 CGUIDialogYesNo::~CGUIDialogYesNo() = default;
@@ -31,7 +30,7 @@ bool CGUIDialogYesNo::OnMessage(CGUIMessage& message)
     {
       int iControl = message.GetSenderId();
       int iAction = message.GetParam1();
-      if (1 || ACTION_SELECT_ITEM == iAction)
+      if (true || ACTION_SELECT_ITEM == iAction)
       {
         if (iControl == CONTROL_NO_BUTTON)
         {
@@ -79,18 +78,34 @@ void CGUIDialogYesNo::OnInitWindow()
   CGUIDialogBoxBase::OnInitWindow();
 }
 
-bool CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant line0, CVariant line1, CVariant line2, bool &bCanceled)
+bool CGUIDialogYesNo::ShowAndGetInput(const CVariant& heading,
+                                      const CVariant& line0,
+                                      const CVariant& line1,
+                                      const CVariant& line2,
+                                      bool& bCanceled)
 {
   return ShowAndGetInput(heading, line0, line1, line2, bCanceled, "", "", NO_TIMEOUT);
 }
 
-bool CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant line0, CVariant line1, CVariant line2, CVariant noLabel /* = "" */, CVariant yesLabel /* = "" */)
+bool CGUIDialogYesNo::ShowAndGetInput(const CVariant& heading,
+                                      const CVariant& line0,
+                                      const CVariant& line1,
+                                      const CVariant& line2,
+                                      const CVariant& noLabel /* = "" */,
+                                      const CVariant& yesLabel /* = "" */)
 {
   bool bDummy(false);
   return ShowAndGetInput(heading, line0, line1, line2, bDummy, noLabel, yesLabel, NO_TIMEOUT);
 }
 
-bool CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant line0, CVariant line1, CVariant line2, bool &bCanceled, CVariant noLabel, CVariant yesLabel, unsigned int autoCloseTime)
+bool CGUIDialogYesNo::ShowAndGetInput(const CVariant& heading,
+                                      const CVariant& line0,
+                                      const CVariant& line1,
+                                      const CVariant& line2,
+                                      bool& bCanceled,
+                                      const CVariant& noLabel,
+                                      const CVariant& yesLabel,
+                                      unsigned int autoCloseTime)
 {
   CGUIDialogYesNo *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
   if (!dialog)
@@ -112,13 +127,18 @@ bool CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant line0, CVariant
   return (dialog->IsConfirmed()) ? true : false;
 }
 
-bool CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant text)
+bool CGUIDialogYesNo::ShowAndGetInput(const CVariant& heading, const CVariant& text)
 {
   bool bDummy(false);
   return ShowAndGetInput(heading, text, "", "", bDummy);
 }
 
-bool CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant text, bool &bCanceled, CVariant noLabel /* = "" */, CVariant yesLabel /* = "" */, unsigned int autoCloseTime)
+bool CGUIDialogYesNo::ShowAndGetInput(const CVariant& heading,
+                                      const CVariant& text,
+                                      bool& bCanceled,
+                                      const CVariant& noLabel /* = "" */,
+                                      const CVariant& yesLabel /* = "" */,
+                                      unsigned int autoCloseTime)
 {
   int result = ShowAndGetInput(heading, text, noLabel, yesLabel, "", autoCloseTime);
 
@@ -126,7 +146,32 @@ bool CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant text, bool &bCa
   return result == 1;
 }
 
-int CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant text, CVariant noLabel, CVariant yesLabel, CVariant customLabel, unsigned int autoCloseTime)
+void CGUIDialogYesNo::Reset()
+{
+  m_bConfirmed = false;
+  m_bCanceled = false;
+  m_bCustom = false;
+  m_bAutoClosed = false;
+}
+
+int CGUIDialogYesNo::GetResult() const
+{
+  if (m_bCanceled)
+    return -1;
+  else if (m_bCustom)
+    return 2;
+  else if (IsConfirmed())
+    return 1;
+  else
+    return 0;
+}
+
+int CGUIDialogYesNo::ShowAndGetInput(const CVariant& heading,
+                                     const CVariant& text,
+                                     const CVariant& noLabel,
+                                     const CVariant& yesLabel,
+                                     const CVariant& customLabel,
+                                     unsigned int autoCloseTime)
 {
   CGUIDialogYesNo *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
   if (!dialog)
@@ -134,7 +179,7 @@ int CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant text, CVariant n
 
   dialog->SetHeading(heading);
   dialog->SetText(text);
-  if (autoCloseTime)
+  if (autoCloseTime > 0)
     dialog->SetAutoClose(autoCloseTime);
   dialog->m_bCanceled = false;
   dialog->m_bCustom = false;
@@ -144,14 +189,7 @@ int CGUIDialogYesNo::ShowAndGetInput(CVariant heading, CVariant text, CVariant n
 
   dialog->Open();
 
-  if (dialog->m_bCanceled)
-    return -1;
-  else if (dialog->m_bCustom)
-    return 2;
-  else if (dialog->IsConfirmed())
-    return 1;
-  else
-    return 0;
+  return dialog->GetResult();
 }
 
 int CGUIDialogYesNo::ShowAndGetInput(const KODI::MESSAGING::HELPERS::DialogYesNoMessage& options)
@@ -184,14 +222,7 @@ int CGUIDialogYesNo::ShowAndGetInput(const KODI::MESSAGING::HELPERS::DialogYesNo
 
   Open();
 
-  if (m_bCanceled)
-    return -1;
-  else if (m_bCustom)
-    return 2;
-  else if (IsConfirmed())
-    return 1;
-  else
-    return 0;
+  return GetResult();
 }
 
 int CGUIDialogYesNo::GetDefaultLabelID(int controlId) const

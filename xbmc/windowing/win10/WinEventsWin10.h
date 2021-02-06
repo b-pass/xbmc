@@ -10,6 +10,7 @@
 
 #include "interfaces/IAnnouncer.h"
 #include "windowing/WinEvents.h"
+
 #include <concurrent_queue.h>
 #include <winrt/Windows.Media.h>
 
@@ -56,7 +57,10 @@ public:
   static void OnSystemMediaButtonPressed(const winrt::Windows::Media::SystemMediaTransportControls&
                                        , const winrt::Windows::Media::SystemMediaTransportControlsButtonPressedEventArgs&);
   // IAnnouncer overrides
-  void Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data) override;
+  void Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                const std::string& sender,
+                const std::string& message,
+                const CVariant& data) override;
 
 private:
   friend class CWinSystemWin10;

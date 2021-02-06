@@ -32,10 +32,13 @@
 #include FT_OUTLINE_H
 
 #define ELEMENT_ARRAY_MAX_CHAR_INDEX (1000)
-#define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
-CGUIFontTTFGL::CGUIFontTTFGL(const std::string& strFileName)
-: CGUIFontTTFBase(strFileName)
+CGUIFontTTF* CGUIFontTTF::CreateGUIFontTTF(const std::string& fileName)
+{
+  return new CGUIFontTTFGL(fileName);
+}
+
+CGUIFontTTFGL::CGUIFontTTFGL(const std::string& strFileName) : CGUIFontTTF(strFileName)
 {
   m_updateY1 = 0;
   m_updateY2 = 0;
@@ -155,9 +158,12 @@ void CGUIFontTTFGL::LastEnd()
     glBindBuffer(GL_ARRAY_BUFFER, VertexVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(SVertex)*vecVertices.size(), &vecVertices[0], GL_STATIC_DRAW);
 
-    glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(SVertex), BUFFER_OFFSET(offsetof(SVertex, x)));
-    glVertexAttribPointer(colLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SVertex), BUFFER_OFFSET(offsetof(SVertex, r)));
-    glVertexAttribPointer(tex0Loc, 2, GL_FLOAT, GL_FALSE, sizeof(SVertex), BUFFER_OFFSET(offsetof(SVertex, u)));
+    glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(SVertex),
+                          reinterpret_cast<const GLvoid*>(offsetof(SVertex, x)));
+    glVertexAttribPointer(colLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SVertex),
+                          reinterpret_cast<const GLvoid*>(offsetof(SVertex, r)));
+    glVertexAttribPointer(tex0Loc, 2, GL_FLOAT, GL_FALSE, sizeof(SVertex),
+                          reinterpret_cast<const GLvoid*>(offsetof(SVertex, u)));
 
     glDrawArrays(GL_TRIANGLES, 0, vecVertices.size());
 
@@ -221,6 +227,11 @@ void CGUIFontTTFGL::LastEnd()
 
     for (size_t i = 0; i < m_vertexTrans.size(); i++)
     {
+      if (m_vertexTrans[i].vertexBuffer->bufferHandle == 0)
+      {
+        continue;
+      }
+
       // Apply the clip rectangle
       CRect clip = renderSystem->ClipRectToScissorRect(m_vertexTrans[i].clip);
       if (!clip.IsEmpty())
@@ -282,20 +293,23 @@ void CGUIFontTTFGL::LastEnd()
 
 CVertexBuffer CGUIFontTTFGL::CreateVertexBuffer(const std::vector<SVertex> &vertices) const
 {
-  assert(!vertices.empty());
   assert(vertices.size() % 4 == 0);
+  GLuint bufferHandle = 0;
 
-  // Generate a unique buffer object name and put it in bufferHandle
-  GLuint bufferHandle;
-  glGenBuffers(1, &bufferHandle);
-  // Bind the buffer to the OpenGL context's GL_ARRAY_BUFFER binding point
-  glBindBuffer(GL_ARRAY_BUFFER, bufferHandle);
-  // Create a data store for the buffer object bound to the GL_ARRAY_BUFFER
-  // binding point (i.e. our buffer object) and initialise it from the
-  // specified client-side pointer
-  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof (SVertex), vertices.data(), GL_STATIC_DRAW);
-  // Unbind GL_ARRAY_BUFFER
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  // Do not create empty buffers, leave buffer as 0, it will be ignored in drawing stage
+  if (!vertices.empty())
+  {
+    // Generate a unique buffer object name and put it in bufferHandle
+    glGenBuffers(1, &bufferHandle);
+    // Bind the buffer to the OpenGL context's GL_ARRAY_BUFFER binding point
+    glBindBuffer(GL_ARRAY_BUFFER, bufferHandle);
+    // Create a data store for the buffer object bound to the GL_ARRAY_BUFFER
+    // binding point (i.e. our buffer object) and initialise it from the
+    // specified client-side pointer
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(SVertex), vertices.data(), GL_STATIC_DRAW);
+    // Unbind GL_ARRAY_BUFFER
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+  }
 
   return CVertexBuffer(bufferHandle, vertices.size() / 4, this);
 }
@@ -310,11 +324,11 @@ void CGUIFontTTFGL::DestroyVertexBuffer(CVertexBuffer &buffer) const
   }
 }
 
-CBaseTexture* CGUIFontTTFGL::ReallocTexture(unsigned int& newHeight)
+CTexture* CGUIFontTTFGL::ReallocTexture(unsigned int& newHeight)
 {
-  newHeight = CBaseTexture::PadPow2(newHeight);
+  newHeight = CTexture::PadPow2(newHeight);
 
-  CBaseTexture* newTexture = new CTexture(m_textureWidth, newHeight, XB_FMT_A8);
+  CTexture* newTexture = CTexture::CreateTexture(m_textureWidth, newHeight, XB_FMT_A8);
 
   if (!newTexture || newTexture->GetPixels() == NULL)
   {

@@ -8,10 +8,10 @@
 
 #pragma once
 
+#include "settings/lib/SettingConditions.h"
+
 #include <set>
 #include <string>
-
-#include "settings/lib/SettingConditions.h"
 
 class CProfile;
 class CProfileManager;
@@ -27,7 +27,9 @@ public:
   static const std::set<std::string>& GetSimpleConditions() { return m_simpleConditions; }
   static const std::map<std::string, SettingConditionCheck>& GetComplexConditions() { return m_complexConditions; }
 
-  static bool Check(const std::string &condition, const std::string &value = "", std::shared_ptr<const CSetting> setting = NULL);
+  static bool Check(const std::string& condition,
+                    const std::string& value = "",
+                    const std::shared_ptr<const CSetting>& setting = NULL);
 
 private:
   // Initialization parameters

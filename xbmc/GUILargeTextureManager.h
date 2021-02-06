@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include <utility>
-#include <vector>
-
 #include "guilib/TextureManager.h"
 #include "threads/CriticalSection.h"
 #include "utils/Job.h"
+
+#include <utility>
+#include <vector>
 
 /*!
  \ingroup textures,jobs
@@ -36,7 +36,7 @@ public:
 
   bool          m_use_cache; ///< Whether or not to use any caching with this image
   std::string    m_path; ///< path of image to load
-  CBaseTexture *m_texture; ///< Texture object to load the image into \sa CBaseTexture.
+  CTexture* m_texture; ///< Texture object to load the image into \sa CTexture.
 };
 
 /*!
@@ -113,7 +113,7 @@ private:
     void AddRef();
     bool DecrRef(bool deleteImmediately);
     bool DeleteIfRequired(bool deleteImmediately = false);
-    void SetTexture(CBaseTexture* texture);
+    void SetTexture(CTexture* texture);
 
     const std::string &GetPath() const { return m_path; };
     const CTextureArray &GetTexture() const { return m_texture; };

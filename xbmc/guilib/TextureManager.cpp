@@ -26,10 +26,22 @@
 #include "utils/TimeUtils.h"
 #endif
 #if defined(TARGET_DARWIN_IOS)
+#define WIN_SYSTEM_CLASS CWinSystemIOS
 #include "ServiceBroker.h"
-#include "windowing/osx/WinSystemIOS.h" // for g_Windowing in CGUITextureManager::FreeUnusedTextures
+#include "windowing/ios/WinSystemIOS.h" // for g_Windowing in CGUITextureManager::FreeUnusedTextures
+#elif defined(TARGET_DARWIN_TVOS)
+#define WIN_SYSTEM_CLASS CWinSystemTVOS
+#include "ServiceBroker.h"
+#include "windowing/tvos/WinSystemTVOS.h" // for g_Windowing in CGUITextureManager::FreeUnusedTextures
 #endif
+
+#if defined(HAS_GL) || defined(HAS_GLES)
+#include "system_gl.h"
+#endif
+
 #include "FFmpegImage.h"
+
+#include <inttypes.h>
 
 /************************************************************************/
 /*                                                                      */
@@ -71,7 +83,7 @@ void CTextureArray::Reset()
   m_texCoordsArePixels = false;
 }
 
-void CTextureArray::Add(CBaseTexture *texture, int delay)
+void CTextureArray::Add(CTexture* texture, int delay)
 {
   if (!texture)
     return;
@@ -84,7 +96,7 @@ void CTextureArray::Add(CBaseTexture *texture, int delay)
   m_texCoordsArePixels = false;
 }
 
-void CTextureArray::Set(CBaseTexture *texture, int width, int height)
+void CTextureArray::Set(CTexture* texture, int width, int height)
 {
   assert(!m_textures.size()); // don't try and set a texture if we already have one!
   m_width = width;
@@ -198,7 +210,7 @@ bool CTextureMap::IsEmpty() const
   return m_texture.m_textures.empty();
 }
 
-void CTextureMap::Add(CBaseTexture* texture, int delay)
+void CTextureMap::Add(CTexture* texture, int delay)
 {
   m_texture.Add(texture, delay);
 
@@ -331,7 +343,7 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
   if (bundle >= 0 && StringUtils::EndsWithNoCase(strPath, ".gif"))
   {
     CTextureMap* pMap = nullptr;
-    CBaseTexture **pTextures = nullptr;
+    CTexture** pTextures = nullptr;
     int nLoops = 0, width = 0, height = 0;
     int* Delay = nullptr;
     int nImages = m_TexBundle[bundle].LoadAnim(strTextureName, &pTextures, width, height, nLoops, &Delay);
@@ -391,7 +403,7 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
     auto frame = anim.ReadFrame();
     while (frame)
     {
-      CTexture *glTexture = new CTexture();
+      CTexture* glTexture = CTexture::CreateTexture();
       if (glTexture)
       {
         glTexture->LoadFromMemory(anim.Width(), anim.Height(), frame->GetPitch(), XB_FMT_A8R8G8B8, true, frame->m_pImage);
@@ -420,7 +432,7 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
     return pMap->GetTexture();
   }
 
-  CBaseTexture *pTexture = NULL;
+  CTexture* pTexture = NULL;
   int width = 0, height = 0;
   if (bundle >= 0)
   {
@@ -432,7 +444,7 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
   }
   else
   {
-    pTexture = CBaseTexture::LoadFromFile(strPath);
+    pTexture = CTexture::LoadFromFile(strPath);
     if (!pTexture)
       return emptyTexture;
     width = pTexture->GetWidth();
@@ -473,7 +485,7 @@ void CGUITextureManager::ReleaseTexture(const std::string& strTextureName, bool 
       {
         //CLog::Log(LOGINFO, "  cleanup:%s", strTextureName.c_str());
         // add to our textures to free
-        m_unusedTextures.push_back(std::make_pair(pMap, immediately ? 0 : XbmcThreads::SystemClockMillis()));
+        m_unusedTextures.emplace_back(pMap, immediately ? 0 : XbmcThreads::SystemClockMillis());
         i = m_vecTextures.erase(i);
       }
       return;
@@ -501,11 +513,11 @@ void CGUITextureManager::FreeUnusedTextures(unsigned int timeDelay)
 #if defined(HAS_GL) || defined(HAS_GLES)
   for (unsigned int i = 0; i < m_unusedHwTextures.size(); ++i)
   {
-  // on ios the hw textures might be deleted from the os
-  // when XBMC is backgrounded (e.x. for backgrounded music playback)
-  // sanity check before delete in that case.
-#if defined(TARGET_DARWIN_IOS)
-    CWinSystemIOS* winSystem = dynamic_cast<CWinSystemIOS*>(CServiceBroker::GetWinSystem());
+    // on ios/tvos the hw textures might be deleted from the os
+    // when XBMC is backgrounded (e.x. for backgrounded music playback)
+    // sanity check before delete in that case.
+#if defined(TARGET_DARWIN_EMBEDDED)
+    auto winSystem = dynamic_cast<WIN_SYSTEM_CLASS*>(CServiceBroker::GetWinSystem());
     if (!winSystem->IsBackgrounded() || glIsTexture(m_unusedHwTextures[i]))
 #endif
       glDeleteTextures(1, (GLuint*) &m_unusedHwTextures[i]);
@@ -533,7 +545,8 @@ void CGUITextureManager::Cleanup()
     delete pMap;
     i = m_vecTextures.erase(i);
   }
-
+  m_TexBundle[0].Close();
+  m_TexBundle[1].Close();
   m_TexBundle[0] = CTextureBundle(true);
   m_TexBundle[1] = CTextureBundle();
   FreeUnusedTextures();
@@ -617,9 +630,9 @@ std::string CGUITextureManager::GetTexturePath(const std::string &textureName, b
   else
   { // texture doesn't include the full path, so check all fallbacks
     CSingleLock lock(m_section);
-    for (std::vector<std::string>::iterator it = m_texturePaths.begin(); it != m_texturePaths.end(); ++it)
+    for (const std::string& it : m_texturePaths)
     {
-      std::string path = URIUtils::AddFileToFolder(it->c_str(), "media", textureName);
+      std::string path = URIUtils::AddFileToFolder(it.c_str(), "media", textureName);
       if (directory)
       {
         if (XFILE::CDirectory::Exists(path))

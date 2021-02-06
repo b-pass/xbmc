@@ -15,33 +15,30 @@
 
 #include "DVDAudioCodecAndroidMediaCodec.h"
 
-#include "DVDCodecs/DVDCodecs.h"
-#include "DVDCodecs/DVDFactoryCodec.h"
 #include "DVDAudioCodecFFmpeg.h"
 #include "DVDAudioCodecPassthrough.h"
-
-#include "utils/log.h"
-#include "settings/AdvancedSettings.h"
-#include "settings/SettingsComponent.h"
+#include "DVDCodecs/DVDCodecs.h"
+#include "DVDCodecs/DVDFactoryCodec.h"
+#include "ServiceBroker.h"
 #include "cores/AudioEngine/Interfaces/AE.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
-#include "cores/VideoPlayer/Interface/Addon/DemuxCrypto.h"
-#include "ServiceBroker.h"
+#include "cores/VideoPlayer/Interface/DemuxCrypto.h"
+#include "utils/StringUtils.h"
+#include "utils/log.h"
+
+#include "platform/android/activity/AndroidFeatures.h"
+
+#include <cassert>
 
 #include <androidjni/ByteBuffer.h>
 #include <androidjni/MediaCodec.h>
+#include <androidjni/MediaCodecCryptoInfo.h>
+#include <androidjni/MediaCodecInfo.h>
+#include <androidjni/MediaCodecList.h>
 #include <androidjni/MediaCrypto.h>
 #include <androidjni/MediaFormat.h>
-#include <androidjni/MediaCodecList.h>
-#include <androidjni/MediaCodecInfo.h>
-#include <androidjni/MediaCodecCryptoInfo.h>
-#include "platform/android/activity/AndroidFeatures.h"
-#include <androidjni/UUID.h>
 #include <androidjni/Surface.h>
-
-#include "utils/StringUtils.h"
-
-#include <cassert>
+#include <androidjni/UUID.h>
 
 static const AEChannel KnownChannels[] = { AE_CH_FL, AE_CH_FR, AE_CH_FC, AE_CH_LFE, AE_CH_SL, AE_CH_SR, AE_CH_BL, AE_CH_BR, AE_CH_BC, AE_CH_BLOC, AE_CH_BROC, AE_CH_NULL };
 
@@ -54,7 +51,7 @@ static bool IsDownmixDecoder(const std::string &name)
   };
   for (const char **ptr = downmixDecoders; *ptr; ptr++)
   {
-    if (!strnicmp(*ptr, name.c_str(), strlen(*ptr)))
+    if (!StringUtils::CompareNoCase(*ptr, name, strlen(*ptr)))
       return true;
   }
   return false;
@@ -68,7 +65,7 @@ static bool IsDecoderWhitelisted(const std::string &name)
   };
   for (const char **ptr = whitelistDecoders; *ptr; ptr++)
   {
-    if (!strnicmp(*ptr, name.c_str(), strlen(*ptr)))
+    if (!StringUtils::CompareNoCase(*ptr, name, strlen(*ptr)))
       return true;
   }
   return false;
@@ -136,7 +133,7 @@ bool CDVDAudioCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
     case AV_CODEC_ID_AAC_LATM:
       if (!m_hints.extrasize)
       {
-        CLog::Log(LOGNOTICE, "CDVDAudioCodecAndroidMediaCodec: extradata required for aac decoder!");
+        CLog::Log(LOGINFO, "CDVDAudioCodecAndroidMediaCodec: extradata required for aac decoder!");
         return false;
       }
 
@@ -192,7 +189,7 @@ bool CDVDAudioCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
       break;
 
     default:
-      CLog::Log(LOGNOTICE, "CDVDAudioCodecAndroidMediaCodec: Unknown hints.codec(%d)", hints.codec);
+      CLog::Log(LOGINFO, "CDVDAudioCodecAndroidMediaCodec: Unknown hints.codec(%d)", hints.codec);
       return false;
       break;
   }
@@ -253,7 +250,9 @@ PROCESSDECODER:
       return false;
     }
 
-    m_crypto = new CJNIMediaCrypto(uuid, std::vector<char>(m_hints.cryptoSession->sessionId, m_hints.cryptoSession->sessionId + m_hints.cryptoSession->sessionIdSize));
+    m_crypto =
+        new CJNIMediaCrypto(uuid, std::vector<char>(m_hints.cryptoSession->sessionId.begin(),
+                                                    m_hints.cryptoSession->sessionId.end()));
 
     if (xbmc_jnienv()->ExceptionCheck())
     {
@@ -593,7 +592,7 @@ void CDVDAudioCodecAndroidMediaCodec::GetData(DVDAudioFrame &frame)
     frame.duration = ((double)frame.nb_frames * DVD_TIME_BASE) / frame.format.m_sampleRate;
   else
     frame.duration = 0.0;
-  if (frame.nb_frames > 0 && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGAUDIO))
+  if (frame.nb_frames > 0 && CServiceBroker::GetLogging().CanLogComponent(LOGAUDIO))
     CLog::Log(LOGDEBUG, "MediaCodecAudio::GetData: frames:%d pts: %0.4f", frame.nb_frames, frame.pts);
 }
 

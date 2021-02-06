@@ -11,6 +11,10 @@
 #include <array>
 
 #if defined(HAS_GL)
+// always define GL_GLEXT_PROTOTYPES before include gl headers
+#if !defined(GL_GLEXT_PROTOTYPES)
+#define GL_GLEXT_PROTOTYPES
+#endif
 #include <GL/gl.h>
 #elif defined(HAS_GLES)
 #include <GLES2/gl2.h>
@@ -18,12 +22,13 @@
 #include <GLES3/gl3.h>
 #endif
 
-#include <EGL/egl.h>
+#include "system_egl.h"
+#include "utils/Geometry.h"
+
+#include "platform/posix/utils/FileHandle.h"
+
 #include <EGL/eglext.h>
 #include <va/va.h>
-
-#include "utils/Geometry.h"
-#include "platform/posix/utils/FileHandle.h"
 
 namespace VAAPI
 {
@@ -49,7 +54,6 @@ public:
   virtual bool Map(CVaapiRenderPicture *pic) = 0;
   virtual void Unmap() = 0;
 
-  virtual int GetBits() = 0;
   virtual GLuint GetTextureY() = 0;
   virtual GLuint GetTextureVU() = 0;
   virtual CSizeInt GetTextureSize() = 0;
@@ -58,13 +62,12 @@ public:
 class CVaapi1Texture : public CVaapiTexture
 {
 public:
-  CVaapi1Texture();
+  CVaapi1Texture() = default;
 
   bool Map(CVaapiRenderPicture *pic) override;
   void Unmap() override;
   void Init(InteropInfo &interop) override;
 
-  int GetBits() override;
   GLuint GetTextureY() override;
   GLuint GetTextureVU() override;
   CSizeInt GetTextureSize() override;
@@ -76,7 +79,6 @@ public:
   GLuint m_textureVU = 0;
   int m_texWidth = 0;
   int m_texHeight = 0;
-  int m_bits = 0;
 
 protected:
   static bool TestInteropDeepColor(VADisplay vaDpy, EGLDisplay eglDisplay);
@@ -99,7 +101,6 @@ public:
   void Unmap() override;
   void Init(InteropInfo &interop) override;
 
-  int GetBits() override;
   GLuint GetTextureY() override;
   GLuint GetTextureVU() override;
   CSizeInt GetTextureSize() override;
@@ -120,7 +121,6 @@ private:
   CVaapiRenderPicture* m_vaapiPic{};
   bool m_hasPlaneModifiers{false};
   std::array<KODI::UTILS::POSIX::CFileHandle, 4> m_drmFDs;
-  int m_bits{0};
   MappedTexture m_y, m_vu;
   CSizeInt m_textureSize;
 };

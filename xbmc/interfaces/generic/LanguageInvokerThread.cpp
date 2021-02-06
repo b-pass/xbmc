@@ -7,12 +7,17 @@
  */
 
 #include "LanguageInvokerThread.h"
+
 #include "ScriptInvocationManager.h"
 
-CLanguageInvokerThread::CLanguageInvokerThread(LanguageInvokerPtr invoker, CScriptInvocationManager *invocationManager, bool reuseable)
+#include <utility>
+
+CLanguageInvokerThread::CLanguageInvokerThread(LanguageInvokerPtr invoker,
+                                               CScriptInvocationManager* invocationManager,
+                                               bool reuseable)
   : ILanguageInvoker(NULL),
     CThread("LanguageInvoker"),
-    m_invoker(invoker),
+    m_invoker(std::move(invoker)),
     m_invocationManager(invocationManager),
     m_reusable(reuseable)
 { }
@@ -96,14 +101,15 @@ void CLanguageInvokerThread::Process()
     return;
 
   std::unique_lock<std::mutex> lckdl(m_mutex);
-  do {
+  do
+  {
     m_restart = false;
     m_invoker->Execute(m_script, m_args);
 
     if (m_invoker->GetState() != InvokerStateScriptDone)
       m_reusable = false;
 
-    m_condition.wait(lckdl, [this] {return m_bStop || m_restart || !m_reusable; });
+    m_condition.wait(lckdl, [this] { return m_bStop || m_restart || !m_reusable; });
 
   } while (m_reusable && !m_bStop);
 }

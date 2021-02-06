@@ -7,17 +7,19 @@
  */
 
 #include "AESinkFactory.h"
-#include "ServiceBroker.h"
+
 #include "Interfaces/AESink.h"
-#include "utils/log.h"
+#include "ServiceBroker.h"
 #include "utils/StringUtils.h"
+#include "utils/log.h"
+
 #include <algorithm>
 
 using namespace AE;
 
 std::map<std::string, AESinkRegEntry> CAESinkFactory::m_AESinkRegEntry;
 
-void CAESinkFactory::RegisterSink(AESinkRegEntry regEntry)
+void CAESinkFactory::RegisterSink(const AESinkRegEntry& regEntry)
 {
   m_AESinkRegEntry[regEntry.sinkName] = regEntry;
 
@@ -44,7 +46,7 @@ void CAESinkFactory::ParseDevice(std::string &device, std::string &driver)
   {
     driver = device.substr(0, pos);
 
-    for (auto reg : m_AESinkRegEntry)
+    for (const auto& reg : m_AESinkRegEntry)
     {
       if (!StringUtils::EqualsNoCase(driver, reg.second.sinkName))
         continue;
@@ -68,7 +70,7 @@ IAESink *CAESinkFactory::Create(std::string &device, AEAudioFormat &desiredForma
   IAESink *sink;
   std::string tmpDevice = device;
 
-  for (auto reg : m_AESinkRegEntry)
+  for (const auto& reg : m_AESinkRegEntry)
   {
     if (driver != reg.second.sinkName)
       continue;
@@ -83,12 +85,17 @@ IAESink *CAESinkFactory::Create(std::string &device, AEAudioFormat &desiredForma
   return nullptr;
 }
 
-void CAESinkFactory::EnumerateEx(std::vector<AESinkInfo> &list, bool force)
+void CAESinkFactory::EnumerateEx(std::vector<AESinkInfo>& list,
+                                 bool force,
+                                 const std::string& driver)
 {
   AESinkInfo info;
 
-  for(auto reg : m_AESinkRegEntry)
+  for (const auto& reg : m_AESinkRegEntry)
   {
+    if (!driver.empty() && driver != reg.second.sinkName)
+      continue;
+
     info.m_deviceInfoList.clear();
     info.m_sinkName = reg.second.sinkName;
     reg.second.enumerateFunc(info.m_deviceInfoList, force);
@@ -99,7 +106,7 @@ void CAESinkFactory::EnumerateEx(std::vector<AESinkInfo> &list, bool force)
 
 void CAESinkFactory::Cleanup()
 {
-  for (auto reg : m_AESinkRegEntry)
+  for (const auto& reg : m_AESinkRegEntry)
   {
     if (reg.second.cleanupFunc)
       reg.second.cleanupFunc();

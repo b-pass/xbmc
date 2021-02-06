@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include <vector>
-
 #include "guilib/GUIDialog.h"
 #include "threads/CriticalSection.h"
+
+#include <vector>
 
 #define CONTROL_CHOICES_START  10
 #define CONTROL_NO_BUTTON      CONTROL_CHOICES_START
@@ -32,9 +32,9 @@ public:
   ~CGUIDialogBoxBase(void) override;
   bool OnMessage(CGUIMessage& message) override;
   bool IsConfirmed() const;
-  void SetLine(unsigned int iLine, CVariant line);
-  void SetText(CVariant text);
-  void SetHeading(CVariant heading);
+  void SetLine(unsigned int iLine, const CVariant& line);
+  void SetText(const CVariant& text);
+  void SetHeading(const CVariant& heading);
   void SetChoice(int iButton, const CVariant &choice);
 protected:
   std::string GetDefaultLabel(int controlId) const;

@@ -8,20 +8,20 @@
 
 #include "VideoLibraryQueue.h"
 
-#include <utility>
-
+#include "GUIUserMessages.h"
 #include "ServiceBroker.h"
+#include "Util.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "GUIUserMessages.h"
 #include "threads/SingleLock.h"
-#include "Util.h"
 #include "video/jobs/VideoLibraryCleaningJob.h"
 #include "video/jobs/VideoLibraryJob.h"
 #include "video/jobs/VideoLibraryMarkWatchedJob.h"
 #include "video/jobs/VideoLibraryRefreshingJob.h"
 #include "video/jobs/VideoLibraryResetResumePointJob.h"
 #include "video/jobs/VideoLibraryScanningJob.h"
+
+#include <utility>
 
 CVideoLibraryQueue::CVideoLibraryQueue()
   : CJobQueue(false, 1, CJob::PRIORITY_LOW),
@@ -116,7 +116,8 @@ void CVideoLibraryQueue::CleanLibraryModal(const std::set<int>& paths /* = std::
 
 void CVideoLibraryQueue::RefreshItem(CFileItemPtr item, bool ignoreNfo /* = false */, bool forceRefresh /* = true */, bool refreshAll /* = false */, const std::string& searchTitle /* = "" */)
 {
-  AddJob(new CVideoLibraryRefreshingJob(item, forceRefresh, refreshAll, ignoreNfo, searchTitle));
+  AddJob(new CVideoLibraryRefreshingJob(std::move(item), forceRefresh, refreshAll, ignoreNfo,
+                                        searchTitle));
 }
 
 bool CVideoLibraryQueue::RefreshItemModal(CFileItemPtr item, bool forceRefresh /* = true */, bool refreshAll /* = false */)
@@ -126,7 +127,7 @@ bool CVideoLibraryQueue::RefreshItemModal(CFileItemPtr item, bool forceRefresh /
     return false;
 
   m_modal = true;
-  CVideoLibraryRefreshingJob refreshingJob(item, forceRefresh, refreshAll);
+  CVideoLibraryRefreshingJob refreshingJob(std::move(item), forceRefresh, refreshAll);
 
   bool result = refreshingJob.DoModal();
   m_modal = false;
@@ -142,7 +143,7 @@ void CVideoLibraryQueue::MarkAsWatched(const CFileItemPtr &item, bool watched)
   AddJob(new CVideoLibraryMarkWatchedJob(item, watched));
 }
 
-void CVideoLibraryQueue::ResetResumePoint(const CFileItemPtr item)
+void CVideoLibraryQueue::ResetResumePoint(const CFileItemPtr& item)
 {
   if (item == nullptr)
     return;

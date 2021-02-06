@@ -7,24 +7,23 @@
  */
 
 #include "WinSystemGbm.h"
+
+#include "GBMDPMSSupport.h"
+#include "OptionalsReg.h"
 #include "ServiceBroker.h"
+#include "drm/DRMAtomic.h"
+#include "drm/DRMLegacy.h"
+#include "drm/OffScreenModeSetting.h"
+#include "messaging/ApplicationMessenger.h"
 #include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "settings/lib/Setting.h"
-#include <string.h>
-
-#include "OptionalsReg.h"
-#include "platform/linux/OptionalsReg.h"
-#include "windowing/GraphicContext.h"
-#include "platform/linux/powermanagement/LinuxPowerSyscall.h"
-#include "settings/DisplaySettings.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
-#include "DRMAtomic.h"
-#include "DRMLegacy.h"
-#include "OffScreenModeSetting.h"
-#include "messaging/ApplicationMessenger.h"
+#include "utils/log.h"
+#include "windowing/GraphicContext.h"
+
+#include <string.h>
 
 using namespace KODI::WINDOWING::GBM;
 
@@ -33,46 +32,21 @@ CWinSystemGbm::CWinSystemGbm() :
   m_GBM(new CGBMUtils),
   m_libinput(new CLibInputHandler)
 {
-  std::string envSink;
-  if (getenv("KODI_AE_SINK"))
-    envSink = getenv("KODI_AE_SINK");
-  if (StringUtils::EqualsNoCase(envSink, "ALSA"))
-  {
-    OPTIONALS::ALSARegister();
-  }
-  else if (StringUtils::EqualsNoCase(envSink, "PULSE"))
-  {
-    OPTIONALS::PulseAudioRegister();
-  }
-  else if (StringUtils::EqualsNoCase(envSink, "OSS"))
-  {
-    OPTIONALS::OSSRegister();
-  }
-  else if (StringUtils::EqualsNoCase(envSink, "SNDIO"))
-  {
-    OPTIONALS::SndioRegister();
-  }
-  else
-  {
-    if (!OPTIONALS::PulseAudioRegister())
-    {
-      if (!OPTIONALS::ALSARegister())
-      {
-        if (!OPTIONALS::SndioRegister())
-        {
-          OPTIONALS::OSSRegister();
-        }
-      }
-    }
-  }
-
-  CLinuxPowerSyscall::Register();
-  m_lirc.reset(OPTIONALS::LircRegister());
+  m_dpms = std::make_shared<CGBMDPMSSupport>();
   m_libinput->Start();
 }
 
 bool CWinSystemGbm::InitWindowSystem()
 {
+  const char* x11 = getenv("DISPLAY");
+  const char* wayland = getenv("WAYLAND_DISPLAY");
+  if (x11 || wayland)
+  {
+    CLog::Log(LOGDEBUG, "CWinSystemGbm::{} - not allowed to run GBM under a window manager",
+              __FUNCTION__);
+    return false;
+  }
+
   m_DRM = std::make_shared<CDRMAtomic>();
 
   if (!m_DRM->InitDrm())
@@ -103,14 +77,35 @@ bool CWinSystemGbm::InitWindowSystem()
     return false;
   }
 
+  auto settingsComponent = CServiceBroker::GetSettingsComponent();
+  if (!settingsComponent)
+    return false;
+
+  auto settings = settingsComponent->GetSettings();
+  if (!settings)
+    return false;
+
+  auto setting = settings->GetSetting(CSettings::SETTING_VIDEOSCREEN_LIMITEDRANGE);
+  if (setting)
+    setting->SetVisible(true);
+
+  setting = settings->GetSetting("videoscreen.limitguisize");
+  if (setting)
+    setting->SetVisible(true);
+
+  setting = settings->GetSetting(CSettings::SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK);
+  if (setting)
+  {
+    setting->SetVisible(false);
+    settings->SetBool(CSettings::SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK, false);
+  }
+
   CLog::Log(LOGDEBUG, "CWinSystemGbm::%s - initialized DRM", __FUNCTION__);
   return CWinSystemBase::InitWindowSystem();
 }
 
 bool CWinSystemGbm::DestroyWindowSystem()
 {
-  m_GBM->DestroyDevice();
-
   CLog::Log(LOGDEBUG, "CWinSystemGbm::%s - deinitialized DRM", __FUNCTION__);
 
   m_libinput.reset();
@@ -146,13 +141,9 @@ void CWinSystemGbm::UpdateResolutions()
         CDisplaySettings::GetInstance().GetResolutionInfo(RES_DESKTOP) = res;
       }
 
-      CLog::Log(LOGNOTICE, "Found resolution %dx%d with %dx%d%s @ %f Hz",
-                res.iWidth,
-                res.iHeight,
-                res.iScreenWidth,
-                res.iScreenHeight,
-                res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "",
-                res.fRefreshRate);
+      CLog::Log(LOGINFO, "Found resolution %dx%d with %dx%d%s @ %f Hz", res.iWidth, res.iHeight,
+                res.iScreenWidth, res.iScreenHeight,
+                res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "", res.fRefreshRate);
     }
   }
 
@@ -179,24 +170,37 @@ bool CWinSystemGbm::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool bl
 
   if (!std::dynamic_pointer_cast<CDRMAtomic>(m_DRM))
   {
-    bo = m_GBM->LockFrontBuffer();
+    bo = m_GBM->GetDevice()->GetSurface()->LockFrontBuffer()->Get();
   }
 
   auto result = m_DRM->SetVideoMode(res, bo);
 
-  if (!std::dynamic_pointer_cast<CDRMAtomic>(m_DRM))
-  {
-    m_GBM->ReleaseBuffer();
-  }
-
   int delay = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt("videoscreen.delayrefreshchange");
   if (delay > 0)
-  {
-    m_delayDispReset = true;
     m_dispResetTimer.Set(delay * 100);
-  }
 
   return result;
+}
+
+bool CWinSystemGbm::DisplayHardwareScalingEnabled()
+{
+  auto drmAtomic = std::dynamic_pointer_cast<CDRMAtomic>(m_DRM);
+  if (drmAtomic && drmAtomic->DisplayHardwareScalingEnabled())
+    return true;
+
+  return false;
+}
+
+void CWinSystemGbm::UpdateDisplayHardwareScaling(const RESOLUTION_INFO& resInfo)
+{
+  if (!DisplayHardwareScalingEnabled())
+    return;
+
+  //! @todo The PR that made the res struct constant was abandoned due to drama.
+  // It should be const-corrected and changed here.
+  RESOLUTION_INFO& resMutable = const_cast<RESOLUTION_INFO&>(resInfo);
+
+  SetFullScreen(true, resMutable, false);
 }
 
 void CWinSystemGbm::FlipPage(bool rendered, bool videoLayer)
@@ -207,11 +211,14 @@ void CWinSystemGbm::FlipPage(bool rendered, bool videoLayer)
     m_videoLayerBridge->Disable();
   }
 
-  struct gbm_bo *bo = m_GBM->LockFrontBuffer();
+  struct gbm_bo *bo = nullptr;
+
+  if (rendered)
+  {
+    bo = m_GBM->GetDevice()->GetSurface()->LockFrontBuffer()->Get();
+  }
 
   m_DRM->FlipPage(bo, rendered, videoLayer);
-
-  m_GBM->ReleaseBuffer();
 
   if (m_videoLayerBridge && !videoLayer)
   {
@@ -258,6 +265,7 @@ void CWinSystemGbm::Unregister(IDispResource *resource)
 void CWinSystemGbm::OnLostDevice()
 {
   CLog::Log(LOGDEBUG, "%s - notify display change event", __FUNCTION__);
+  m_dispReset = true;
 
   CSingleLock lock(m_resourceSection);
   for (auto resource : m_resources)

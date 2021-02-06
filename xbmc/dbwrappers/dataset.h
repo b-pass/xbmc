@@ -12,13 +12,14 @@
 
 #pragma once
 
+#include "qry_dat.h"
+
 #include <cstdio>
 #include <list>
 #include <map>
+#include <stdarg.h>
 #include <string>
 #include <vector>
-#include "qry_dat.h"
-#include <stdarg.h>
 
 namespace dbiplus {
 class Dataset;		// forward declaration of class Dataset
@@ -332,8 +333,10 @@ public:
   virtual void append() { insert(); }
 /* Start the edit mode */
   virtual void edit();
+  /* Start the delete mode */
+  virtual void del();
 
-/* Add changes, that were made during insert or edit states of dataset into the database */
+  /* Add changes, that were made during insert or edit states of dataset into the database */
   virtual void post();
 /* Delete statements from database */
   virtual void deletion();
@@ -468,8 +471,13 @@ public:
 /*clear delete_sql*/
   void clear_delete_sql();
 
-/*get value of select_sql*/
- const char *get_select_sql();
+  /* size of insert_sql*/
+  size_t insert_sql_count();
+  /* size of delete_sql*/
+  size_t delete_sql_count();
+
+  /*get value of select_sql*/
+  const char* get_select_sql();
 
 };
 

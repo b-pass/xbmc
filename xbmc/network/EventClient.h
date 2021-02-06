@@ -8,17 +8,18 @@
 
 #pragma once
 
-#include "ServiceBroker.h"
-#include "threads/Thread.h"
-#include "threads/CriticalSection.h"
-#include "Socket.h"
 #include "EventPacket.h"
+#include "ServiceBroker.h"
+#include "Socket.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "threads/CriticalSection.h"
+#include "threads/Thread.h"
 
 #include <list>
 #include <map>
 #include <queue>
+#include <utility>
 
 namespace EVENTCLIENT
 {
@@ -63,9 +64,8 @@ namespace EVENTCLIENT
                       float fAmount,
                       bool isAxis,
                       bool bRepeat,
-                      bool bUseAmount):
-      m_buttonName(buttonName),
-      m_mapName(mapName)
+                      bool bUseAmount)
+      : m_buttonName(std::move(buttonName)), m_mapName(std::move(mapName))
     {
       m_iKeyCode   = iKeyCode;
       m_fAmount    = fAmount;

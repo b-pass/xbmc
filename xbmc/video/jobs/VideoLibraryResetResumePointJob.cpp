@@ -24,7 +24,7 @@
 #include "utils/URIUtils.h"
 #include "video/VideoDatabase.h"
 
-CVideoLibraryResetResumePointJob::CVideoLibraryResetResumePointJob(const CFileItemPtr item)
+CVideoLibraryResetResumePointJob::CVideoLibraryResetResumePointJob(const CFileItemPtr& item)
   : m_item(item)
 {
 }
@@ -62,7 +62,8 @@ bool CVideoLibraryResetResumePointJob::Work(CVideoDatabase &db)
       continue;
 #endif
 
-    if (item->HasPVRRecordingInfoTag() && CServiceBroker::GetPVRManager().Recordings()->ResetResumePoint(item))
+    if (item->HasPVRRecordingInfoTag() &&
+        CServiceBroker::GetPVRManager().Recordings()->ResetResumePoint(item->GetPVRRecordingInfoTag()))
       continue;
 
     resetItems.emplace_back(item);

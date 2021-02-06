@@ -16,6 +16,7 @@
 	</variable>
 	<variable name="OSDImage">
 		<value condition="Window.IsVisible(MusicOSD)">$INFO[MusicPlayer.Cover]</value>
+		<value condition="Window.IsVisible(VideoOSD) + !String.IsEmpty(Player.Art(poster))">$INFO[Player.Art(poster)]</value>
 		<value condition="Window.IsVisible(VideoOSD)">$INFO[VideoPlayer.Cover]</value>
 	</variable>
 	<variable name="OSDLabel1">
@@ -216,10 +217,10 @@
 			<control type="image">
 				<description>Kodi Logo</description>
 				<posx>22</posx>
-				<posy>2</posy>
-				<width>150</width>
-				<height>75</height>
-				<texture>kodi_logo.png</texture>
+				<posy>16</posy>
+				<width>160</width>
+				<height>44</height>
+				<texture>special://xbmc/media/vendor_logo.png</texture>
 				<include>VisibleFadeEffect</include>
 			</control>
 		</control>
@@ -408,6 +409,13 @@
 					<onclick>Container.NextViewMode</onclick>
 					<icon>icon_button_view.png</icon>
 					<visible>![Window.IsVisible(TVChannels) | Window.IsVisible(RadioChannels) | Window.IsVisible(TVGuide) | Window.IsVisible(RadioGuide) | Window.IsVisible(TVRecordings) | Window.IsVisible(RadioRecordings) | Window.IsVisible(TVTimers) | Window.IsVisible(RadioTimers) | Window.IsVisible(TVTimerRules) | Window.IsVisible(RadioTimerRules) | Window.IsVisible(TVSearch) | Window.IsVisible(RadioSearch) | Window.IsVisible(MusicOSD) | Window.IsVisible(VideoOSD) | Window.IsVisible(MusicPlaylist) | Window.IsVisible(VideoPlaylist) | Window.IsVisible(MusicPlaylistEditor)]</visible>
+				</item>
+				<item>
+					<label>31202</label>
+					<onclick condition="String.IsEmpty(Window(Home).Property(ViewMenuVisible))">SetProperty(ViewMenuVisible,Show,Home)</onclick>
+					<onclick condition="!String.IsEmpty(Window(Home).Property(ViewMenuVisible))">ClearProperty(ViewMenuVisible,Home)</onclick>
+					<icon>icon_button_view.png</icon>
+					<visible>Window.IsVisible(TVChannels) | Window.IsVisible(RadioChannels) | Window.IsVisible(TVGuide) | Window.IsVisible(RadioGuide) | Window.IsVisible(TVRecordings) | Window.IsVisible(RadioRecordings) | Window.IsVisible(TVTimers) | Window.IsVisible(RadioTimers) | Window.IsVisible(TVTimerRules) | Window.IsVisible(RadioTimerRules) | Window.IsVisible(TVSearch) | Window.IsVisible(RadioSearch)</visible>
 				</item>
 				<item>
 					<label>5</label>
@@ -640,7 +648,7 @@
 	<include name="ScrollOffsetLabel">
 		<control type="group">
 			<include>16x9_xPos_Relocation</include>
-			<visible>Container.Scrolling + [String.IsEqual(Container.SortMethod,$LOCALIZE[551]) | String.IsEqual(Container.SortMethod,$LOCALIZE[561]) | String.IsEqual(Container.SortMethod,$LOCALIZE[558]) | String.IsEqual(Container.SortMethod,$LOCALIZE[557]) | String.IsEqual(Container.SortMethod,$LOCALIZE[556])]</visible>
+			<visible>Container.Scrolling + [Container.SortMethod(1) | Container.SortMethod(4) | Container.SortMethod(12) | Container.SortMethod(10) | Container.SortMethod(7) | Container.SortMethod(29)]</visible>
 			<animation effect="fade" time="100">Visible</animation>
 			<animation effect="fade" time="300">Hidden</animation>
 			<posx>600</posx>
@@ -951,6 +959,55 @@
 		<align>center</align>
 		<aligny>center</aligny>
 	</include>
+	<include name="ViewMenu">
+		<control type="group">
+			<visible>!String.IsEmpty(Window(Home).Property(ViewMenuVisible))</visible>
+			<include>VisibleFadeEffect</include>
+			<animation effect="fade" time="250">WindowClose</animation>
+			<control type="button">
+				<description>Hidden button to close the sort when its focused</description>
+				<posx>0</posx>
+				<posy>0</posy>
+				<include>ScreenWidth</include>
+				<height>960</height>
+				<texturenofocus></texturenofocus>
+				<texturefocus></texturefocus>
+				<onclick>ClearProperty(ViewMenuVisible,Home)</onclick>
+			</control>
+			<control type="group">
+				<posx>360r</posx>
+				<posy>685r</posy>
+				<control type="image">
+					<description>Panel image</description>
+					<posx>0</posx>
+					<posy>$PARAM[panel-posy]</posy>
+					<width>350</width>
+					<height>$PARAM[panel-height]</height>
+					<texture>dialog_back.png</texture>
+				</control>
+				<control type="grouplist">
+					<posx>0</posx>
+					<posy>$PARAM[panel-posy]</posy>
+					<width>350</width>
+					<height>640</height>
+					<onleft>9000</onleft>
+					<onright>50</onright>
+					<onup>9000</onup>
+					<ondown>9000</ondown>
+					<itemgap>0</itemgap>
+					<include condition="Window.IsVisible(TVChannels) | Window.IsVisible(RadioChannels) | Window.IsVisible(TVGuide) | Window.IsVisible(RadioGuide) | Window.IsVisible(TVRecordings) | Window.IsVisible(RadioRecordings) | Window.IsVisible(TVTimers) | Window.IsVisible(RadioTimers) | Window.IsVisible(TVTimerRules) | Window.IsVisible(RadioTimerRules) | Window.IsVisible(TVSearch) | Window.IsVisible(RadioSearch)">PVRViews</include>
+				</control>
+				<control type="image">
+					<description>Panel Arrow image</description>
+					<posx>225r</posx>
+					<posy>122r</posy>
+					<width>75</width>
+					<height>41</height>
+					<texture>arrow_up.png</texture>
+				</control>
+			</control>
+		</control>
+	</include>
 	<include name="PopupMenu">
 		<control type="group">
 			<visible>!String.IsEmpty(Window(Home).Property(PopupMenuVisible))</visible>
@@ -1153,7 +1210,7 @@
 		<control type="button">
 			<label>31006</label>
 			<include>MenuButtonCommonValues</include>
-			<onclick>ActivateWindow(122)</onclick>
+			<onclick>ActivateWindow(visualisationpresetlist)</onclick>
 		</control>
 		<control type="button">
 			<label>$LOCALIZE[486]$INFO[Playlist.Repeat, : ]</label>
@@ -1438,7 +1495,7 @@
 			<colordiffuse>blue</colordiffuse>
 		</control>
 	</include>
-	<include name="PVRMenu">
+	<include name="PVRViews">
 		<control type="button" id="201">
 			<include>MenuButtonCommonValues</include>
 			<label>19019</label>
@@ -1494,6 +1551,55 @@
 			<include>MenuButtonCommonValues</include>
 			<label>31565</label>
 			<visible>Window.IsVisible(TVRecordings) | Window.IsVisible(RadioRecordings)</visible>
+		</control>
+	</include>
+	<include name="PVRMenu">
+		<control type="button" id="28">
+			<description>Group button</description>
+			<include>MenuButtonCommonValues</include>
+			<label>19141</label>
+			<visible>Window.IsActive(MyPVRChannels.xml) | Window.IsActive(MyPVRGuide.xml)</visible>
+		</control>
+		<control type="button" id="3">
+			<description>Sort by button</description>
+			<include>MenuButtonCommonValues</include>
+			<label>103</label>
+		</control>
+		<control type="togglebutton" id="4">
+			<description>Sort asc</description>
+			<include>MenuButtonCommonValues</include>
+			<alttexturefocus>list_focus.png</alttexturefocus>
+			<alttexturenofocus></alttexturenofocus>
+			<label>31051</label>
+			<altlabel>31050</altlabel>
+			<usealttexture>Container.SortDirection(Ascending)</usealttexture>
+		</control>
+		<control type="button" id="10">
+			<description>Watched button</description>
+			<include>MenuButtonCommonValues</include>
+			<label>20367</label>
+			<visible>Window.IsActive(MyPVRRecordings.xml)</visible>
+		</control>
+		<control type="radiobutton" id="5">
+			<description>Group items Toggle</description>
+			<textwidth>240</textwidth>
+			<include>MenuButtonCommonValues</include>
+			<label>19270</label>
+			<visible>Window.IsActive(MyPVRRecordings.xml)</visible>
+		</control>
+		<control type="radiobutton" id="7">
+			<description>Deleted items Toggle</description>
+			<textwidth>240</textwidth>
+			<include>MenuButtonCommonValues</include>
+			<label>19184</label>
+			<visible>Window.IsActive(MyPVRRecordings.xml)</visible>
+		</control>
+		<control type="radiobutton" id="8">
+			<description>Hide disabled items Toggle</description>
+			<textwidth>240</textwidth>
+			<include>MenuButtonCommonValues</include>
+			<label>19077</label>
+			<visible>Window.IsActive(MyPVRTimers.xml)</visible>
 		</control>
 	</include>
 	<include name="SettingsContent">
@@ -2492,7 +2598,7 @@
 			<visible>VideoPlayer.HasMenu + !VideoPlayer.Content(LiveTV)</visible>
 		</control>
 		<control type="button">
-			<label>Player info</label>
+			<label>31015</label>
 			<include>MenuButtonCommonValues</include>
 			<onclick>ClearProperty(PopupMenuVisible,Home)</onclick>
 			<onclick>ActivateWindow(playerprocessinfo)</onclick>

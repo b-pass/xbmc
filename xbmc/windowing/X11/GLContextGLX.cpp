@@ -6,11 +6,15 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "system_gl.h"
+#include "GLContextGLX.h"
+
+#include "utils/log.h"
 
 #include <GL/glx.h>
-#include "GLContextGLX.h"
-#include "utils/log.h"
+
+#include "system_gl.h"
+
+using namespace KODI::WINDOWING::X11;
 
 CGLContextGLX::CGLContextGLX(Display *dpy) : CGLContext(dpy)
 {
@@ -88,7 +92,7 @@ bool CGLContextGLX::Refresh(bool force, int screen, Window glWindow, bool &newCo
 
   if (vInfo)
   {
-    CLog::Log(LOGNOTICE, "Using visual 0x%x", (unsigned) vInfo->visualid);
+    CLog::Log(LOGINFO, "Using visual 0x%x", (unsigned)vInfo->visualid);
     if (m_glxContext)
     {
       glXMakeCurrent(m_dpy, None, NULL);

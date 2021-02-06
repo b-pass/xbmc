@@ -7,29 +7,25 @@
  */
 
 #include "RenderManager.h"
-#include "RenderFlags.h"
-#include "RenderFactory.h"
-#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
-#include "windowing/GraphicContext.h"
-#include "utils/MathUtils.h"
-#include "threads/SingleLock.h"
-#include "utils/log.h"
-#include "utils/StringUtils.h"
-#include "windowing/WinSystem.h"
 
 #include "Application.h"
+#include "RenderCapture.h"
+#include "RenderFactory.h"
+#include "RenderFlags.h"
 #include "ServiceBroker.h"
+#include "cores/VideoPlayer/Interface/TimingConstants.h"
 #include "messaging/ApplicationMessenger.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-
-#if defined(TARGET_POSIX)
-#include "platform/linux/XTimeUtils.h"
-#endif
-
-#include "RenderCapture.h"
+#include "threads/SingleLock.h"
+#include "utils/MathUtils.h"
+#include "utils/StringUtils.h"
+#include "utils/XTimeUtils.h"
+#include "utils/log.h"
+#include "windowing/GraphicContext.h"
+#include "windowing/WinSystem.h"
 
 /* to use the same as player */
 #include "../VideoPlayer/DVDClock.h"
@@ -89,6 +85,9 @@ bool CRenderManager::Configure(const VideoPicture& picture, float fps, unsigned 
   // check if something has changed
   {
     CSingleLock lock(m_statelock);
+
+    if (!m_bRenderGUI)
+      return true;
 
     if (m_width == picture.iWidth &&
         m_height == picture.iHeight &&
@@ -373,6 +372,7 @@ void CRenderManager::PreInit()
   m_QueueSize   = 2;
   m_QueueSkip   = 0;
   m_presentstep = PRESENT_IDLE;
+  m_bRenderGUI = true;
 
   m_initEvent.Set();
 }
@@ -399,6 +399,7 @@ void CRenderManager::UnInit()
   m_renderState = STATE_UNCONFIGURED;
   m_width = 0;
   m_height = 0;
+  m_bRenderGUI = false;
   RemoveCaptures();
 
   m_initEvent.Set();
@@ -649,7 +650,7 @@ void CRenderManager::RemoveCaptures()
       entry.second->GetEvent().Set();
     }
     CSingleExit lockexit(m_captCritSect);
-    Sleep(10);
+    KODI::TIME::Sleep(10);
   }
 
   for (auto entry : m_captures)
@@ -1054,10 +1055,6 @@ int CRenderManager::WaitForBuffer(volatile std::atomic_bool&bStop, int timeout)
     m_presentevent.wait(lock, std::min(50, timeout));
     if (endtime.IsTimePast() || bStop)
     {
-      if (timeout != 0 && !bStop)
-      {
-        CLog::Log(LOGWARNING, "CRenderManager::WaitForBuffer - timeout waiting for buffer");
-      }
       return -1;
     }
   }

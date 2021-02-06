@@ -7,20 +7,21 @@
  */
 
 #include "GUIWindowHome.h"
-#include "input/Key.h"
-#include "guilib/WindowIDs.h"
-#include "utils/JobManager.h"
-#include "utils/RecentlyAddedJob.h"
-#include "interfaces/AnnouncementManager.h"
-#include "utils/log.h"
-#include "settings/AdvancedSettings.h"
-#include "settings/SettingsComponent.h"
-#include "utils/Variant.h"
-#include "guilib/GUIComponent.h"
-#include "guilib/GUIWindowManager.h"
+
 #include "Application.h"
 #include "ServiceBroker.h"
+#include "guilib/GUIComponent.h"
+#include "guilib/GUIWindowManager.h"
+#include "guilib/WindowIDs.h"
+#include "input/Key.h"
+#include "interfaces/AnnouncementManager.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
+#include "utils/JobManager.h"
+#include "utils/RecentlyAddedJob.h"
 #include "utils/StringUtils.h"
+#include "utils/Variant.h"
+#include "utils/log.h"
 
 CGUIWindowHome::CGUIWindowHome(void) : CGUIWindow(WINDOW_HOME, "Home.xml")
 {
@@ -60,11 +61,14 @@ void CGUIWindowHome::OnInitWindow()
   CGUIWindow::OnInitWindow();
 }
 
-void CGUIWindowHome::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data)
+void CGUIWindowHome::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                              const std::string& sender,
+                              const std::string& message,
+                              const CVariant& data)
 {
   int ra_flag = 0;
 
-  CLog::Log(LOGDEBUG, "GOT ANNOUNCEMENT, type: %i, from %s, message %s",(int)flag, sender, message);
+  CLog::Log(LOGDEBUG, LOGANNOUNCE, "GOT ANNOUNCEMENT, type: {}, from {}, message {}", flag, sender, message);
 
   // we are only interested in library changes
   if ((flag & (ANNOUNCEMENT::VideoLibrary | ANNOUNCEMENT::AudioLibrary)) == 0)
@@ -73,11 +77,10 @@ void CGUIWindowHome::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *s
   if (data.isMember("transaction") && data["transaction"].asBoolean())
     return;
 
-  if (strcmp(message, "OnScanStarted") == 0 ||
-      strcmp(message, "OnCleanStarted") == 0)
+  if (message == "OnScanStarted" || message == "OnCleanStarted")
     return;
 
-  bool onUpdate = strcmp(message, "OnUpdate") == 0;
+  bool onUpdate = message == "OnUpdate";
   // always update Totals except on an OnUpdate with no playcount update
   if (!onUpdate || data.isMember("playcount"))
     ra_flag |= Totals;

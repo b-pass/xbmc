@@ -8,20 +8,21 @@
 
 #include "RendererDRMPRIME.h"
 
-#include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecDRMPRIME.h"
+#include "ServiceBroker.h"
+#include "cores/VideoPlayer/Buffers/VideoBufferDRMPRIME.h"
+#include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h"
 #include "cores/VideoPlayer/VideoRenderers/HwDecRender/VideoLayerBridgeDRMPRIME.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderCapture.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
-#include "settings/lib/Setting.h"
 #include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "settings/lib/Setting.h"
 #include "utils/log.h"
-#include "windowing/gbm/DRMAtomic.h"
-#include "windowing/gbm/WinSystemGbm.h"
 #include "windowing/GraphicContext.h"
-#include "ServiceBroker.h"
+#include "windowing/gbm/WinSystemGbm.h"
+#include "windowing/gbm/drm/DRMAtomic.h"
 
 using namespace KODI::WINDOWING::GBM;
 
@@ -34,13 +35,45 @@ CRendererDRMPRIME::~CRendererDRMPRIME()
 
 CBaseRenderer* CRendererDRMPRIME::Create(CVideoBuffer* buffer)
 {
-  if (buffer && dynamic_cast<CVideoBufferDRMPRIME*>(buffer) &&
-      CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(SETTING_VIDEOPLAYER_USEPRIMERENDERER) == 0)
+  if (buffer && CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+                    SETTING_VIDEOPLAYER_USEPRIMERENDERER) == 0)
   {
-    CWinSystemGbm* winSystem = dynamic_cast<CWinSystemGbm*>(CServiceBroker::GetWinSystem());
-    if (winSystem && winSystem->GetDrm()->GetVideoPlane()->plane &&
-        std::dynamic_pointer_cast<CDRMAtomic>(winSystem->GetDrm()))
-      return new CRendererDRMPRIME();
+    auto buf = dynamic_cast<CVideoBufferDRMPRIME*>(buffer);
+    if (!buf)
+      return nullptr;
+
+    auto winSystem = static_cast<CWinSystemGbm*>(CServiceBroker::GetWinSystem());
+    if (!winSystem)
+      return nullptr;
+
+    auto drm = std::static_pointer_cast<CDRMAtomic>(winSystem->GetDrm());
+    if (!drm)
+      return nullptr;
+
+    if (!buf->AcquireDescriptor())
+      return nullptr;
+
+    AVDRMFrameDescriptor* desc = buf->GetDescriptor();
+    if (!desc)
+    {
+      buf->ReleaseDescriptor();
+      return nullptr;
+    }
+
+    AVDRMLayerDescriptor* layer = &desc->layers[0];
+    uint32_t format = layer->format;
+    uint64_t modifier = desc->objects[0].format_modifier;
+
+    buf->ReleaseDescriptor();
+
+    auto plane = drm->GetVideoPlane();
+    if (!plane)
+      return nullptr;
+
+    if (!plane->SupportsFormatAndModifier(format, modifier))
+      return nullptr;
+
+    return new CRendererDRMPRIME();
   }
 
   return nullptr;
@@ -49,10 +82,13 @@ CBaseRenderer* CRendererDRMPRIME::Create(CVideoBuffer* buffer)
 void CRendererDRMPRIME::Register()
 {
   CWinSystemGbm* winSystem = dynamic_cast<CWinSystemGbm*>(CServiceBroker::GetWinSystem());
-  if (winSystem && winSystem->GetDrm()->GetVideoPlane()->plane &&
+  if (winSystem && winSystem->GetDrm()->GetVideoPlane() &&
       std::dynamic_pointer_cast<CDRMAtomic>(winSystem->GetDrm()))
   {
-    CServiceBroker::GetSettingsComponent()->GetSettings()->GetSetting(SETTING_VIDEOPLAYER_USEPRIMERENDERER)->SetVisible(true);
+    CServiceBroker::GetSettingsComponent()
+        ->GetSettings()
+        ->GetSetting(SETTING_VIDEOPLAYER_USEPRIMERENDERER)
+        ->SetVisible(true);
     VIDEOPLAYER::CRendererFactory::RegisterRenderer("drm_prime", CRendererDRMPRIME::Create);
     return;
   }
@@ -154,7 +190,8 @@ void CRendererDRMPRIME::Update()
   ManageRenderArea();
 }
 
-void CRendererDRMPRIME::RenderUpdate(int index, int index2, bool clear, unsigned int flags, unsigned int alpha)
+void CRendererDRMPRIME::RenderUpdate(
+    int index, int index2, bool clear, unsigned int flags, unsigned int alpha)
 {
   if (m_iLastRenderBuffer == index && m_videoLayerBridge)
   {
@@ -163,19 +200,17 @@ void CRendererDRMPRIME::RenderUpdate(int index, int index2, bool clear, unsigned
   }
 
   CVideoBufferDRMPRIME* buffer = dynamic_cast<CVideoBufferDRMPRIME*>(m_buffers[index].videoBuffer);
-  if (!buffer)
-    return;
-
-  AVDRMFrameDescriptor* descriptor = buffer->GetDescriptor();
-  if (!descriptor || !descriptor->nb_layers)
+  if (!buffer || !buffer->IsValid())
     return;
 
   if (!m_videoLayerBridge)
   {
     CWinSystemGbm* winSystem = static_cast<CWinSystemGbm*>(CServiceBroker::GetWinSystem());
-    m_videoLayerBridge = std::dynamic_pointer_cast<CVideoLayerBridgeDRMPRIME>(winSystem->GetVideoLayerBridge());
+    m_videoLayerBridge =
+        std::dynamic_pointer_cast<CVideoLayerBridgeDRMPRIME>(winSystem->GetVideoLayerBridge());
     if (!m_videoLayerBridge)
-      m_videoLayerBridge = std::make_shared<CVideoLayerBridgeDRMPRIME>(winSystem->GetDrm());
+      m_videoLayerBridge = std::make_shared<CVideoLayerBridgeDRMPRIME>(
+          std::dynamic_pointer_cast<CDRMAtomic>(winSystem->GetDrm()));
     winSystem->RegisterVideoLayerBridge(m_videoLayerBridge);
   }
 
@@ -204,12 +239,16 @@ bool CRendererDRMPRIME::ConfigChanged(const VideoPicture& picture)
 
 bool CRendererDRMPRIME::Supports(ERENDERFEATURE feature)
 {
-  if (feature == RENDERFEATURE_ZOOM ||
-      feature == RENDERFEATURE_STRETCH ||
-      feature == RENDERFEATURE_PIXEL_RATIO)
-    return true;
-
-  return false;
+  switch (feature)
+  {
+    case RENDERFEATURE_STRETCH:
+    case RENDERFEATURE_ZOOM:
+    case RENDERFEATURE_VERTICAL_SHIFT:
+    case RENDERFEATURE_PIXEL_RATIO:
+      return true;
+    default:
+      return false;
+  }
 }
 
 bool CRendererDRMPRIME::Supports(ESCALINGMETHOD method)

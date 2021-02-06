@@ -11,19 +11,21 @@
 
 #pragma once
 
-#include "DllLibShairplay.h"
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "filesystem/PipeFile.h"
+#include "interfaces/IActionListener.h"
+#include "interfaces/IAnnouncer.h"
+#include "threads/CriticalSection.h"
+#include "threads/Thread.h"
+
+#include <list>
 #include <string>
 #include <vector>
-#include <list>
-#include "threads/Thread.h"
-#include "threads/CriticalSection.h"
-#include "filesystem/PipeFile.h"
-#include "interfaces/IAnnouncer.h"
-#include "interfaces/IActionListener.h"
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <shairplay/raop.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
 class CDACP;
 class CVariant;
@@ -32,7 +34,10 @@ class CAirTunesServer : public ANNOUNCEMENT::IAnnouncer, public IActionListener,
 {
 public:
   // ANNOUNCEMENT::IAnnouncer
-  void Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data) override;
+  void Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                const std::string& sender,
+                const std::string& message,
+                const CVariant& data) override;
 
   void RegisterActionListener(bool doRegister);
   static void EnableActionProcessing(bool enable);
@@ -62,8 +67,7 @@ private:
   static void InformPlayerAboutPlayTimes();
 
   int m_port;
-  static DllLibShairplay *m_pLibShairplay;//the lib
-  raop_t *m_pRaop;
+  raop_t* m_pRaop = nullptr;
   XFILE::CPipeFile *m_pPipe;
   static CAirTunesServer *ServerInstance;
   static std::string m_macAddress;

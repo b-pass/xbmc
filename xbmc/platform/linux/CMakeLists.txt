@@ -1,29 +1,15 @@
-set(SOURCES ConvUtils.cpp
-            LinuxResourceCounter.cpp
-            LinuxTimezone.cpp
+set(SOURCES CPUInfoLinux.cpp
+            MemUtils.cpp
             OptionalsReg.cpp
-            PosixMountProvider.cpp
-            TimeUtils.cpp
-            XFileUtils.cpp
-            XHandle.cpp
-            XMemUtils.cpp
-            XTimeUtils.cpp)
+            PlatformLinux.cpp
+            SysfsPath.cpp
+            TimeUtils.cpp)
 
-set(HEADERS ConvUtils.h
-            LinuxResourceCounter.h
-            LinuxTimezone.h
+set(HEADERS CPUInfoLinux.h
             OptionalsReg.h
-            PlatformConstants.h
-            PlatformDefs.h
-            PosixMountProvider.h
-            stat_utf8.h
-            stdio_utf8.h
-            TimeUtils.h
-            XFileUtils.h
-            XHandle.h
-            XHandlePublic.h
-            XMemUtils.h
-            XTimeUtils.h)
+            PlatformLinux.h
+            SysfsPath.h
+            TimeUtils.h)
 
 if(ALSA_FOUND)
   list(APPEND SOURCES FDEventMonitor.cpp)
@@ -37,21 +23,6 @@ if(DBUS_FOUND)
   list(APPEND HEADERS DBusMessage.h
                       DBusReserve.h
                       DBusUtil.h)
-endif()
-
-if(CORE_PLATFORM_NAME_LC STREQUAL rbpi)
-  list(APPEND SOURCES RBP.cpp
-                      OMXClock.cpp
-                      OMXCore.cpp)
-  list(APPEND HEADERS RBP.h
-                      DllBCM.h
-                      DllOMX.h
-                      OMXClock.h
-                      OMXCore.h)
-endif()
-
-if(HAVE_SSE4_1)
-  add_subdirectory(sse4)
 endif()
 
 core_add_library(linuxsupport)

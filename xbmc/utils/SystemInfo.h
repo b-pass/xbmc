@@ -9,7 +9,8 @@
 #pragma once
 
 #include "InfoLoader.h"
-#include "settings/lib/ISubSettings.h"
+#include "settings/ISubSettings.h"
+
 #include <string>
 
 #define KB  (1024)          // 1 KiloByte (1KB)   1024 Byte (2^10 Byte)
@@ -18,6 +19,8 @@
 #define TB  (1024*GB)       // 1 TerraByte (1TB)  1024 GB (2^10 GB)
 
 #define MAX_KNOWN_ATTRIBUTES  46
+
+#define REG_CURRENT_VERSION L"Software\\Microsoft\\Windows NT\\CurrentVersion"
 
 
 class CSysData
@@ -55,9 +58,7 @@ public:
   static CSysData::INTERNET_STATE GetInternetState();
 private:
   static bool SystemUpTime(int iInputMinutes, int &iMinutes, int &iHours, int &iDays);
-  static double GetCPUFrequency();
   static std::string GetSystemUpTime(bool bTotalUptime);
-  static std::string GetCPUFreqInfo();
   static std::string GetMACAddress();
   static std::string GetVideoEncoder();
   static std::string GetBatteryLevel();
@@ -75,7 +76,13 @@ public:
     WindowsVersionWin8,         // Windows 8, Windows Server 2012
     WindowsVersionWin8_1,       // Windows 8.1
     WindowsVersionWin10,        // Windows 10
-    WindowsVersionWin10_FCU,    // Windows 10 Fall Creators Update
+    WindowsVersionWin10_1709,   // Windows 10 1709 (FCU)
+    WindowsVersionWin10_1803,   // Windows 10 1803
+    WindowsVersionWin10_1809,   // Windows 10 1809
+    WindowsVersionWin10_1903,   // Windows 10 1903
+    WindowsVersionWin10_1909,   // Windows 10 1909
+    WindowsVersionWin10_2004,   // Windows 10 2004
+    WindowsVersionWin10_Future, // Windows 10 future build
     /* Insert new Windows versions here, when they'll be known */
     WindowsVersionFuture = 100  // Future Windows version, not known to code
   };
@@ -109,10 +116,11 @@ public:
   static std::string GetDeviceName();
   static std::string GetVersion();
   static std::string GetVersionShort();
+  static std::string GetVersionCode();
+  static std::string GetVersionGit();
   static std::string GetBuildDate();
 
   bool HasInternet();
-  bool HasVideoToolBoxDecoder();
   bool IsAeroDisabled();
   static bool IsWindowsVersion(WindowsVersion ver);
   static bool IsWindowsVersionAtLeast(WindowsVersion ver);
@@ -120,12 +128,6 @@ public:
   static int GetKernelBitness(void);
   static int GetXbmcBitness(void);
   static const std::string& GetKernelCpuFamily(void);
-  std::string GetCPUModel();
-  std::string GetCPUBogoMips();
-  std::string GetCPUSoC();
-  std::string GetCPUHardware();
-  std::string GetCPURevision();
-  std::string GetCPUSerial();
   static std::string GetManufacturerName(void);
   static std::string GetModelName(void);
   bool GetDiskSpace(std::string drive,int& iTotal, int& iTotalFree, int& iTotalUsed, int& iPercentFree, int& iPercentUsed);

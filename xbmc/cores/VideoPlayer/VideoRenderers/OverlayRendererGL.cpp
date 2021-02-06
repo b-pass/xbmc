@@ -35,8 +35,6 @@
 
 #define USE_PREMULTIPLIED_ALPHA 1
 
-#define BUFFER_OFFSET(i) ((char *)NULL + (i))
-
 using namespace OVERLAY;
 
 static void LoadTexture(GLenum target
@@ -50,7 +48,6 @@ static void LoadTexture(GLenum target
   const GLvoid *pixelData = pixels;
 
 #ifdef HAS_GLES
-  /** OpenGL ES does not support BGR so use RGB and swap later **/
   GLenum internalFormat = alpha ? GL_ALPHA : GL_RGBA;
   GLenum externalFormat = alpha ? GL_ALPHA : GL_RGBA;
 #else
@@ -61,12 +58,30 @@ static void LoadTexture(GLenum target
   int bytesPerPixel = glFormatElementByteCount(externalFormat);
 
 #ifdef HAS_GLES
+  bool bgraSupported = false;
+  CRenderSystemGLES* renderSystem = dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
 
-  /** OpenGL ES does not support BGR **/
   if (!alpha)
   {
-    int bytesPerLine = bytesPerPixel * width;
+    if (renderSystem->IsExtSupported("GL_EXT_texture_format_BGRA8888") ||
+        renderSystem->IsExtSupported("GL_IMG_texture_format_BGRA8888"))
+    {
+      bgraSupported = true;
+      internalFormat = externalFormat = GL_BGRA_EXT;
+    }
+    else if (renderSystem->IsExtSupported("GL_APPLE_texture_format_BGRA8888"))
+    {
+      // Apple's implementation does not conform to spec. Instead, they require
+      // differing format/internalformat, more like GL.
+      bgraSupported = true;
+      externalFormat = GL_BGRA_EXT;
+    }
+  }
 
+  int bytesPerLine = bytesPerPixel * width;
+
+  if (!alpha && !bgraSupported)
+  {
     pixelVector = (char *)malloc(bytesPerLine * height);
 
     const char *src = (const char*)pixels;
@@ -89,10 +104,8 @@ static void LoadTexture(GLenum target
     stride = width;
   }
   /** OpenGL ES does not support strided texture input. Make a copy without stride **/
-  else if (stride != width)
+  else if (stride != bytesPerLine)
   {
-    int bytesPerLine = bytesPerPixel * width;
-
     pixelVector = (char *)malloc(bytesPerLine * height);
 
     const char *src = (const char*)pixels;
@@ -105,7 +118,7 @@ static void LoadTexture(GLenum target
     }
 
     pixelData = pixelVector;
-    stride = width;
+    stride = bytesPerLine;
   }
 #else
   glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / bytesPerPixel);
@@ -393,9 +406,12 @@ void COverlayGlyphGL::Render(SRenderState& state)
   glBindBuffer(GL_ARRAY_BUFFER, VertexVBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(VERTEX)*vecVertices.size(), &vecVertices[0], GL_STATIC_DRAW);
 
-  glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(VERTEX), BUFFER_OFFSET(offsetof(VERTEX, x)));
-  glVertexAttribPointer(colLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(VERTEX), BUFFER_OFFSET(offsetof(VERTEX, r)));
-  glVertexAttribPointer(tex0Loc, 2, GL_FLOAT, GL_FALSE, sizeof(VERTEX), BUFFER_OFFSET(offsetof(VERTEX, u)));
+  glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(VERTEX),
+                        reinterpret_cast<const GLvoid*>(offsetof(VERTEX, x)));
+  glVertexAttribPointer(colLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(VERTEX),
+                        reinterpret_cast<const GLvoid*>(offsetof(VERTEX, r)));
+  glVertexAttribPointer(tex0Loc, 2, GL_FLOAT, GL_FALSE, sizeof(VERTEX),
+                        reinterpret_cast<const GLvoid*>(offsetof(VERTEX, u)));
 
   glEnableVertexAttribArray(posLoc);
   glEnableVertexAttribArray(colLoc);
@@ -499,7 +515,14 @@ void COverlayTextureGL::Render(SRenderState& state)
 
 #if defined(HAS_GL)
   CRenderSystemGL* renderSystem = dynamic_cast<CRenderSystemGL*>(CServiceBroker::GetRenderSystem());
-  renderSystem->EnableShader(SM_TEXTURE_LIM);
+
+  int glslMajor, glslMinor;
+  renderSystem->GetGLSLVersion(glslMajor, glslMinor);
+  if (glslMajor >= 2 || (glslMajor == 1 && glslMinor >= 50))
+    renderSystem->EnableShader(SM_TEXTURE_LIM);
+  else
+    renderSystem->EnableShader(SM_TEXTURE);
+
   GLint posLoc = renderSystem->ShaderGetPos();
   GLint tex0Loc = renderSystem->ShaderGetCoord0();
   GLint uniColLoc = renderSystem->ShaderGetUniCol();
@@ -546,8 +569,10 @@ void COverlayTextureGL::Render(SRenderState& state)
   glBindBuffer(GL_ARRAY_BUFFER, vertexVBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(PackedVertex)*4, &vertex[0], GL_STATIC_DRAW);
 
-  glVertexAttribPointer(posLoc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, x)));
-  glVertexAttribPointer(tex0Loc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u1)));
+  glVertexAttribPointer(posLoc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, x)));
+  glVertexAttribPointer(tex0Loc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u1)));
 
   glEnableVertexAttribArray(posLoc);
   glEnableVertexAttribArray(tex0Loc);

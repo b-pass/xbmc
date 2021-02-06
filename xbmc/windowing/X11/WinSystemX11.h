@@ -8,18 +8,27 @@
 
 #pragma once
 
+#include "settings/lib/ISettingCallback.h"
+#include "threads/CriticalSection.h"
+#include "threads/SystemClock.h"
+#include "utils/Stopwatch.h"
+#include "windowing/WinSystem.h"
+
 #include <string>
 #include <vector>
 
-#include "windowing/WinSystem.h"
-#include "utils/Stopwatch.h"
-#include "threads/CriticalSection.h"
-#include "threads/SystemClock.h"
-#include "settings/lib/ISettingCallback.h"
-#include "X11/Xlib.h"
-#include "X11/Xutil.h"
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 
 class IDispResource;
+
+namespace KODI
+{
+namespace WINDOWING
+{
+namespace X11
+{
+
 class CWinEventsX11;
 
 class CWinSystemX11 : public CWinSystemBase
@@ -27,6 +36,8 @@ class CWinSystemX11 : public CWinSystemBase
 public:
   CWinSystemX11();
   ~CWinSystemX11() override;
+
+  const std::string GetName() override { return "x11"; }
 
   // CWinSystemBase
   bool InitWindowSystem() override;
@@ -56,7 +67,7 @@ public:
   int GetScreen() { return m_screen; }
   void NotifyXRREvent();
   void GetConnectedOutputs(std::vector<std::string> *outputs);
-  bool IsCurrentOutput(std::string output);
+  bool IsCurrentOutput(const std::string& output);
   void RecreateWindow();
   int GetCrtc() { return m_crtc; }
 
@@ -99,3 +110,7 @@ private:
   bool HasWindowManager();
   void UpdateCrtc();
 };
+
+}
+}
+}

@@ -6,8 +6,9 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "GUIAudioManager.h"
 #include "GUIComponent.h"
+
+#include "GUIAudioManager.h"
 #include "GUIColorManager.h"
 #include "GUIInfoManager.h"
 #include "GUILargeTextureManager.h"
@@ -39,9 +40,6 @@ void CGUIComponent::Init()
   m_pWindowManager->Initialize();
   m_stereoscopicsManager->Initialize();
   m_guiInfoManager->Initialize();
-
-  //! @todo This is something we need to change
-  m_pWindowManager->AddMsgTarget(m_stereoscopicsManager.get());
 
   CServiceBroker::RegisterGUI(this);
 }
@@ -88,7 +86,7 @@ CGUIAudioManager &CGUIComponent::GetAudioManager()
   return *m_guiAudioManager;
 }
 
-bool CGUIComponent::ConfirmDelete(std::string path)
+bool CGUIComponent::ConfirmDelete(const std::string& path)
 {
   CGUIDialogYesNo* pDialog = GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
   if (pDialog)

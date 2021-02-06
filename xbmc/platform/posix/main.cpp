@@ -6,8 +6,9 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <sys/resource.h>
 #include <signal.h>
+#include <sys/resource.h>
+#include <cstdio>
 
 #include <cstring>
 
@@ -25,6 +26,7 @@
 #include "PlayListPlayer.h"
 #include "platform/MessagePrinter.h"
 #include "platform/xbmc.h"
+#include "PlatformPosix.h"
 #include "utils/log.h"
 
 #ifdef HAS_LIRC
@@ -36,31 +38,14 @@
 namespace
 {
 
-class CPOSIXSignalHandleThread : public CThread
-{
-public:
-  CPOSIXSignalHandleThread()
-  : CThread("POSIX signal handler")
-  {}
-protected:
-  void Process() override
-  {
-    CMessagePrinter::DisplayMessage("Exiting application");
-    KODI::MESSAGING::CApplicationMessenger::GetInstance().PostMsg(TMSG_QUIT);
-  }
-};
-
 extern "C"
 {
 
 void XBMC_POSIX_HandleSignal(int sig)
 {
-  // Spawn handling thread: the current thread that this signal was catched on
-  // might have been interrupted in a call to PostMsg() while holding a lock
-  // there, which would lead to a deadlock if PostMsg() was called directly here
-  // as PostMsg() is not supposed to be reentrant
-  auto thread = new CPOSIXSignalHandleThread;
-  thread->Create(true);
+  // Setting an atomic flag is one of the only useful things that is permitted by POSIX
+  // in signal handlers
+  CPlatformPosix::RequestQuit();
 }
 
 }
@@ -74,7 +59,7 @@ int main(int argc, char* argv[])
   struct rlimit rlim;
   rlim.rlim_cur = rlim.rlim_max = RLIM_INFINITY;
   if (setrlimit(RLIMIT_CORE, &rlim) == -1)
-    CLog::Log(LOGDEBUG, "Failed to set core size limit (%s)", strerror(errno));
+    fprintf(stderr, "Failed to set core size limit (%s).\n", strerror(errno));
 #endif
 
   // Set up global SIGINT/SIGTERM handler

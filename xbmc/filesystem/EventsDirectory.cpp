@@ -8,10 +8,11 @@
 
 
 #include "EventsDirectory.h"
+
+#include "ServiceBroker.h"
 #include "URL.h"
 #include "events/EventLog.h"
 #include "utils/StringUtils.h"
-#include "ServiceBroker.h"
 
 using namespace XFILE;
 
@@ -45,7 +46,7 @@ bool CEventsDirectory::GetDirectory(const CURL& url, CFileItemList &items)
     events = log.Get(level, includeHigherLevels);
   }
 
-  for (auto eventItem : events)
+  for (const auto& eventItem : events)
     items.Add(EventToFileItem(eventItem));
 
   return true;

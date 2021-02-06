@@ -8,22 +8,23 @@
 
 
 #include "GUIDialogSimpleMenu.h"
+
+#include "GUIDialogSelect.h"
 #include "ServiceBroker.h"
+#include "URL.h"
 #include "dialogs/GUIDialogBusy.h"
+#include "filesystem/Directory.h"
+#include "filesystem/File.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "GUIDialogSelect.h"
 #include "settings/DiscSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "utils/URIUtils.h"
-#include "filesystem/Directory.h"
-#include "filesystem/File.h"
 #include "threads/IRunnable.h"
+#include "utils/URIUtils.h"
+#include "utils/Variant.h"
 #include "utils/log.h"
 #include "video/VideoInfoTag.h"
-#include "URL.h"
-#include "utils/Variant.h"
 
 namespace
 {
@@ -60,7 +61,7 @@ bool CGUIDialogSimpleMenu::ShowPlaySelection(CFileItem& item)
 
   if (item.IsBDFile())
   {
-    std::string root = URIUtils::GetParentPath(path);
+    std::string root = URIUtils::GetParentPath(item.GetDynPath());
     URIUtils::RemoveSlashAtEnd(root);
     if (URIUtils::GetFileName(root) == "BDMV")
     {
@@ -74,7 +75,7 @@ bool CGUIDialogSimpleMenu::ShowPlaySelection(CFileItem& item)
   if (item.IsDiscImage())
   {
     CURL url2("udf://");
-    url2.SetHostName(item.GetPath());
+    url2.SetHostName(item.GetDynPath());
     url2.SetFileName("BDMV/index.bdmv");
     if (XFILE::CFile::Exists(url2.Get()))
     {
@@ -124,7 +125,7 @@ bool CGUIDialogSimpleMenu::ShowPlaySelection(CFileItem& item, const std::string&
 
     if (item_new->m_bIsFolder == false)
     {
-      std::string original_path = item.GetPath();
+      std::string original_path = item.GetDynPath();
       item.Reset();
       item = *item_new;
       item.SetProperty("original_listitem_url", original_path);
@@ -132,7 +133,7 @@ bool CGUIDialogSimpleMenu::ShowPlaySelection(CFileItem& item, const std::string&
     }
 
     items.Clear();
-    if (!GetDirectoryItems(item_new->GetPath(), items, XFILE::CDirectory::CHints()) || items.IsEmpty())
+    if (!GetDirectoryItems(item_new->GetDynPath(), items, XFILE::CDirectory::CHints()) || items.IsEmpty())
     {
       CLog::Log(LOGERROR, "CGUIWindowVideoBase::ShowPlaySelection - Failed to get any items %s", item_new->GetPath().c_str());
       break;

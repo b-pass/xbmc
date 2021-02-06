@@ -8,13 +8,16 @@
 
 #pragma once
 
-#include "gtest/gtest.h"
-
 #include "threads/Thread.h"
+
+#include <gtest/gtest.h>
 
 #define MILLIS(x) x
 
-inline static void SleepMillis(unsigned int millis) { XbmcThreads::ThreadSleep(millis); }
+inline static void SleepMillis(unsigned int millis)
+{
+  std::this_thread::sleep_for(std::chrono::milliseconds(millis));
+}
 
 template<class E> inline static bool waitForWaiters(E& event, int numWaiters, int milliseconds)
 {
@@ -75,12 +78,12 @@ public:
 
   void join()
   {
-    cthread->WaitForThreadExit((unsigned int)-1);
+    cthread->Join(static_cast<unsigned int>(-1));
   }
 
   bool timed_join(unsigned int millis)
   {
-    return cthread->WaitForThreadExit(millis);
+    return cthread->Join(millis);
   }
 };
 

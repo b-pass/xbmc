@@ -8,10 +8,10 @@
 
 #include "Registry.h"
 
-#include <wayland-client-protocol.h>
-
-#include "utils/log.h"
 #include "WinEventsWayland.h"
+#include "utils/log.h"
+
+#include <wayland-client-protocol.h>
 
 using namespace KODI::WINDOWING::WAYLAND;
 
@@ -81,8 +81,8 @@ void CRegistry::Bind()
 
   m_registry = displayProxy.get_registry();
 
-  m_registry.on_global() = [this] (std::uint32_t name, std::string interface, std::uint32_t version)
-  {
+  m_registry.on_global() = [this](std::uint32_t name, const std::string& interface,
+                                  std::uint32_t version) {
     {
       auto it = m_singletonBinds.find(interface);
       if (it != m_singletonBinds.end())

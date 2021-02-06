@@ -7,8 +7,11 @@
  */
 
 #include "WinEventsWin10.h"
-#include "Application.h"
+
 #include "AppInboundProtocol.h"
+#include "Application.h"
+#include "GUIUserMessages.h"
+#include "ServiceBroker.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/actions/Action.h"
@@ -17,17 +20,16 @@
 #include "input/touch/generic/GenericTouchInputHandler.h"
 #include "interfaces/AnnouncementManager.h"
 #include "messaging/ApplicationMessenger.h"
-#include "platform/win10/input/RemoteControlXbox.h"
 #include "rendering/dx/DeviceResources.h"
 #include "rendering/dx/RenderContext.h"
-#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
-#include "utils/log.h"
 #include "utils/SystemInfo.h"
 #include "utils/Variant.h"
+#include "utils/log.h"
 #include "windowing/windows/WinKeyMap.h"
-#include "xbmc/GUIUserMessages.h"
+
+#include "platform/win10/input/RemoteControlXbox.h"
 
 #include <winrt/Windows.Devices.Input.h>
 
@@ -597,7 +599,10 @@ void CWinEventsWin10::OnSystemMediaButtonPressed(const SystemMediaTransportContr
   }
 }
 
-void CWinEventsWin10::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char * sender, const char * message, const CVariant & data)
+void CWinEventsWin10::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                               const std::string& sender,
+                               const std::string& message,
+                               const CVariant& data)
 {
   if (flag & ANNOUNCEMENT::Player)
   {
@@ -608,22 +613,22 @@ void CWinEventsWin10::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *
     bool changed = false;
     MediaPlaybackStatus status = MediaPlaybackStatus::Changing;
 
-    if (strcmp(message, "OnPlay") == 0 || strcmp(message, "OnResume") == 0)
+    if (message == "OnPlay" || message == "OnResume")
     {
       changed = true;
       status = MediaPlaybackStatus::Playing;
     }
-    else if (strcmp(message, "OnStop") == 0)
+    else if (message == "OnStop")
     {
       changed = true;
       status = MediaPlaybackStatus::Stopped;
     }
-    else if (strcmp(message, "OnPause") == 0)
+    else if (message == "OnPause")
     {
       changed = true;
       status = MediaPlaybackStatus::Paused;
     }
-    else if (strcmp(message, "OnSpeedChanged") == 0)
+    else if (message == "OnSpeedChanged")
     {
       changed = true;
       status = speed != 0.0 ? MediaPlaybackStatus::Playing : MediaPlaybackStatus::Paused;

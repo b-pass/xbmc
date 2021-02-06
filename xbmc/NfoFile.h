@@ -12,13 +12,11 @@
 //
 //////////////////////////////////////////////////////////////////////
 
-#if !defined(AFX_NfoFile_H__641CCF68_6D2A_426E_9204_C0E4BEF12D00__INCLUDED_)
-#define AFX_NfoFile_H__641CCF68_6D2A_426E_9204_C0E4BEF12D00__INCLUDED_
+#include "InfoScanner.h"
+#include "addons/Scraper.h"
 
 #include <string>
-
-#include "addons/Scraper.h"
-#include "InfoScanner.h"
+#include <utility>
 
 class CNfoFile
 {
@@ -43,7 +41,7 @@ public:
   }
 
   void Close();
-  void SetScraperInfo(ADDON::ScraperPtr info) { m_info = info; }
+  void SetScraperInfo(ADDON::ScraperPtr info) { m_info = std::move(info); }
   ADDON::ScraperPtr GetScraperInfo() { return m_info; }
   const CScraperUrl &ScraperUrl() const { return m_scurl; }
 
@@ -51,7 +49,7 @@ public:
                     const std::string& content);
 
   static std::vector<ADDON::ScraperPtr> GetScrapers(ADDON::TYPE type,
-                                                    ADDON::ScraperPtr selectedScraper);
+                                                    const ADDON::ScraperPtr& selectedScraper);
 
 private:
   std::string m_doc;
@@ -62,5 +60,3 @@ private:
 
   int Load(const std::string&);
 };
-
-#endif // !defined(AFX_NfoFile_H__641CCF68_6D2A_426E_9204_C0E4BEF12D00__INCLUDED_)

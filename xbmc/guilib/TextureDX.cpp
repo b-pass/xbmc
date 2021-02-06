@@ -7,13 +7,17 @@
  */
 
 #include "TextureDX.h"
+
+#include "utils/MemUtils.h"
 #include "utils/log.h"
 
-/************************************************************************/
-/*    CDXTexture                                                       */
-/************************************************************************/
+CTexture* CTexture::CreateTexture(unsigned int width, unsigned int height, unsigned int format)
+{
+  return new CDXTexture(width, height, format);
+}
+
 CDXTexture::CDXTexture(unsigned int width, unsigned int height, unsigned int format)
-: CBaseTexture(width, height, format)
+  : CTexture(width, height, format)
 {
 }
 
@@ -171,7 +175,7 @@ void CDXTexture::LoadToGPU()
 
   if (!m_bCacheMemory)
   {
-    _aligned_free(m_pixels);
+    KODI::MEMORY::AlignedFree(m_pixels);
     m_pixels = nullptr;
   }
 

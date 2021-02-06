@@ -7,7 +7,9 @@
  */
 
 #include "BlurayFile.h"
+
 #include "URL.h"
+
 #include <assert.h>
 
 namespace XFILE
@@ -24,7 +26,7 @@ namespace XFILE
     assert(url.IsProtocol("bluray"));
 
     std::string host = url.GetHostName();
-    std::string filename = url.GetFileName();
+    const std::string& filename = url.GetFileName();
     if (host.empty() || filename.empty())
       return "";
 

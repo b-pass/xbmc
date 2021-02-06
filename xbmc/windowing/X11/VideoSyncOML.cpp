@@ -7,11 +7,13 @@
  */
 
 #include "VideoSyncOML.h"
+
 #include "utils/TimeUtils.h"
 #include "utils/log.h"
 #include "windowing/GraphicContext.h"
 #include "windowing/X11/WinSystemX11GLContext.h"
 
+using namespace KODI::WINDOWING::X11;
 
 bool CVideoSyncOML::Setup(PUPDATECLOCK func)
 {
@@ -20,7 +22,8 @@ bool CVideoSyncOML::Setup(PUPDATECLOCK func)
   UpdateClock = func;
 
   m_abort = false;
-  m_winSystem.Register(this);
+
+  static_cast<CWinSystemX11*>(&m_winSystem)->Register(this);
 
   return true;
 }
@@ -45,7 +48,14 @@ void CVideoSyncOML::Run(CEvent& stopEvent)
     timeSinceVblank = m_winSystem.GetVblankTiming(newMsc, interval);
 
     if (newMsc == msc)
+    {
+      newMsc++;
+    }
+    else if (newMsc < msc)
+    {
+      timeSinceVblank = interval;
       continue;
+    }
 
     uint64_t now = CurrentHostCounter();
     UpdateClock(newMsc - msc, now, m_refClock);

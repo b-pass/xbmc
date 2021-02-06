@@ -17,9 +17,7 @@ namespace ADDON
   class CService: public CAddon
   {
   public:
-    static std::unique_ptr<CService> FromExtension(CAddonInfo addonInfo, const cp_extension_t* ext);
-
-    explicit CService(CAddonInfo addonInfo) : CAddon(std::move(addonInfo)) {}
+    explicit CService(const AddonInfoPtr& addonInfo) : CAddon(addonInfo, ADDON_SERVICE) {}
   };
 
   class CServiceAddonManager
@@ -52,7 +50,7 @@ namespace ADDON
   private:
     void OnEvent(const AddonEvent& event);
 
-    void Stop(std::map<std::string, int>::value_type service);
+    void Stop(const std::map<std::string, int>::value_type& service);
 
     CAddonMgr& m_addonMgr;
     CCriticalSection m_criticalSection;

@@ -7,23 +7,22 @@
  */
 
 #include "ApplicationStackHelper.h"
+
 #include "ApplicationPlayer.h"
+#include "Util.h"
 #include "cores/VideoPlayer/DVDFileInfo.h"
 #include "filesystem/StackDirectory.h"
-#include "utils/log.h"
-#include "utils/URIUtils.h"
-#include "video/VideoDatabase.h"
 #include "threads/SingleLock.h"
-#include "Util.h"
+#include "utils/URIUtils.h"
+#include "utils/log.h"
+#include "video/VideoDatabase.h"
+
+#include <utility>
 
 using namespace XFILE;
 
 CApplicationStackHelper::CApplicationStackHelper(void)
   : m_currentStack(new CFileItemList)
-{
-}
-
-CApplicationStackHelper::~CApplicationStackHelper(void)
 {
 }
 
@@ -56,7 +55,6 @@ void CApplicationStackHelper::OnPlayBackStarted(const CFileItem& item)
       }
     }
   }
-  return;
 }
 
 bool CApplicationStackHelper::InitializeStack(const CFileItem & item)
@@ -241,7 +239,7 @@ bool CApplicationStackHelper::HasRegisteredStack(const CFileItem & item)
 
 void CApplicationStackHelper::SetRegisteredStack(const CFileItem& item, CFileItemPtr stackItem)
 {
-  GetStackPartInformation(item.GetPath())->m_pStack = stackItem;
+  GetStackPartInformation(item.GetPath())->m_pStack = std::move(stackItem);
 }
 
 int CApplicationStackHelper::GetRegisteredStackPartNumber(const CFileItem& item)
@@ -274,7 +272,8 @@ void CApplicationStackHelper::SetRegisteredStackTotalTimeMs(const CFileItem& ite
   GetStackPartInformation(item.GetPath())->m_lStackTotalTimeMs = totalTime;
 }
 
-CApplicationStackHelper::StackPartInformationPtr CApplicationStackHelper::GetStackPartInformation(std::string key)
+CApplicationStackHelper::StackPartInformationPtr CApplicationStackHelper::GetStackPartInformation(
+    const std::string& key)
 {
   if (m_stackmap.count(key) == 0)
   {

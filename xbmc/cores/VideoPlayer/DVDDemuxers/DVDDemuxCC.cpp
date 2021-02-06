@@ -6,10 +6,11 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "DVDDemuxUtils.h"
-#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
 #include "DVDDemuxCC.h"
+
+#include "DVDDemuxUtils.h"
 #include "cores/VideoPlayer/DVDCodecs/Overlay/contrib/cc_decoder708.h"
+#include "cores/VideoPlayer/Interface/TimingConstants.h"
 
 #include <algorithm>
 
@@ -113,6 +114,7 @@ std::vector<CDemuxStream*> CDVDDemuxCC::GetStreams() const
   std::vector<CDemuxStream*> streams;
 
   int num = GetNrOfStreams();
+  streams.reserve(num);
   for (int i = 0; i < num; ++i)
   {
     streams.push_back(const_cast<CDemuxStreamSubtitle*>(&m_streams[i]));

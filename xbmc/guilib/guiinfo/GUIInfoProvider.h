@@ -9,7 +9,6 @@
 #pragma once
 
 #include "cores/VideoPlayer/Interface/StreamInfo.h"
-
 #include "guilib/guiinfo/IGUIInfoProvider.h"
 
 namespace KODI
@@ -25,7 +24,16 @@ class CGUIInfoProvider : public IGUIInfoProvider
 {
 public:
   CGUIInfoProvider() = default;
-  virtual ~CGUIInfoProvider() = default;
+  ~CGUIInfoProvider() override = default;
+
+  bool GetFallbackLabel(std::string& value,
+                        const CFileItem* item,
+                        int contextWindow,
+                        const CGUIInfo& info,
+                        std::string* fallback) override
+  {
+    return false;
+  }
 
   void UpdateAVInfo(const AudioStreamInfo& audioInfo, const VideoStreamInfo& videoInfo, const SubtitleStreamInfo& subtitleInfo) override
   { m_audioInfo = audioInfo, m_videoInfo = videoInfo, m_subtitleInfo = subtitleInfo; }

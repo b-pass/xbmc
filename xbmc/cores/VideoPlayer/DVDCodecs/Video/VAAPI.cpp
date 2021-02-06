@@ -7,40 +7,42 @@
  */
 
 #include "VAAPI.h"
-#include "ServiceBroker.h"
+
 #include "DVDVideoCodec.h"
+#include "ServiceBroker.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDCodecUtils.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
-#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
+#include "cores/VideoPlayer/Interface/TimingConstants.h"
 #include "cores/VideoPlayer/Process/ProcessInfo.h"
-#include "utils/log.h"
-#include "utils/StringUtils.h"
-#include "threads/SingleLock.h"
+#include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "settings/lib/Setting.h"
+#include "threads/SingleLock.h"
+#include "utils/MemUtils.h"
+#include "utils/StringUtils.h"
+#include "utils/XTimeUtils.h"
+#include "utils/log.h"
 #include "windowing/GraphicContext.h"
-#include "settings/AdvancedSettings.h"
+
+#include <drm_fourcc.h>
 #include <va/va_drm.h>
 #include <va/va_drmcommon.h>
-#include <drm_fourcc.h>
-#include "platform/linux/XTimeUtils.h"
-#include "platform/linux/XMemUtils.h"
 
 extern "C" {
-#include "libavutil/avutil.h"
-#include "libavutil/hwcontext.h"
-#include "libavutil/hwcontext_vaapi.h"
-#include "libavutil/opt.h"
-#include "libavfilter/buffersink.h"
-#include "libavfilter/buffersrc.h"
+#include <libavutil/avutil.h>
+#include <libavutil/hwcontext.h>
+#include <libavutil/hwcontext_vaapi.h>
+#include <libavutil/opt.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
 }
 
+#include "system_egl.h"
+
+#include <EGL/eglext.h>
 #include <va/va_vpp.h>
 #include <xf86drm.h>
-
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 
 #if VA_CHECK_VERSION(1, 0, 0)
 # include <va/va_str.h>
@@ -49,23 +51,25 @@ extern "C" {
 using namespace VAAPI;
 #define NUM_RENDER_PICS 7
 
-const std::string SETTING_VIDEOPLAYER_USEVAAPI = "videoplayer.usevaapi";
-const std::string SETTING_VIDEOPLAYER_USEVAAPIHEVC = "videoplayer.usevaapihevc";
-const std::string SETTING_VIDEOPLAYER_USEVAAPIMPEG2 = "videoplayer.usevaapimpeg2";
-const std::string SETTING_VIDEOPLAYER_USEVAAPIMPEG4 = "videoplayer.usevaapimpeg4";
-const std::string SETTING_VIDEOPLAYER_USEVAAPIVC1 = "videoplayer.usevaapivc1";
-const std::string SETTING_VIDEOPLAYER_USEVAAPIVP8 = "videoplayer.usevaapivp8";
-const std::string SETTING_VIDEOPLAYER_USEVAAPIVP9 = "videoplayer.usevaapivp9";
-const std::string SETTING_VIDEOPLAYER_PREFERVAAPIRENDER = "videoplayer.prefervaapirender";
+constexpr auto SETTING_VIDEOPLAYER_USEVAAPI = "videoplayer.usevaapi";
+constexpr auto SETTING_VIDEOPLAYER_USEVAAPIHEVC = "videoplayer.usevaapihevc";
+constexpr auto SETTING_VIDEOPLAYER_USEVAAPIMPEG2 = "videoplayer.usevaapimpeg2";
+constexpr auto SETTING_VIDEOPLAYER_USEVAAPIMPEG4 = "videoplayer.usevaapimpeg4";
+constexpr auto SETTING_VIDEOPLAYER_USEVAAPIVC1 = "videoplayer.usevaapivc1";
+constexpr auto SETTING_VIDEOPLAYER_USEVAAPIVP8 = "videoplayer.usevaapivp8";
+constexpr auto SETTING_VIDEOPLAYER_USEVAAPIVP9 = "videoplayer.usevaapivp9";
+constexpr auto SETTING_VIDEOPLAYER_PREFERVAAPIRENDER = "videoplayer.prefervaapirender";
 
 void VAAPI::VaErrorCallback(void *user_context, const char *message)
 {
-  CLog::Log(LOGERROR, "libva error: {}", message);
+  std::string str{message};
+  CLog::Log(LOGERROR, "libva error: {}", StringUtils::TrimRight(str));
 }
 
 void VAAPI::VaInfoCallback(void *user_context, const char *message)
 {
-  CLog::Log(LOGDEBUG, "libva info: {}", message);
+  std::string str{message};
+  CLog::Log(LOGDEBUG, "libva info: {}", StringUtils::TrimRight(str));
 }
 
 //-----------------------------------------------------------------------------
@@ -101,7 +105,7 @@ void CVAAPIContext::Release(CDecoder *decoder)
 
 void CVAAPIContext::Close()
 {
-  CLog::Log(LOGNOTICE, "VAAPI::Close - closing decoder context");
+  CLog::Log(LOGINFO, "VAAPI::Close - closing decoder context");
   if (m_renderNodeFD >= 0)
   {
     close(m_renderNodeFD);
@@ -204,7 +208,7 @@ bool CVAAPIContext::CreateContext()
 #endif
 
   int major_version, minor_version;
-  if (!CheckSuccess(vaInitialize(m_display, &major_version, &minor_version)))
+  if (!CheckSuccess(vaInitialize(m_display, &major_version, &minor_version), "vaInitialize"))
   {
     vaTerminate(m_display);
     m_display = NULL;
@@ -225,12 +229,19 @@ void CVAAPIContext::DestroyContext()
 {
   delete[] m_profiles;
   if (m_display)
-    CheckSuccess(vaTerminate(m_display));
-
+  {
+    if (CheckSuccess(vaTerminate(m_display), "vaTerminate"))
+    {
+      m_display = NULL;
+    }
+    else
+    {
 #if VA_CHECK_VERSION(1, 0, 0)
-  vaSetErrorCallback(m_display, nullptr, nullptr);
-  vaSetInfoCallback(m_display, nullptr, nullptr);
+      vaSetErrorCallback(m_display, nullptr, nullptr);
+      vaSetInfoCallback(m_display, nullptr, nullptr);
 #endif
+    }
+  }
 }
 
 void CVAAPIContext::QueryCaps()
@@ -240,7 +251,7 @@ void CVAAPIContext::QueryCaps()
   int max_profiles = vaMaxNumProfiles(m_display);
   m_profiles = new VAProfile[max_profiles];
 
-  if (!CheckSuccess(vaQueryConfigProfiles(m_display, m_profiles, &m_profileCount)))
+  if (!CheckSuccess(vaQueryConfigProfiles(m_display, m_profiles, &m_profileCount), "vaQueryConfigProfiles"))
     return;
 
   for(int i = 0; i < m_profileCount; i++)
@@ -259,7 +270,7 @@ VAConfigAttrib CVAAPIContext::GetAttrib(VAProfile profile)
 
   VAConfigAttrib attrib;
   attrib.type = VAConfigAttribRTFormat;
-  CheckSuccess(vaGetConfigAttributes(m_display, profile, VAEntrypointVLD, &attrib, 1));
+  CheckSuccess(vaGetConfigAttributes(m_display, profile, VAEntrypointVLD, &attrib, 1), "vaGetConfigAttributes");
 
   return attrib;
 }
@@ -281,16 +292,16 @@ VAConfigID CVAAPIContext::CreateConfig(VAProfile profile, VAConfigAttrib attrib)
   CSingleLock lock(m_section);
 
   VAConfigID config = VA_INVALID_ID;
-  CheckSuccess(vaCreateConfig(m_display, profile, VAEntrypointVLD, &attrib, 1, &config));
+  CheckSuccess(vaCreateConfig(m_display, profile, VAEntrypointVLD, &attrib, 1, &config), "vaCreateConfig");
 
   return config;
 }
 
-bool CVAAPIContext::CheckSuccess(VAStatus status)
+bool CVAAPIContext::CheckSuccess(VAStatus status, const std::string& function)
 {
   if (status != VA_STATUS_SUCCESS)
   {
-    CLog::Log(LOGERROR, "VAAPI::%s error: %s", __FUNCTION__, vaErrorStr(status));
+    CLog::Log(LOGERROR, "VAAPI/context {} error: {} ({})", function, vaErrorStr(status), status);
     return false;
   }
   return true;
@@ -532,8 +543,22 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, const enum A
   auto entry = settings_map.find(avctx->codec_id);
   if (entry != settings_map.end())
   {
-    const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-    bool enabled = settings->GetBool(entry->second) && settings->GetSetting(entry->second)->IsVisible();
+    auto settingsComponent = CServiceBroker::GetSettingsComponent();
+    if (!settingsComponent)
+      return false;
+
+    auto settings = settingsComponent->GetSettings();
+    if (!settings)
+      return false;
+
+    auto setting = settings->GetSetting(entry->second);
+    if (!setting)
+    {
+      CLog::Log(LOGERROR, "Failed to load setting for: {}", entry->second);
+      return false;
+    }
+
+    bool enabled = settings->GetBool(entry->second) && setting->IsVisible();
     if (!enabled)
       return false;
   }
@@ -558,7 +583,6 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, const enum A
   m_vaapiConfig.surfaceWidth = avctx->coded_width;
   m_vaapiConfig.surfaceHeight = avctx->coded_height;
   m_vaapiConfig.aspect = avctx->sample_aspect_ratio;
-  m_decoderThread = CThread::GetCurrentThreadId();
   m_DisplayState = VAAPI_OPEN;
   m_vaapiConfigured = false;
   m_presentPicture = nullptr;
@@ -711,7 +735,7 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, const enum A
 
 void CDecoder::Close()
 {
-  CLog::Log(LOGNOTICE, "VAAPI::%s", __FUNCTION__);
+  CLog::Log(LOGINFO, "VAAPI::%s", __FUNCTION__);
 
   CSingleLock lock(m_DecoderSection);
 
@@ -765,7 +789,7 @@ long CDecoder::Release()
     VASurfaceID surf;
     while((surf = m_videoSurfaces.RemoveNext(true)) != VA_INVALID_SURFACE)
     {
-      CheckSuccess(vaDestroySurfaces(m_vaapiConfig.dpy, &surf, 1));
+      CheckSuccess(vaDestroySurfaces(m_vaapiConfig.dpy, &surf, 1), "vaDestroySurfaces");
     }
   }
   return IHardwareDecoder::Release();
@@ -998,7 +1022,7 @@ CDVDVideoCodec::VCReturn CDecoder::Check(AVCodecContext* avctx)
   {
     // if there is no other error, sleep for a short while
     // in order not to drain player's message queue
-    Sleep(10);
+    KODI::TIME::Sleep(10);
 
     return CDVDVideoCodec::VC_NOBUFFER;
   }
@@ -1069,11 +1093,11 @@ bool CDecoder::CanSkipDeint()
   return m_bufferStats.CanSkipDeint();
 }
 
-bool CDecoder::CheckSuccess(VAStatus status)
+bool CDecoder::CheckSuccess(VAStatus status, const std::string& function)
 {
   if (status != VA_STATUS_SUCCESS)
   {
-    CLog::Log(LOGERROR, "VAAPI::%s - error: %s", __FUNCTION__, vaErrorStr(status));
+    CLog::Log(LOGERROR, "VAAPI/decoder {} error: {} ({})", function, vaErrorStr(status), status);
     m_ErrorCount++;
 
     if(m_DisplayState == VAAPI_OPEN)
@@ -1121,13 +1145,10 @@ bool CDecoder::ConfigVAAPI()
 
   VASurfaceID surfaces[32];
   int nb_surfaces = m_vaapiConfig.maxReferences;
-  if (!CheckSuccess(vaCreateSurfaces(m_vaapiConfig.dpy,
-                                     format,
-                                     m_vaapiConfig.surfaceWidth,
-                                     m_vaapiConfig.surfaceHeight,
-                                     surfaces,
-                                     nb_surfaces,
-                                     attribs, 1)))
+  if (!CheckSuccess(
+      vaCreateSurfaces(m_vaapiConfig.dpy, format, m_vaapiConfig.surfaceWidth,
+          m_vaapiConfig.surfaceHeight, surfaces,
+          nb_surfaces, attribs, 1), "vaCreateSurfaces"))
   {
     return false;
   }
@@ -1186,13 +1207,13 @@ void CDecoder::FiniVAAPIOutput()
   VASurfaceID surf;
   while((surf = m_videoSurfaces.RemoveNext()) != VA_INVALID_SURFACE)
   {
-    CheckSuccess(vaDestroySurfaces(m_vaapiConfig.dpy, &surf, 1));
+    CheckSuccess(vaDestroySurfaces(m_vaapiConfig.dpy, &surf, 1), "vaDestroySurfaces");
   }
   m_videoSurfaces.Reset();
 
   // destroy vaapi config
   if (m_vaapiConfig.configId != VA_INVALID_ID)
-    CheckSuccess(vaDestroyConfig(m_vaapiConfig.dpy, m_vaapiConfig.configId));
+    CheckSuccess(vaDestroyConfig(m_vaapiConfig.dpy, m_vaapiConfig.configId), "vaDestroyConfig");
   m_vaapiConfig.configId = VA_INVALID_ID;
 }
 
@@ -1222,14 +1243,31 @@ void CDecoder::Register(IVaapiWinSystem *winSystem, bool deepColor)
   CDVDFactoryCodec::RegisterHWAccel("vaapi", CDecoder::Create);
   config.context->Release(nullptr);
 
-  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-  settings->GetSetting(SETTING_VIDEOPLAYER_USEVAAPI)->SetVisible(true);
-  settings->GetSetting(SETTING_VIDEOPLAYER_USEVAAPIMPEG4)->SetVisible(true);
-  settings->GetSetting(SETTING_VIDEOPLAYER_USEVAAPIVC1)->SetVisible(true);
-  settings->GetSetting(SETTING_VIDEOPLAYER_USEVAAPIMPEG2)->SetVisible(true);
-  settings->GetSetting(SETTING_VIDEOPLAYER_USEVAAPIVP8)->SetVisible(true);
-  settings->GetSetting(SETTING_VIDEOPLAYER_USEVAAPIVP9)->SetVisible(true);
-  settings->GetSetting(SETTING_VIDEOPLAYER_USEVAAPIHEVC)->SetVisible(true);
+  auto settingsComponent = CServiceBroker::GetSettingsComponent();
+  if (!settingsComponent)
+    return;
+
+  auto settings = settingsComponent->GetSettings();
+  if (!settings)
+    return;
+
+  constexpr std::array<const char*, 8> vaapiSettings = {
+      SETTING_VIDEOPLAYER_USEVAAPI,     SETTING_VIDEOPLAYER_USEVAAPIMPEG4,
+      SETTING_VIDEOPLAYER_USEVAAPIVC1,  SETTING_VIDEOPLAYER_USEVAAPIMPEG2,
+      SETTING_VIDEOPLAYER_USEVAAPIVP8,  SETTING_VIDEOPLAYER_USEVAAPIVP9,
+      SETTING_VIDEOPLAYER_USEVAAPIHEVC, SETTING_VIDEOPLAYER_PREFERVAAPIRENDER};
+
+  for (const auto vaapiSetting : vaapiSettings)
+  {
+    auto setting = settings->GetSetting(vaapiSetting);
+    if (!setting)
+    {
+      CLog::Log(LOGERROR, "Failed to load setting for: {}", vaapiSetting);
+      continue;
+    }
+
+    setting->SetVisible(true);
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -1453,12 +1491,12 @@ void COutput::Dispose()
 
 void COutput::OnStartup()
 {
-  CLog::Log(LOGNOTICE, "COutput::OnStartup: Output Thread created");
+  CLog::Log(LOGINFO, "COutput::OnStartup: Output Thread created");
 }
 
 void COutput::OnExit()
 {
-  CLog::Log(LOGNOTICE, "COutput::OnExit: Output Thread terminated");
+  CLog::Log(LOGINFO, "COutput::OnExit: Output Thread terminated");
 }
 
 enum OUTPUT_STATES
@@ -1550,16 +1588,8 @@ void COutput::StateMachine(int signal, Protocol *port, Message *msg)
 
           // set initial number of
           EnsureBufferPool();
-          if (!m_vaError)
-          {
-            m_state = O_TOP_CONFIGURED_IDLE;
-            msg->Reply(COutputControlProtocol::ACC);
-          }
-          else
-          {
-            m_state = O_TOP_ERROR;
-            msg->Reply(COutputControlProtocol::ERROR);
-          }
+          m_state = O_TOP_CONFIGURED_IDLE;
+          msg->Reply(COutputControlProtocol::ACC);
           return;
         default:
           break;
@@ -1750,11 +1780,6 @@ void COutput::StateMachine(int signal, Protocol *port, Message *msg)
               m_dataPort.SendInMessage(COutputDataProtocol::PICTURE, &outPic, sizeof(outPic));
             }
             m_config.stats->DecProcessed();
-            if (m_vaError)
-            {
-              m_state = O_TOP_ERROR;
-              return;
-            }
           }
           m_state = O_TOP_CONFIGURED_IDLE;
           m_extTimeout = 0;
@@ -1864,7 +1889,7 @@ bool COutput::Init()
   m_config.processInfo->UpdateDeinterlacingMethods(deintMethods);
   m_config.processInfo->SetDeinterlacingMethodDefault(EINTERLACEMETHOD::VS_INTERLACEMETHOD_VAAPI_BOB);
 
-  m_vaError = false;
+  m_seenInterlaced = false;
 
   return true;
 }
@@ -1985,9 +2010,13 @@ void COutput::InitCycle()
 
   EINTERLACEMETHOD method = m_config.processInfo->GetVideoSettings().m_InterlaceMethod;
   bool interlaced = m_currentPicture.DVDPic.iFlags & DVP_FLAG_INTERLACED;
+  // Remember whether any interlaced frames were encountered already.
+  // If this is the case, the deinterlace method will never automatically be switched to NONE again in
+  // order to not change deint methods every few frames in PAFF streams.
+  m_seenInterlaced = m_seenInterlaced || interlaced;
 
   if (!(flags & DVD_CODEC_CTRL_NO_POSTPROC) &&
-      interlaced &&
+      m_seenInterlaced &&
       method != VS_INTERLACEMETHOD_NONE)
   {
     if (!m_config.processInfo->Supports(method))
@@ -2217,17 +2246,6 @@ void COutput::ReadyForDisposal(CPostproc *pp)
   }
 }
 
-bool COutput::CheckSuccess(VAStatus status)
-{
-  if (status != VA_STATUS_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "VAAPI::%s - Error: %s(%d)", __FUNCTION__, vaErrorStr(status), status);
-    m_vaError = true;
-    return false;
-  }
-  return true;
-}
-
 //-----------------------------------------------------------------------------
 // Postprocessing
 //-----------------------------------------------------------------------------
@@ -2327,7 +2345,9 @@ bool CVppPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
   m_config = config;
 
   // create config
-  if (!CheckSuccess(vaCreateConfig(m_config.dpy, VAProfileNone, VAEntrypointVideoProc, NULL, 0, &m_configId)))
+  if (!CheckSuccess(
+      vaCreateConfig(m_config.dpy, VAProfileNone, VAEntrypointVideoProc, NULL, 0, &m_configId),
+      "vaCreateConfig"))
   {
     CLog::Log(LOGDEBUG, LOGVIDEO, "CVppPostproc::PreInit  - VPP init failed in vaCreateConfig");
 
@@ -2350,13 +2370,10 @@ bool CVppPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
     attrib->value.value.i = VA_FOURCC_P010;
   }
   int nb_surfaces = NUM_RENDER_PICS;
-  if (!CheckSuccess(vaCreateSurfaces(m_config.dpy,
-                                     format,
-                                     m_config.surfaceWidth,
-                                     m_config.surfaceHeight,
-                                     surfaces,
-                                     nb_surfaces,
-                                     attribs, 1)))
+  if (!CheckSuccess(
+      vaCreateSurfaces(m_config.dpy, format, m_config.surfaceWidth, m_config.surfaceHeight,
+          surfaces, nb_surfaces,
+          attribs, 1), "vaCreateSurfaces"))
   {
     CLog::Log(LOGDEBUG, LOGVIDEO, "CVppPostproc::PreInit  - VPP init failed in vaCreateSurfaces");
 
@@ -2368,14 +2385,10 @@ bool CVppPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
   }
 
   // create vaapi decoder context
-  if (!CheckSuccess(vaCreateContext(m_config.dpy,
-                                    m_configId,
-                                    m_config.surfaceWidth,
-                                    m_config.surfaceHeight,
-                                    0,
-                                    surfaces,
-                                    nb_surfaces,
-                                    &m_contextId)))
+  if (!CheckSuccess(
+      vaCreateContext(m_config.dpy, m_configId, m_config.surfaceWidth, m_config.surfaceHeight, 0,
+          surfaces,
+          nb_surfaces, &m_contextId), "vaCreateContext"))
   {
     m_contextId = VA_INVALID_ID;
     CLog::Log(LOGDEBUG, LOGVIDEO, "CVppPostproc::PreInit  - VPP init failed in vaCreateContext");
@@ -2388,18 +2401,17 @@ bool CVppPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
   VAProcFilterCapDeinterlacing deinterlacingCaps[VAProcDeinterlacingCount];
   unsigned int numDeinterlacingCaps = VAProcDeinterlacingCount;
 
-  if (!CheckSuccess(vaQueryVideoProcFilters(m_config.dpy, m_contextId, filters, &numFilters)))
+  if (!CheckSuccess(vaQueryVideoProcFilters(m_config.dpy, m_contextId, filters, &numFilters),
+      "vaQueryVideoProcFilters"))
   {
     CLog::Log(LOGDEBUG, LOGVIDEO, "CVppPostproc::PreInit  - VPP init failed in vaQueryVideoProcFilters");
 
     return false;
   }
 
-  if (!CheckSuccess(vaQueryVideoProcFilterCaps(m_config.dpy,
-                                               m_contextId,
-                                               VAProcFilterDeinterlacing,
-                                               deinterlacingCaps,
-                                               &numDeinterlacingCaps)))
+  if (!CheckSuccess(vaQueryVideoProcFilterCaps(m_config.dpy, m_contextId, VAProcFilterDeinterlacing,
+      deinterlacingCaps,
+      &numDeinterlacingCaps), "vaQueryVideoProcFilterCaps"))
   {
     CLog::Log(LOGDEBUG, LOGVIDEO, "CVppPostproc::PreInit  - VPP init failed in vaQueryVideoProcFilterCaps");
 
@@ -2458,7 +2470,7 @@ bool CVppPostproc::UpdateDeintMethod(EINTERLACEMETHOD method)
 
   if (m_filter != VA_INVALID_ID)
   {
-    CheckSuccess(vaDestroyBuffer(m_config.dpy, m_filter));
+    CheckSuccess(vaDestroyBuffer(m_config.dpy, m_filter), "vaDestroyBuffer");
     m_filter = VA_INVALID_ID;
   }
 
@@ -2491,17 +2503,17 @@ bool CVppPostproc::UpdateDeintMethod(EINTERLACEMETHOD method)
   filterparams.algorithm = vppMethod;
   filterparams.flags = 0;
 
-  if (!CheckSuccess(vaCreateBuffer(m_config.dpy, m_contextId,
-                    VAProcFilterParameterBufferType,
-                    sizeof(filterparams), 1, &filterparams, &m_filter)))
+  if (!CheckSuccess(vaCreateBuffer(m_config.dpy, m_contextId, VAProcFilterParameterBufferType,
+      sizeof(filterparams), 1,
+      &filterparams, &m_filter), "vaCreateBuffer"))
   {
     m_filter = VA_INVALID_ID;
     return false;
   }
 
   VAProcPipelineCaps pplCaps;
-  if (!CheckSuccess(vaQueryVideoProcPipelineCaps(m_config.dpy, m_contextId,
-                    &m_filter, 1, &pplCaps)))
+  if (!CheckSuccess(vaQueryVideoProcPipelineCaps(m_config.dpy, m_contextId, &m_filter, 1, &pplCaps),
+      "vaQueryVideoProcPipelineCaps"))
   {
     return false;
   }
@@ -2517,29 +2529,29 @@ void CVppPostproc::Dispose()
   // make sure surfaces are idle
   for (int i=0; i<m_videoSurfaces.Size(); i++)
   {
-    CheckSuccess(vaSyncSurface(m_config.dpy, m_videoSurfaces.GetAtIndex(i)));
+    CheckSuccess(vaSyncSurface(m_config.dpy, m_videoSurfaces.GetAtIndex(i)), "vaSyncSurface");
   }
 
   if (m_filter != VA_INVALID_ID)
   {
-    CheckSuccess(vaDestroyBuffer(m_config.dpy, m_filter));
+    CheckSuccess(vaDestroyBuffer(m_config.dpy, m_filter), "vaDestroyBuffer");
     m_filter = VA_INVALID_ID;
   }
   if (m_contextId != VA_INVALID_ID)
   {
-    CheckSuccess(vaDestroyContext(m_config.dpy, m_contextId));
+    CheckSuccess(vaDestroyContext(m_config.dpy, m_contextId), "vaDestroyContext");
     m_contextId = VA_INVALID_ID;
   }
   VASurfaceID surf;
   while((surf = m_videoSurfaces.RemoveNext()) != VA_INVALID_SURFACE)
   {
-    CheckSuccess(vaDestroySurfaces(m_config.dpy, &surf, 1));
+    CheckSuccess(vaDestroySurfaces(m_config.dpy, &surf, 1), "vaDestroySurface");
   }
   m_videoSurfaces.Reset();
 
   if (m_configId != VA_INVALID_ID)
   {
-    CheckSuccess(vaDestroyConfig(m_config.dpy, m_configId));
+    CheckSuccess(vaDestroyConfig(m_config.dpy, m_configId), "vaDestroyConfig");
     m_configId = VA_INVALID_ID;
   }
 
@@ -2597,7 +2609,7 @@ bool CVppPostproc::Filter(CVaapiProcessedPicture &outPic)
 
   // skip deinterlacing cycle if requested
   if ((m_step == 1) &&
-      ((outPic.DVDPic.iFlags & DVD_CODEC_CTRL_SKIPDEINT) || (m_vppMethod == VS_INTERLACEMETHOD_NONE)))
+      ((outPic.DVDPic.iFlags & DVD_CODEC_CTRL_SKIPDEINT) || !(outPic.DVDPic.iFlags & DVP_FLAG_INTERLACED) || (m_vppMethod == VS_INTERLACEMETHOD_NONE)))
   {
     Advance();
     return false;
@@ -2610,18 +2622,18 @@ bool CVppPostproc::Filter(CVaapiProcessedPicture &outPic)
   VARectangle inputRegion;
   VARectangle outputRegion;
 
-  if (!CheckSuccess(vaBeginPicture(m_config.dpy, m_contextId, surf)))
+  if (!CheckSuccess(vaBeginPicture(m_config.dpy, m_contextId, surf), "vaBeginPicture"))
   {
     return false;
   }
 
-  if (!CheckSuccess(vaCreateBuffer(m_config.dpy, m_contextId,
-                    VAProcPipelineParameterBufferType,
-                    sizeof(VAProcPipelineParameterBuffer), 1, NULL, &pipelineBuf)))
+  if (!CheckSuccess(vaCreateBuffer(m_config.dpy, m_contextId, VAProcPipelineParameterBufferType,
+          sizeof(VAProcPipelineParameterBuffer), 1, NULL, &pipelineBuf), "vaCreateBuffer"))
   {
     return false;
   }
-  if (!CheckSuccess(vaMapBuffer(m_config.dpy, pipelineBuf, (void**)&pipelineParams)))
+  if (!CheckSuccess(vaMapBuffer(m_config.dpy, pipelineBuf, (void**) &pipelineParams),
+      "vaMapBuffer"))
   {
     return false;
   }
@@ -2635,6 +2647,7 @@ bool CVppPostproc::Filter(CVaapiProcessedPicture &outPic)
   pipelineParams->output_region = &outputRegion;
   pipelineParams->surface_region = &inputRegion;
   pipelineParams->output_background_color = 0xff000000;
+  pipelineParams->filter_flags = 0;
 
   VASurfaceID forwardRefs[32];
   VASurfaceID backwardRefs[32];
@@ -2651,32 +2664,31 @@ bool CVppPostproc::Filter(CVaapiProcessedPicture &outPic)
   if (m_vppMethod != VS_INTERLACEMETHOD_NONE)
   {
     unsigned int flags = 0;
-    if (it->DVDPic.iFlags & DVP_FLAG_TOP_FIELD_FIRST)
-      flags = 0;
-    else
-      flags = VA_DEINTERLACING_BOTTOM_FIELD_FIRST | VA_DEINTERLACING_BOTTOM_FIELD;
 
-    if (m_step)
+    if (it->DVDPic.iFlags & DVP_FLAG_INTERLACED)
     {
-      if (flags & VA_DEINTERLACING_BOTTOM_FIELD)
-        flags &= ~VA_DEINTERLACING_BOTTOM_FIELD;
+      if (it->DVDPic.iFlags & DVP_FLAG_TOP_FIELD_FIRST)
+        flags = 0;
       else
-        flags |= VA_DEINTERLACING_BOTTOM_FIELD;
+        flags = VA_DEINTERLACING_BOTTOM_FIELD_FIRST | VA_DEINTERLACING_BOTTOM_FIELD;
+
+      if (m_step)
+      {
+        if (flags & VA_DEINTERLACING_BOTTOM_FIELD)
+          flags &= ~VA_DEINTERLACING_BOTTOM_FIELD;
+        else
+          flags |= VA_DEINTERLACING_BOTTOM_FIELD;
+      }
     }
-    if (!CheckSuccess(vaMapBuffer(m_config.dpy, m_filter, (void**)&filterParams)))
+    if (!CheckSuccess(vaMapBuffer(m_config.dpy, m_filter, (void**) &filterParams), "vaMapBuffer"))
     {
       return false;
     }
     filterParams->flags = flags;
-    if (!CheckSuccess(vaUnmapBuffer(m_config.dpy, m_filter)))
+    if (!CheckSuccess(vaUnmapBuffer(m_config.dpy, m_filter), "vaUnmapBuffer"))
     {
       return false;
     }
-
-    if (m_vppMethod == VS_INTERLACEMETHOD_VAAPI_BOB)
-      pipelineParams->filter_flags = (flags & VA_DEINTERLACING_BOTTOM_FIELD) ? VA_BOTTOM_FIELD : VA_TOP_FIELD;
-    else
-      pipelineParams->filter_flags = 0;
 
     pipelineParams->filters = &m_filter;
     pipelineParams->num_filters = 1;
@@ -2722,23 +2734,22 @@ bool CVppPostproc::Filter(CVaapiProcessedPicture &outPic)
   if (pipelineParams->surface == VA_INVALID_SURFACE)
     return false;
 
-  if (!CheckSuccess(vaUnmapBuffer(m_config.dpy, pipelineBuf)))
+  if (!CheckSuccess(vaUnmapBuffer(m_config.dpy, pipelineBuf), "vaUnmmapBuffer"))
   {
     return false;
   }
 
-  if (!CheckSuccess(vaRenderPicture(m_config.dpy, m_contextId,
-                                    &pipelineBuf, 1)))
+  if (!CheckSuccess(vaRenderPicture(m_config.dpy, m_contextId, &pipelineBuf, 1), "vaRenderPicture"))
   {
     return false;
   }
 
-  if (!CheckSuccess(vaEndPicture(m_config.dpy, m_contextId)))
+  if (!CheckSuccess(vaEndPicture(m_config.dpy, m_contextId), "vaEndPicture"))
   {
     return false;
   }
 
-  if (!CheckSuccess(vaDestroyBuffer(m_config.dpy, pipelineBuf)))
+  if (!CheckSuccess(vaDestroyBuffer(m_config.dpy, pipelineBuf), "vaDestroyBuffer"))
   {
     return false;
   }
@@ -2817,11 +2828,11 @@ void CVppPostproc::Discard(COutput *output, ReadyToDispose cb)
     (m_pOut->*m_cbDispose)(this);
 }
 
-bool CVppPostproc::CheckSuccess(VAStatus status)
+bool CVppPostproc::CheckSuccess(VAStatus status, const std::string& function)
 {
   if (status != VA_STATUS_SUCCESS)
   {
-    CLog::Log(LOGERROR, "VAAPI::%s - Error: %s(%d)", __FUNCTION__, vaErrorStr(status), status);
+    CLog::Log(LOGERROR, "VAAPI/vpp {} error: {} ({})", function, vaErrorStr(status), status);
     return false;
   }
   return true;
@@ -2847,7 +2858,7 @@ CFFmpegPostproc::CFFmpegPostproc()
 CFFmpegPostproc::~CFFmpegPostproc()
 {
   Close();
-  _aligned_free(m_cache);
+  KODI::MEMORY::AlignedFree(m_cache);
   m_dllSSE4.Unload();
   av_frame_free(&m_pFilterFrameIn);
   av_frame_free(&m_pFilterFrameOut);
@@ -2884,7 +2895,7 @@ bool CFFmpegPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
     use_filter = false;
   }
   if (image.image_id != VA_INVALID_ID)
-    CheckSuccess(vaDestroyImage(config.dpy,image.image_id));
+    CheckSuccess(vaDestroyImage(config.dpy, image.image_id), "vaDestroyImage");
 
   if (use_filter && !m_dllSSE4.Load())
   {
@@ -2894,7 +2905,7 @@ bool CFFmpegPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
 
   if (use_filter)
   {
-    m_cache = (uint8_t*)_aligned_malloc(CACHED_BUFFER_SIZE, 64);
+    m_cache = static_cast<uint8_t*>(KODI::MEMORY::AlignedMalloc(CACHED_BUFFER_SIZE, 64));
     if (methods)
     {
       methods->diMethods[methods->numDiMethods++] = VS_INTERLACEMETHOD_DEINTERLACE;
@@ -3015,13 +3026,13 @@ bool CFFmpegPostproc::AddPicture(CVaapiDecodedPicture &inPic)
   m_DVDPic.SetParams(inPic.DVDPic);
   bool result = false;
 
-  if (!CheckSuccess(vaSyncSurface(m_config.dpy, surf)))
+  if (!CheckSuccess(vaSyncSurface(m_config.dpy, surf), "vaSyncSurface"))
     goto error;
 
-  if (!CheckSuccess(vaDeriveImage(m_config.dpy, surf, &image)))
+  if (!CheckSuccess(vaDeriveImage(m_config.dpy, surf, &image), "vaDeriveImage"))
     goto error;
 
-  if (!CheckSuccess(vaMapBuffer(m_config.dpy, image.buf, (void**)&buf)))
+  if (!CheckSuccess(vaMapBuffer(m_config.dpy, image.buf, (void**) &buf), "vaMapBuffer"))
     goto error;
 
   m_pFilterFrameIn->format = AV_PIX_FMT_NV12;
@@ -3057,8 +3068,8 @@ bool CFFmpegPostproc::AddPicture(CVaapiDecodedPicture &inPic)
   m_pFilterFrameIn->data[3] = NULL;
   m_pFilterFrameIn->pkt_size = image.data_size;
 
-  CheckSuccess(vaUnmapBuffer(m_config.dpy, image.buf));
-  CheckSuccess(vaDestroyImage(m_config.dpy,image.image_id));
+  CheckSuccess(vaUnmapBuffer(m_config.dpy, image.buf), "vaUnmapBuffer");
+  CheckSuccess(vaDestroyImage(m_config.dpy, image.image_id), "vaDestroyImage");
 
   if (m_diMethod == VS_INTERLACEMETHOD_DEINTERLACE)
   {
@@ -3162,19 +3173,8 @@ void CFFmpegPostproc::Flush()
 
 bool CFFmpegPostproc::UpdateDeintMethod(EINTERLACEMETHOD method)
 {
-  // switching between certain methods should be done without deinit/init
-  if (method != m_diMethod)
-    return false;
-
-  if (method == VS_INTERLACEMETHOD_DEINTERLACE)
-    return true;
-  else if (method == VS_INTERLACEMETHOD_RENDER_BOB)
-    return true;
-  else if (method == VS_INTERLACEMETHOD_NONE &&
-           !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(SETTING_VIDEOPLAYER_PREFERVAAPIRENDER))
-    return true;
-
-  return false;
+  /// \todo switching between certain methods could be done without deinit/init
+  return (m_diMethod == method);
 }
 
 bool CFFmpegPostproc::DoesSync()
@@ -3195,11 +3195,11 @@ void CFFmpegPostproc::Discard(COutput *output, ReadyToDispose cb)
     (m_pOut->*m_cbDispose)(this);
 }
 
-bool CFFmpegPostproc::CheckSuccess(VAStatus status)
+bool CFFmpegPostproc::CheckSuccess(VAStatus status, const std::string& function)
 {
   if (status != VA_STATUS_SUCCESS)
   {
-    CLog::Log(LOGERROR, "VAAPI - Error: %s(%d)", vaErrorStr(status), status);
+    CLog::Log(LOGERROR, "VAAPI/ffpp error: {} ({})", function, vaErrorStr(status), status);
     return false;
   }
   return true;

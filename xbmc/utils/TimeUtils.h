@@ -9,8 +9,8 @@
 #pragma once
 
 #include <stdint.h>
-#include <time.h>
 #include <string>
+#include <time.h>
 
 class CDateTime;
 
@@ -38,7 +38,8 @@ public:
    * @brief Returns a time string without seconds, i.e: HH:MM
    * @param hhmmss Time string in the format HH:MM:SS
   */
-  static std::string WithoutSeconds(const std::string hhmmss);
+  static std::string WithoutSeconds(const std::string& hhmmss);
+
 private:
   static unsigned int frameTime;
 };

@@ -7,6 +7,7 @@
  */
 
 #include "GUIWindowEventLog.h"
+
 #include "FileItem.h"
 #include "GUIUserMessages.h"
 #include "ServiceBroker.h"
@@ -218,7 +219,7 @@ bool CGUIWindowEventLog::GetDirectory(const std::string &strDirectory, CFileItem
   return result;
 }
 
-bool CGUIWindowEventLog::OnSelect(CFileItemPtr item)
+bool CGUIWindowEventLog::OnSelect(const CFileItemPtr& item)
 {
   if (item == nullptr)
     return false;
@@ -227,7 +228,7 @@ bool CGUIWindowEventLog::OnSelect(CFileItemPtr item)
   return true;
 }
 
-bool CGUIWindowEventLog::OnDelete(CFileItemPtr item)
+bool CGUIWindowEventLog::OnDelete(const CFileItemPtr& item)
 {
   if (item == nullptr)
     return false;
@@ -240,7 +241,7 @@ bool CGUIWindowEventLog::OnDelete(CFileItemPtr item)
   return true;
 }
 
-bool CGUIWindowEventLog::OnExecute(CFileItemPtr item)
+bool CGUIWindowEventLog::OnExecute(const CFileItemPtr& item)
 {
   if (item == nullptr)
     return false;
@@ -259,7 +260,7 @@ bool CGUIWindowEventLog::OnExecute(CFileItemPtr item)
   return eventPtr->Execute();
 }
 
-void CGUIWindowEventLog::OnEventAdded(CFileItemPtr item)
+void CGUIWindowEventLog::OnEventAdded(const CFileItemPtr& item)
 {
   if (!IsActive())
     return;
@@ -267,7 +268,7 @@ void CGUIWindowEventLog::OnEventAdded(CFileItemPtr item)
   Refresh(true);
 }
 
-void CGUIWindowEventLog::OnEventRemoved(CFileItemPtr item)
+void CGUIWindowEventLog::OnEventRemoved(const CFileItemPtr& item)
 {
   if (!IsActive())
     return;

@@ -7,14 +7,13 @@
  */
 
 #include "GUIFont.h"
+
 #include "GUIFontTTF.h"
-#include "windowing/GraphicContext.h"
-
 #include "threads/SingleLock.h"
-#include "utils/TimeUtils.h"
-#include "utils/MathUtils.h"
-
 #include "utils/CharsetConverter.h"
+#include "utils/MathUtils.h"
+#include "utils/TimeUtils.h"
+#include "windowing/GraphicContext.h"
 
 #define ROUND(x) (float)(MathUtils::round_int(x))
 
@@ -51,9 +50,14 @@ float CScrollInfo::GetPixelsPerFrame()
   return pixelSpeed * m_averageFrameTime;
 }
 
-CGUIFont::CGUIFont(const std::string& strFontName, uint32_t style, UTILS::Color textColor,
-                   UTILS::Color shadowColor, float lineSpacing, float origHeight, CGUIFontTTFBase *font):
-  m_strFontName(strFontName)
+CGUIFont::CGUIFont(const std::string& strFontName,
+                   uint32_t style,
+                   UTILS::Color textColor,
+                   UTILS::Color shadowColor,
+                   float lineSpacing,
+                   float origHeight,
+                   CGUIFontTTF* font)
+  : m_strFontName(strFontName)
 {
   m_style = style & FONT_STYLE_MASK;
   m_textColor = textColor;
@@ -275,7 +279,7 @@ void CGUIFont::End()
   m_font->End();
 }
 
-void CGUIFont::SetFont(CGUIFontTTFBase *font)
+void CGUIFont::SetFont(CGUIFontTTF* font)
 {
   if (m_font == font)
     return; // no need to update the font if we already have it

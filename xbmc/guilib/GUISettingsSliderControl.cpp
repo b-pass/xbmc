@@ -7,6 +7,7 @@
  */
 
 #include "GUISettingsSliderControl.h"
+
 #include "input/Key.h"
 
 CGUISettingsSliderControl::CGUISettingsSliderControl(int parentID, int controlID, float posX, float posY, float width, float height, float sliderWidth, float sliderHeight, const CTextureInfo &textureFocus, const CTextureInfo &textureNoFocus, const CTextureInfo& backGroundTexture, const CTextureInfo& nibTexture, const CTextureInfo& nibTextureFocus, const CLabelInfo &labelInfo, int iType)
@@ -19,7 +20,13 @@ CGUISettingsSliderControl::CGUISettingsSliderControl(int parentID, int controlID
   m_active = false;
 }
 
-CGUISettingsSliderControl::~CGUISettingsSliderControl(void) = default;
+CGUISettingsSliderControl::CGUISettingsSliderControl(const CGUISettingsSliderControl& control)
+  : CGUISliderControl(control),
+    m_buttonControl(control.m_buttonControl),
+    m_label(control.m_label),
+    m_active(control.m_active)
+{
+}
 
 void CGUISettingsSliderControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
 {

@@ -19,6 +19,7 @@
 #define SETTING_XML_ELM_CONTROL_MULTISELECT "multiselect"
 #define SETTING_XML_ELM_CONTROL_POPUP "popup"
 #define SETTING_XML_ELM_CONTROL_FORMATVALUE "value"
+#define SETTING_XML_ELM_CONTROL_ADDBUTTONLABEL "addbuttonlabel"
 #define SETTING_XML_ATTR_SHOW_MORE "more"
 #define SETTING_XML_ATTR_SHOW_DETAILS "details"
 #define SETTING_XML_ATTR_SEPARATOR_POSITION "separatorposition"
@@ -167,7 +168,8 @@ protected:
 };
 
 class CSetting;
-using SettingControlListValueFormatter = std::string (*)(std::shared_ptr<const CSetting> setting);
+using SettingControlListValueFormatter =
+    std::string (*)(const std::shared_ptr<const CSetting>& setting);
 
 class CSettingControlList : public CSettingControlFormattedRange
 {
@@ -188,6 +190,8 @@ public:
   void SetMultiSelect(bool multiselect) { m_multiselect = multiselect; }
   bool HideValue() const { return m_hideValue; }
   void SetHideValue(bool hideValue) { m_hideValue = hideValue; }
+  int GetAddButtonLabel() const { return m_addButtonLabel; }
+  void SetAddButtonLabel(int label) { m_addButtonLabel = label; }
 
   SettingControlListValueFormatter GetFormatter() const { return m_formatter; }
   void SetFormatter(SettingControlListValueFormatter formatter) { m_formatter = formatter; }
@@ -196,11 +200,17 @@ protected:
   int m_heading = -1;
   bool m_multiselect = false;
   bool m_hideValue = false;
+  int m_addButtonLabel = -1;
   SettingControlListValueFormatter m_formatter = nullptr;
 };
 
 class CSettingControlSlider;
-using SettingControlSliderFormatter = std::string (*)(std::shared_ptr<const CSettingControlSlider> control, const CVariant &value, const CVariant &minimum, const CVariant &step, const CVariant &maximum);
+using SettingControlSliderFormatter =
+    std::string (*)(const std::shared_ptr<const CSettingControlSlider>& control,
+                    const CVariant& value,
+                    const CVariant& minimum,
+                    const CVariant& step,
+                    const CVariant& maximum);
 
 class CSettingControlSlider : public ISettingControl
 {
@@ -221,6 +231,7 @@ public:
   void SetFormatLabel(int formatLabel) { m_formatLabel = formatLabel; }
   const std::string& GetFormatString() const { return m_formatString; }
   void SetFormatString(const std::string &formatString) { m_formatString = formatString; }
+  std::string GetDefaultFormatString() const;
 
   SettingControlSliderFormatter GetFormatter() const { return m_formatter; }
   void SetFormatter(SettingControlSliderFormatter formatter) { m_formatter = formatter; }
@@ -229,7 +240,7 @@ protected:
   int m_heading = -1;
   bool m_popup = false;
   int m_formatLabel = -1;
-  std::string m_formatString = "%i";
+  std::string m_formatString;
   SettingControlSliderFormatter m_formatter = nullptr;
 };
 

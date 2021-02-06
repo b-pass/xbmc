@@ -7,19 +7,21 @@
  */
 
 #include "FavouritesService.h"
-#include "ServiceBroker.h"
-#include "filesystem/File.h"
-#include "Util.h"
+
 #include "FileItem.h"
-#include "utils/XBMCTinyXML.h"
-#include "utils/log.h"
-#include "utils/StringUtils.h"
-#include "utils/URIUtils.h"
+#include "ServiceBroker.h"
+#include "URL.h"
+#include "Util.h"
+#include "filesystem/File.h"
+#include "music/tags/MusicInfoTag.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
+#include "utils/ContentUtils.h"
+#include "utils/StringUtils.h"
+#include "utils/URIUtils.h"
+#include "utils/XBMCTinyXML.h"
+#include "utils/log.h"
 #include "video/VideoInfoTag.h"
-#include "music/tags/MusicInfoTag.h"
-#include "URL.h"
 
 
 static bool LoadFromFile(const std::string& strPath, CFileItemList& items)
@@ -155,7 +157,7 @@ bool CFavouritesService::AddOrRemove(const CFileItem& item, int contextWindow)
       const CFileItemPtr favourite(std::make_shared<CFileItem>(item.GetLabel()));
       if (item.GetLabel().empty())
         favourite->SetLabel(CUtil::GetTitleFromPath(item.GetPath(), item.m_bIsFolder));
-      favourite->SetArt("thumb", item.GetArt("thumb"));
+      favourite->SetArt("thumb", ContentUtils::GetPreferredArtImage(item));
       favourite->SetPath(favUrl);
       m_favourites.Add(favourite);
     }

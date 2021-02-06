@@ -8,13 +8,13 @@
 
 #pragma once
 
-#include "Texture.h"
 #include "D3DResource.h"
+#include "Texture.h"
 
 /************************************************************************/
 /*    CDXTexture                                                       */
 /************************************************************************/
-class CDXTexture : public CBaseTexture
+class CDXTexture : public CTexture
 {
 public:
   CDXTexture(unsigned int width = 0, unsigned int height = 0, unsigned int format = XB_FMT_UNKNOWN);

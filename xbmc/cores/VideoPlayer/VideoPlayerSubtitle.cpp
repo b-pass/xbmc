@@ -7,16 +7,18 @@
  */
 
 #include "VideoPlayerSubtitle.h"
-#include "DVDCodecs/Overlay/DVDOverlay.h"
-#include "DVDCodecs/Overlay/DVDOverlaySpu.h"
-#include "DVDCodecs/Overlay/DVDOverlayCodec.h"
-#include "DVDSubtitles/DVDSubtitleParser.h"
+
 #include "DVDCodecs/DVDFactoryCodec.h"
-#include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
-#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
-#include "utils/log.h"
-#include "system.h"
+#include "DVDCodecs/Overlay/DVDOverlay.h"
+#include "DVDCodecs/Overlay/DVDOverlayCodec.h"
+#include "DVDCodecs/Overlay/DVDOverlaySpu.h"
+#include "DVDSubtitles/DVDSubtitleParser.h"
+#include "cores/VideoPlayer/Interface/DemuxPacket.h"
+#include "cores/VideoPlayer/Interface/TimingConstants.h"
 #include "threads/SingleLock.h"
+#include "utils/log.h"
+
+#include "system.h"
 
 CVideoPlayerSubtitle::CVideoPlayerSubtitle(CDVDOverlayContainer* pOverlayContainer, CProcessInfo &processInfo)
 : IDVDStreamPlayer(processInfo)
@@ -59,7 +61,7 @@ void CVideoPlayerSubtitle::SendMessage(CDVDMsg* pMsg, int priority)
 
         while((overlay = m_pOverlayCodec->GetOverlay()) != NULL)
         {
-          m_pOverlayContainer->Add(overlay);
+          m_pOverlayContainer->ProcessAndAddOverlayIfValid(overlay);
           overlay->Release();
         }
       }
@@ -70,7 +72,7 @@ void CVideoPlayerSubtitle::SendMessage(CDVDMsg* pMsg, int priority)
       if (pSPUInfo)
       {
         CLog::Log(LOGDEBUG, "CVideoPlayer::ProcessSubData: Got complete SPU packet");
-        m_pOverlayContainer->Add(pSPUInfo);
+        m_pOverlayContainer->ProcessAndAddOverlayIfValid(pSPUInfo);
         pSPUInfo->Release();
       }
     }
@@ -202,7 +204,7 @@ void CVideoPlayerSubtitle::Process(double pts, double offset)
       if(pOverlay->iPTSStopTime != 0.0)
         pOverlay->iPTSStopTime -= offset;
 
-      m_pOverlayContainer->Add(pOverlay);
+      m_pOverlayContainer->ProcessAndAddOverlayIfValid(pOverlay);
       pOverlay->Release();
       pOverlay = m_pSubtitleFileParser->Parse(pts);
     }
