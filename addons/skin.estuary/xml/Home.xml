@@ -997,7 +997,7 @@
               <onclick>Skin.SetString(pvrCurrentDir, "Default")</onclick>
               <onclick>ActivateWindow(tvrecordings,pvr://recordings/tv/active/Default/,return)</onclick>
 							<property name="menu_id">$NUMBER[22100]</property>
-							<thumb>icons/pvr/recording.png</thumb>
+							<thumb>icons/sidemenu/recording.png</thumb>
 							<property name="id">tvrec</property>
 							<visible>!Skin.HasSetting(HomeMenuNoTVButton)</visible>
 						</item>
