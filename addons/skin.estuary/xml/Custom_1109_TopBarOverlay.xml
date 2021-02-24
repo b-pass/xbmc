@@ -231,7 +231,7 @@
 						<height>100</height>
 						<width>auto</width>
 						<visible>!String.isempty(Player.Duration)</visible>
-						<visible>Player.HasVideo + ![Player.HasGame | VideoPlayer.HasEpg]</visible>
+						<visible>!Pvr.IsPlayingRecording + Player.HasVideo + ![Player.HasGame | VideoPlayer.HasEpg]</visible>
 					</control>
 					<control type="label">
 						<label>$INFO[PVR.EpgEventFinishTime,$LOCALIZE[31080]: ]</label>
