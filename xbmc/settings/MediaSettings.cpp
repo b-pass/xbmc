@@ -6,33 +6,32 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <string>
-
-#include <limits.h>
-
 #include "MediaSettings.h"
+
 #include "Application.h"
 #include "PlayListPlayer.h"
+#include "ServiceBroker.h"
 #include "cores/RetroPlayer/RetroPlayerUtils.h"
 #include "dialogs/GUIDialogFileBrowser.h"
-#include "settings/dialogs/GUIDialogLibExportSettings.h"
 #include "guilib/LocalizeStrings.h"
 #include "interfaces/AnnouncementManager.h"
 #include "interfaces/builtins/Builtins.h"
-#include "music/MusicDatabase.h"
-#include "music/MusicLibraryQueue.h"
 #include "messaging/helpers/DialogHelper.h"
-#include "ServiceBroker.h"
-#include "settings/lib/Setting.h"
+#include "music/MusicLibraryQueue.h"
 #include "settings/Settings.h"
+#include "settings/dialogs/GUIDialogLibExportSettings.h"
+#include "settings/lib/Setting.h"
 #include "storage/MediaManager.h"
 #include "threads/SingleLock.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
+#include "utils/Variant.h"
 #include "utils/XBMCTinyXML.h"
 #include "utils/XMLUtils.h"
-#include "utils/Variant.h"
+#include "utils/log.h"
 #include "video/VideoDatabase.h"
+
+#include <limits.h>
+#include <string>
 
 using namespace KODI;
 using namespace KODI::MESSAGING;
@@ -52,7 +51,7 @@ CMediaSettings::CMediaSettings()
   m_videoPlaylistRepeat = false;
   m_videoPlaylistShuffle = false;
 
-  m_videoStartWindowed = false;
+  m_mediaStartWindowed = false;
   m_additionalSubtitleDirectoryChecked = 0;
 
   m_musicNeedsUpdate = 0;
@@ -115,10 +114,10 @@ bool CMediaSettings::Load(const TiXmlNode *settings)
       m_defaultVideoSettings.m_StereoMode = 0;
     if (!XMLUtils::GetInt(pElement, "centermixlevel", m_defaultVideoSettings.m_CenterMixLevel))
       m_defaultVideoSettings.m_CenterMixLevel = 0;
-
-    m_defaultVideoSettings.m_ToneMapMethod = 1;
-    m_defaultVideoSettings.m_ToneMapParam = 1.0f;
-    m_defaultVideoSettings.m_SubtitleCached = false;
+    if (!XMLUtils::GetInt(pElement, "tonemapmethod", m_defaultVideoSettings.m_ToneMapMethod))
+      m_defaultVideoSettings.m_ToneMapMethod = VS_TONEMAPMETHOD_REINHARD;
+    if (!XMLUtils::GetFloat(pElement, "tonemapparam", m_defaultVideoSettings.m_ToneMapParam, 0.1f, 5.0f))
+      m_defaultVideoSettings.m_ToneMapParam = 1.0f;
   }
 
   m_defaultGameSettings.Reset();
@@ -155,6 +154,13 @@ bool CMediaSettings::Load(const TiXmlNode *settings)
       m_musicNeedsUpdate = 0;
   }
 
+  // Set music playlist player repeat and shuffle from loaded settings
+  if (m_musicPlaylistRepeat)
+    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST_MUSIC, PLAYLIST::REPEAT_ALL);
+  else
+    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST_MUSIC, PLAYLIST::REPEAT_NONE);
+  CServiceBroker::GetPlaylistPlayer().SetShuffle(PLAYLIST_MUSIC, m_musicPlaylistShuffle);
+
   // Read the watchmode settings for the various media views
   pElement = settings->FirstChildElement("myvideos");
   if (pElement != NULL)
@@ -179,15 +185,14 @@ bool CMediaSettings::Load(const TiXmlNode *settings)
       m_videoNeedsUpdate = 0;
   }
 
-  return true;
-}
-
-void CMediaSettings::OnSettingsLoaded()
-{
-  CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST_MUSIC, m_musicPlaylistRepeat ? PLAYLIST::REPEAT_ALL : PLAYLIST::REPEAT_NONE);
-  CServiceBroker::GetPlaylistPlayer().SetShuffle(PLAYLIST_MUSIC, m_musicPlaylistShuffle);
-  CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST_VIDEO, m_videoPlaylistRepeat ? PLAYLIST::REPEAT_ALL : PLAYLIST::REPEAT_NONE);
+  // Set video playlist player repeat and shuffle from loaded settings
+  if (m_videoPlaylistRepeat)
+    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST_VIDEO, PLAYLIST::REPEAT_ALL);
+  else
+    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST_VIDEO, PLAYLIST::REPEAT_NONE);
   CServiceBroker::GetPlaylistPlayer().SetShuffle(PLAYLIST_VIDEO, m_videoPlaylistShuffle);
+
+  return true;
 }
 
 bool CMediaSettings::Save(TiXmlNode *settings) const
@@ -221,6 +226,8 @@ bool CMediaSettings::Save(TiXmlNode *settings) const
   XMLUtils::SetBoolean(pNode, "nonlinstretch", m_defaultVideoSettings.m_CustomNonLinStretch);
   XMLUtils::SetInt(pNode, "stereomode", m_defaultVideoSettings.m_StereoMode);
   XMLUtils::SetInt(pNode, "centermixlevel", m_defaultVideoSettings.m_CenterMixLevel);
+  XMLUtils::SetInt(pNode, "tonemapmethod", m_defaultVideoSettings.m_ToneMapMethod);
+  XMLUtils::SetFloat(pNode, "tonemapparam", m_defaultVideoSettings.m_ToneMapParam);
 
   // default audio settings for dsp addons
   TiXmlElement audioSettingsNode("defaultaudiosettings");
@@ -285,7 +292,7 @@ bool CMediaSettings::Save(TiXmlNode *settings) const
   return true;
 }
 
-void CMediaSettings::OnSettingAction(std::shared_ptr<const CSetting> setting)
+void CMediaSettings::OnSettingAction(const std::shared_ptr<const CSetting>& setting)
 {
   if (setting == NULL)
     return;
@@ -309,16 +316,14 @@ void CMediaSettings::OnSettingAction(std::shared_ptr<const CSetting> setting)
   {
     std::string path;
     VECSOURCES shares;
-    g_mediaManager.GetLocalDrives(shares);
-    g_mediaManager.GetNetworkLocations(shares);
-    g_mediaManager.GetRemovableDrives(shares);
+    CServiceBroker::GetMediaManager().GetLocalDrives(shares);
+    CServiceBroker::GetMediaManager().GetNetworkLocations(shares);
+    CServiceBroker::GetMediaManager().GetRemovableDrives(shares);
 
     if (CGUIDialogFileBrowser::ShowAndGetFile(shares, "musicdb.xml", g_localizeStrings.Get(651) , path))
     {
-      CMusicDatabase musicdatabase;
-      musicdatabase.Open();
-      musicdatabase.ImportFromXML(path);
-      musicdatabase.Close();
+      // Import data to music library showing progress dialog
+      CMusicLibraryQueue::GetInstance().ImportLibrary(path, true);
     }
   }
   else if (settingId == CSettings::SETTING_VIDEOLIBRARY_CLEANUP)
@@ -332,9 +337,9 @@ void CMediaSettings::OnSettingAction(std::shared_ptr<const CSetting> setting)
   {
     std::string path;
     VECSOURCES shares;
-    g_mediaManager.GetLocalDrives(shares);
-    g_mediaManager.GetNetworkLocations(shares);
-    g_mediaManager.GetRemovableDrives(shares);
+    CServiceBroker::GetMediaManager().GetLocalDrives(shares);
+    CServiceBroker::GetMediaManager().GetNetworkLocations(shares);
+    CServiceBroker::GetMediaManager().GetRemovableDrives(shares);
 
     if (CGUIDialogFileBrowser::ShowAndGetDirectory(shares, g_localizeStrings.Get(651) , path))
     {
@@ -346,13 +351,13 @@ void CMediaSettings::OnSettingAction(std::shared_ptr<const CSetting> setting)
   }
 }
 
-void CMediaSettings::OnSettingChanged(std::shared_ptr<const CSetting> setting)
+void CMediaSettings::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
   if (setting == nullptr)
     return;
 
   if (setting->GetId() == CSettings::SETTING_VIDEOLIBRARY_SHOWUNWATCHEDPLOTS)
-    CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::VideoLibrary, "xbmc", "OnRefresh");
+    CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::VideoLibrary, "OnRefresh");
 }
 
 int CMediaSettings::GetWatchedMode(const std::string &content) const

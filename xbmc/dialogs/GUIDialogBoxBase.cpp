@@ -6,8 +6,9 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "Application.h"
 #include "GUIDialogBoxBase.h"
+
+#include "Application.h"
 #include "guilib/LocalizeStrings.h"
 #include "threads/SingleLock.h"
 #include "utils/StringUtils.h"
@@ -47,7 +48,7 @@ bool CGUIDialogBoxBase::IsConfirmed() const
   return m_bConfirmed;
 }
 
-void CGUIDialogBoxBase::SetHeading(CVariant heading)
+void CGUIDialogBoxBase::SetHeading(const CVariant& heading)
 {
   std::string label = GetLocalized(heading);
   CSingleLock lock(m_section);
@@ -58,7 +59,7 @@ void CGUIDialogBoxBase::SetHeading(CVariant heading)
   }
 }
 
-void CGUIDialogBoxBase::SetLine(unsigned int iLine, CVariant line)
+void CGUIDialogBoxBase::SetLine(unsigned int iLine, const CVariant& line)
 {
   std::string label = GetLocalized(line);
   CSingleLock lock(m_section);
@@ -70,7 +71,7 @@ void CGUIDialogBoxBase::SetLine(unsigned int iLine, CVariant line)
   SetText(text);
 }
 
-void CGUIDialogBoxBase::SetText(CVariant text)
+void CGUIDialogBoxBase::SetText(const CVariant& text)
 {
   std::string label = GetLocalized(text);
   CSingleLock lock(m_section);

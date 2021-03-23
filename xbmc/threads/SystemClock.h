@@ -8,7 +8,9 @@
 
 #pragma once
 
+#include <chrono>
 #include <limits>
+#include <thread>
 
 namespace XbmcThreads
 {

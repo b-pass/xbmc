@@ -8,12 +8,13 @@
 
 #pragma once
 
+#include "SettingConditions.h"
+#include "utils/BooleanLogic.h"
+#include "utils/StaticLoggerBase.h"
+
 #include <list>
 #include <set>
 #include <string>
-
-#include "SettingConditions.h"
-#include "utils/BooleanLogic.h"
 
 enum class SettingDependencyType {
   Unknown = 0,
@@ -36,7 +37,7 @@ enum class SettingDependencyTarget {
   Property
 };
 
-class CSettingDependencyCondition : public CSettingConditionItem
+class CSettingDependencyCondition : public CSettingConditionItem, protected CStaticLoggerBase
 {
 public:
   explicit CSettingDependencyCondition(CSettingsManager *settingsManager = nullptr);
@@ -86,8 +87,9 @@ public:
 
   const std::set<std::string>& GetSettings() const { return m_settings; }
 
-  CSettingDependencyConditionCombination* Add(CSettingDependencyConditionPtr condition);
-  CSettingDependencyConditionCombination* Add(CSettingDependencyConditionCombinationPtr operation);
+  CSettingDependencyConditionCombination* Add(const CSettingDependencyConditionPtr& condition);
+  CSettingDependencyConditionCombination* Add(
+      const CSettingDependencyConditionCombinationPtr& operation);
 
 private:
   CBooleanLogicOperation* newOperation() override { return new CSettingDependencyConditionCombination(m_settingsManager); }
@@ -96,7 +98,7 @@ private:
   std::set<std::string> m_settings;
 };
 
-class CSettingDependency : public CSettingCondition
+class CSettingDependency : public CSettingCondition, protected CStaticLoggerBase
 {
 public:
   explicit CSettingDependency(CSettingsManager *settingsManager = nullptr);

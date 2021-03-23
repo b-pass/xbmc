@@ -7,13 +7,15 @@
  */
 
 #include "ModuleXbmcvfs.h"
+
 #include "LanguageHook.h"
-#include "filesystem/File.h"
-#include "filesystem/Directory.h"
-#include "utils/FileUtils.h"
-#include "utils/URIUtils.h"
 #include "URL.h"
 #include "Util.h"
+#include "filesystem/Directory.h"
+#include "filesystem/File.h"
+#include "filesystem/SpecialProtocol.h"
+#include "utils/FileUtils.h"
+#include "utils/URIUtils.h"
 
 namespace XBMCAddon
 {
@@ -47,6 +49,27 @@ namespace XBMCAddon
       if (URIUtils::HasSlashAtEnd(path, true))
         return XFILE::CDirectory::Exists(path, false);
       return XFILE::CFile::Exists(path, false);
+    }
+
+    // make legal file name
+    String makeLegalFilename(const String& filename)
+    {
+      XBMC_TRACE;
+      return CUtil::MakeLegalPath(filename);
+    }
+
+    // translate path
+    String translatePath(const String& path)
+    {
+      XBMC_TRACE;
+      return CSpecialProtocol::TranslatePath(path);
+    }
+
+    // validate path
+    String validatePath(const String& path)
+    {
+      XBMC_TRACE;
+      return CUtil::ValidatePath(path, true);
     }
 
     // make a directory

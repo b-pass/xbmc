@@ -11,9 +11,10 @@
 #include "threads/CriticalSection.h"
 
 #include <cstddef>
-#include <queue>
 #include <memory>
+#include <queue>
 #include <string>
+#include <utility>
 
 class CEvent;
 
@@ -23,14 +24,14 @@ namespace Actor
 class CPayloadWrapBase
 {
 public:
-  virtual ~CPayloadWrapBase() {};
+  virtual ~CPayloadWrapBase() = default;
 };
 
 template<typename Payload>
 class CPayloadWrap : public CPayloadWrapBase
 {
 public:
-  ~CPayloadWrap() override {};
+  ~CPayloadWrap() override = default;
   CPayloadWrap(Payload *data) {m_pPayload.reset(data);};
   CPayloadWrap(Payload &data) {m_pPayload.reset(new Payload(data));};
   Payload *GetPlayload() {return m_pPayload.get();};
@@ -71,18 +72,26 @@ private:
 class Protocol
 {
 public:
-  Protocol(std::string name, CEvent* inEvent, CEvent *outEvent)
-    :portName(name), containerInEvent(inEvent), containerOutEvent(outEvent) {}
-  Protocol(std::string name)
-    : Protocol(name, nullptr, nullptr) {}
+  Protocol(std::string name, CEvent* inEvent, CEvent* outEvent)
+    : portName(std::move(name)), containerInEvent(inEvent), containerOutEvent(outEvent)
+  {
+  }
+  Protocol(std::string name) : Protocol(std::move(name), nullptr, nullptr) {}
   ~Protocol();
   Message *GetMessage();
   void ReturnMessage(Message *msg);
-  bool SendOutMessage(int signal, void *data = nullptr, size_t size = 0, Message *outMsg = nullptr);
+  bool SendOutMessage(int signal,
+                      const void* data = nullptr,
+                      size_t size = 0,
+                      Message* outMsg = nullptr);
   bool SendOutMessage(int signal, CPayloadWrapBase *payload, Message *outMsg = nullptr);
-  bool SendInMessage(int signal, void *data = nullptr, size_t size = 0, Message *outMsg = nullptr);
+  bool SendInMessage(int signal,
+                     const void* data = nullptr,
+                     size_t size = 0,
+                     Message* outMsg = nullptr);
   bool SendInMessage(int signal, CPayloadWrapBase *payload, Message *outMsg = nullptr);
-  bool SendOutMessageSync(int signal, Message **retMsg, int timeout, void *data = nullptr, size_t size = 0);
+  bool SendOutMessageSync(
+      int signal, Message** retMsg, int timeout, const void* data = nullptr, size_t size = 0);
   bool SendOutMessageSync(int signal, Message **retMsg, int timeout, CPayloadWrapBase *payload);
   bool ReceiveOutMessage(Message **msg);
   bool ReceiveInMessage(Message **msg);

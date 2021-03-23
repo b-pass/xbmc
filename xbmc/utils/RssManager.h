@@ -8,14 +8,13 @@
 
 #pragma once
 
-#include <map>
-#include <vector>
-#include <string>
-
-#include "threads/CriticalSection.h"
-
 #include "settings/lib/ISettingCallback.h"
 #include "settings/lib/ISettingsHandler.h"
+#include "threads/CriticalSection.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 class CRssReader;
 class IRssObserver;
@@ -36,7 +35,7 @@ public:
   void OnSettingsLoaded() override;
   void OnSettingsUnloaded() override;
 
-  void OnSettingAction(std::shared_ptr<const CSetting> setting) override;
+  void OnSettingAction(const std::shared_ptr<const CSetting>& setting) override;
 
   void Start();
   void Stop();

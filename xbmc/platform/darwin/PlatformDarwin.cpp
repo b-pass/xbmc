@@ -7,20 +7,18 @@
  */
 
 #include "PlatformDarwin.h"
-#include <stdlib.h>
+
 #include "filesystem/SpecialProtocol.h"
 
-CPlatformDarwin::CPlatformDarwin()
+#include <cstdlib>
+
+bool CPlatformDarwin::Init()
 {
+  if (!CPlatformPosix::Init())
+    return false;
+  setenv("SSL_CERT_FILE", CSpecialProtocol::TranslatePath("special://xbmc/system/certs/cacert.pem").c_str(), 0);
 
-}
+  setenv("OS", "OS X", true); // for python scripts that check the OS
 
-CPlatformDarwin::~CPlatformDarwin()
-{
-
-}
-
-void CPlatformDarwin::Init()
-{
-    setenv("SSL_CERT_FILE", CSpecialProtocol::TranslatePath("special://xbmc/system/certs/cacert.pem").c_str(), 0);
+  return true;
 }

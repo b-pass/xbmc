@@ -8,31 +8,32 @@
 
 #include "GUIDialogAudioSettings.h"
 
-#include <string>
-#include <vector>
-
-#include "addons/Skin.h"
 #include "Application.h"
+#include "GUIPassword.h"
 #include "ServiceBroker.h"
+#include "URL.h"
+#include "addons/Skin.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "cores/IPlayer.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
-#include "GUIPassword.h"
 #include "profiles/ProfileManager.h"
 #include "settings/AdvancedSettings.h"
-#include "settings/lib/Setting.h"
-#include "settings/lib/SettingsManager.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "URL.h"
+#include "settings/lib/Setting.h"
+#include "settings/lib/SettingDefinitions.h"
+#include "settings/lib/SettingsManager.h"
 #include "utils/LangCodeExpander.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
+#include "utils/log.h"
 #include "video/VideoDatabase.h"
+
+#include <string>
+#include <vector>
 
 #define SETTING_AUDIO_VOLUME                   "audio.volume"
 #define SETTING_AUDIO_VOLUME_AMPLIFICATION     "audio.volumeamplification"
@@ -51,7 +52,7 @@ CGUIDialogAudioSettings::~CGUIDialogAudioSettings() = default;
 void CGUIDialogAudioSettings::FrameMove()
 {
   // update the volume setting if necessary
-  float newVolume = g_application.GetVolume(false);
+  float newVolume = g_application.GetVolumeRatio();
   if (newVolume != m_volume)
     GetSettingsManager()->SetNumber(SETTING_AUDIO_VOLUME, newVolume);
 
@@ -88,7 +89,7 @@ std::string CGUIDialogAudioSettings::FormatPercentAsDecibel(float value)
   return StringUtils::Format(g_localizeStrings.Get(14054).c_str(), CAEUtil::PercentToGain(value));
 }
 
-void CGUIDialogAudioSettings::OnSettingChanged(std::shared_ptr<const CSetting> setting)
+void CGUIDialogAudioSettings::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
   if (setting == NULL)
     return;
@@ -133,7 +134,7 @@ void CGUIDialogAudioSettings::OnSettingChanged(std::shared_ptr<const CSetting> s
   }
 }
 
-void CGUIDialogAudioSettings::OnSettingAction(std::shared_ptr<const CSetting> setting)
+void CGUIDialogAudioSettings::OnSettingAction(const std::shared_ptr<const CSetting>& setting)
 {
   if (setting == NULL)
     return;
@@ -145,22 +146,22 @@ void CGUIDialogAudioSettings::OnSettingAction(std::shared_ptr<const CSetting> se
     Save();
 }
 
-void CGUIDialogAudioSettings::Save()
+bool CGUIDialogAudioSettings::Save()
 {
   const std::shared_ptr<CProfileManager> profileManager = CServiceBroker::GetSettingsComponent()->GetProfileManager();
 
   if (!g_passwordManager.CheckSettingLevelLock(SettingLevel::Expert) &&
       profileManager->GetMasterProfile().getLockMode() != LOCK_MODE_EVERYONE)
-    return;
+    return true;
 
   // prompt user if they are sure
   if (!CGUIDialogYesNo::ShowAndGetInput(CVariant{12376}, CVariant{12377}))
-    return;
+    return true;
 
   // reset the settings
   CVideoDatabase db;
   if (!db.Open())
-    return;
+    return true;
 
   db.EraseAllVideoSettings();
   db.Close();
@@ -168,6 +169,8 @@ void CGUIDialogAudioSettings::Save()
   CMediaSettings::GetInstance().GetDefaultVideoSettings() = g_application.GetAppPlayer().GetVideoSettings();
   CMediaSettings::GetInstance().GetDefaultVideoSettings().m_AudioStream = -1;
   CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
+
+  return true;
 }
 
 void CGUIDialogAudioSettings::SetupView()
@@ -232,7 +235,7 @@ void CGUIDialogAudioSettings::InitializeSettings()
 
   // audio settings
   // audio volume setting
-  m_volume = g_application.GetVolume(false);
+  m_volume = g_application.GetVolumeRatio();
   std::shared_ptr<CSettingNumber> settingAudioVolume = AddSlider(groupAudio, SETTING_AUDIO_VOLUME, 13376, SettingLevel::Basic, m_volume, 14054, VOLUME_MINIMUM, VOLUME_MAXIMUM / 100.0f, VOLUME_MAXIMUM);
   settingAudioVolume->SetDependencies(depsAudioOutputPassthroughDisabled);
   std::static_pointer_cast<CSettingControlSlider>(settingAudioVolume->GetControl())->SetFormatter(SettingFormatterPercentAsDecibel);
@@ -284,7 +287,8 @@ bool CGUIDialogAudioSettings::SupportsAudioFeature(int feature)
   return false;
 }
 
-void CGUIDialogAudioSettings::AddAudioStreams(std::shared_ptr<CSettingGroup> group, const std::string &settingId)
+void CGUIDialogAudioSettings::AddAudioStreams(const std::shared_ptr<CSettingGroup>& group,
+                                              const std::string& settingId)
 {
   if (group == NULL || settingId.empty())
     return;
@@ -296,12 +300,18 @@ void CGUIDialogAudioSettings::AddAudioStreams(std::shared_ptr<CSettingGroup> gro
   AddList(group, settingId, 460, SettingLevel::Basic, m_audioStream, AudioStreamsOptionFiller, 460);
 }
 
-bool CGUIDialogAudioSettings::IsPlayingPassthrough(const std::string &condition, const std::string &value, SettingConstPtr setting, void *data)
+bool CGUIDialogAudioSettings::IsPlayingPassthrough(const std::string& condition,
+                                                   const std::string& value,
+                                                   const SettingConstPtr& setting,
+                                                   void* data)
 {
   return g_application.GetAppPlayer().IsPassthrough();
 }
 
-void CGUIDialogAudioSettings::AudioStreamsOptionFiller(SettingConstPtr setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data)
+void CGUIDialogAudioSettings::AudioStreamsOptionFiller(const SettingConstPtr& setting,
+                                                       std::vector<IntegerSettingOption>& list,
+                                                       int& current,
+                                                       void* data)
 {
   int audioStreamCount = g_application.GetAppPlayer().GetAudioStreamCount();
 
@@ -327,17 +337,22 @@ void CGUIDialogAudioSettings::AudioStreamsOptionFiller(SettingConstPtr setting, 
 
     strItem += FormatFlags(info.flags);
     strItem += StringUtils::Format(" (%i/%i)", i + 1, audioStreamCount);
-    list.push_back(make_pair(strItem, i));
+    list.emplace_back(strItem, i);
   }
 
   if (list.empty())
   {
-    list.push_back(make_pair(g_localizeStrings.Get(231), -1));
+    list.emplace_back(g_localizeStrings.Get(231), -1);
     current = -1;
   }
 }
 
-std::string CGUIDialogAudioSettings::SettingFormatterDelay(std::shared_ptr<const CSettingControlSlider> control, const CVariant &value, const CVariant &minimum, const CVariant &step, const CVariant &maximum)
+std::string CGUIDialogAudioSettings::SettingFormatterDelay(
+    const std::shared_ptr<const CSettingControlSlider>& control,
+    const CVariant& value,
+    const CVariant& minimum,
+    const CVariant& step,
+    const CVariant& maximum)
 {
   if (!value.isDouble())
     return "";
@@ -353,7 +368,12 @@ std::string CGUIDialogAudioSettings::SettingFormatterDelay(std::shared_ptr<const
   return StringUtils::Format(g_localizeStrings.Get(22005).c_str(), fValue);
 }
 
-std::string CGUIDialogAudioSettings::SettingFormatterPercentAsDecibel(std::shared_ptr<const CSettingControlSlider> control, const CVariant &value, const CVariant &minimum, const CVariant &step, const CVariant &maximum)
+std::string CGUIDialogAudioSettings::SettingFormatterPercentAsDecibel(
+    const std::shared_ptr<const CSettingControlSlider>& control,
+    const CVariant& value,
+    const CVariant& minimum,
+    const CVariant& step,
+    const CVariant& maximum)
 {
   if (control == NULL || !value.isDouble())
     return "";

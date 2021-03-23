@@ -7,22 +7,23 @@
  */
 
 #include "PlayList.h"
+
 #include "PlayListFactory.h"
-#include "music/tags/MusicInfoTag.h"
+#include "ServiceBroker.h"
 #include "filesystem/File.h"
-#include "utils/log.h"
+#include "interfaces/AnnouncementManager.h"
+#include "music/tags/MusicInfoTag.h"
 #include "utils/Random.h"
+#include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
-#include "utils/StringUtils.h"
-#include "interfaces/AnnouncementManager.h"
-#include "ServiceBroker.h"
+#include "utils/log.h"
 
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include <string>
 #include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -48,7 +49,7 @@ void CPlayList::AnnounceRemove(int pos)
   CVariant data;
   data["playlistid"] = m_id;
   data["position"] = pos;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnRemove", data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "OnRemove", data);
 }
 
 void CPlayList::AnnounceClear()
@@ -58,7 +59,7 @@ void CPlayList::AnnounceClear()
 
   CVariant data;
   data["playlistid"] = m_id;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnClear", data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "OnClear", data);
 }
 
 void CPlayList::AnnounceAdd(const CFileItemPtr& item, int pos)
@@ -69,7 +70,7 @@ void CPlayList::AnnounceAdd(const CFileItemPtr& item, int pos)
   CVariant data;
   data["playlistid"] = m_id;
   data["position"] = pos;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnAdd", item, data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "OnAdd", item, data);
 }
 
 void CPlayList::Add(const CFileItemPtr &item, int iPosition, int iOrder)
@@ -451,7 +452,7 @@ bool CPlayList::Expand(int position)
 {
   CFileItemPtr item = m_vecItems[position];
   std::unique_ptr<CPlayList> playlist (CPlayListFactory::Create(*item.get()));
-  if (playlist.get() == nullptr)
+  if (playlist == nullptr)
     return false;
 
   std::string path = item->GetDynPath();
@@ -507,5 +508,5 @@ const std::string& CPlayList::ResolveURL(const CFileItemPtr &item ) const
   if (item->IsMusicDb() && item->HasMusicInfoTag())
     return item->GetMusicInfoTag()->GetURL();
   else
-    return item->GetPath();
+    return item->GetDynPath();
 }

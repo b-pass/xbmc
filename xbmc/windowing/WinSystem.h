@@ -8,11 +8,13 @@
 
 #pragma once
 
+#include "HDRStatus.h"
 #include "OSScreenSaver.h"
+#include "Resolution.h"
 #include "VideoSync.h"
 #include "WinEvents.h"
 #include "guilib/DispResource.h"
-#include "Resolution.h"
+
 #include <memory>
 #include <vector>
 
@@ -30,9 +32,12 @@ struct REFRESHRATE
   int   ResInfo_Index;
 };
 
+class CDPMSSupport;
 class CGraphicContext;
 class CRenderSystemBase;
 class IRenderLoop;
+
+struct VideoPicture;
 
 class CWinSystemBase
 {
@@ -45,6 +50,8 @@ public:
   // Access render system interface
   virtual CRenderSystemBase *GetRenderSystem() { return nullptr; }
 
+  virtual const std::string GetName() { return "platform default"; }
+
   // windowing interfaces
   virtual bool InitWindowSystem();
   virtual bool DestroyWindowSystem();
@@ -52,6 +59,8 @@ public:
   virtual bool DestroyWindow(){ return false; }
   virtual bool ResizeWindow(int newWidth, int newHeight, int newLeft, int newTop) = 0;
   virtual bool SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays) = 0;
+  virtual bool DisplayHardwareScalingEnabled() { return false; }
+  virtual void UpdateDisplayHardwareScaling(const RESOLUTION_INFO& resInfo) { }
   virtual bool MoveWindow(int topLeft, int topRight){return false;}
   virtual void FinishModeChange(RESOLUTION res){}
   virtual void FinishWindowResize(int newWidth, int newHeight) {ResizeWindow(newWidth, newHeight, -1, -1);}
@@ -139,8 +148,27 @@ public:
   // Access render system interface
   CGraphicContext& GetGfxContext();
 
+  /**
+   * Get OS specific hardware context
+   *
+   * \return OS specific context or nullptr if OS not have
+   *
+   * \note This function is currently only related to Windows with DirectX,
+   * all other OS where use GL returns nullptr.
+   * Returned Windows class pointer is ID3D11DeviceContext1.
+   */
+  virtual void* GetHWContext() { return nullptr; }
+
+  std::shared_ptr<CDPMSSupport> GetDPMSManager();
+  virtual bool SetHDR(const VideoPicture* videoPicture) { return false; };
+  virtual bool IsHDRDisplay() { return false; };
+  virtual HDR_STATUS ToggleHDR() { return HDR_STATUS::HDR_UNSUPPORTED; };
+  virtual HDR_STATUS GetOSHDRStatus() { return HDR_STATUS::HDR_UNSUPPORTED; };
+
+  static const char* SETTING_WINSYSTEM_IS_HDR_DISPLAY;
+
 protected:
-  void UpdateDesktopResolution(RESOLUTION_INFO& newRes, int width, int height, float refreshRate, uint32_t dwFlags);
+  void UpdateDesktopResolution(RESOLUTION_INFO& newRes, const std::string &output, int width, int height, float refreshRate, uint32_t dwFlags);
   virtual std::unique_ptr<KODI::WINDOWING::IOSScreenSaver> GetOSScreenSaverImpl() { return nullptr; }
 
   int m_nWidth = 0;
@@ -157,4 +185,5 @@ protected:
 
   std::unique_ptr<IWinEvents> m_winEvents;
   std::unique_ptr<CGraphicContext> m_gfxContext;
+  std::shared_ptr<CDPMSSupport> m_dpms;
 };

@@ -7,23 +7,24 @@
  */
 
 #include "PictureThumbLoader.h"
+
+#include "FileItem.h"
+#include "GUIUserMessages.h"
 #include "Picture.h"
 #include "ServiceBroker.h"
-#include "filesystem/File.h"
-#include "FileItem.h"
 #include "TextureCache.h"
+#include "URL.h"
 #include "filesystem/Directory.h"
+#include "filesystem/File.h"
 #include "filesystem/MultiPathDirectory.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "GUIUserMessages.h"
-#include "utils/FileExtensionProvider.h"
-#include "utils/URIUtils.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "utils/FileExtensionProvider.h"
+#include "utils/URIUtils.h"
 #include "video/VideoThumbLoader.h"
-#include "URL.h"
 
 using namespace XFILE;
 
@@ -201,7 +202,7 @@ void CPictureThumbLoader::ProcessFoldersAndArchives(CFileItem *pItem)
             {
               ProcessFoldersAndArchives(item.get());
               pItem->SetArt("thumb", items[i]->GetArt("thumb"));
-              pItem->SetIconImage(items[i]->GetIconImage());
+              pItem->SetArt("icon", items[i]->GetArt("icon"));
               return;
             }
           }
@@ -225,6 +226,7 @@ void CPictureThumbLoader::ProcessFoldersAndArchives(CFileItem *pItem)
         // ok, now we've got the files to get the thumbs from, lets create it...
         // we basically load the 4 images and combine them
         std::vector<std::string> files;
+        files.reserve(4);
         for (int thumb = 0; thumb < 4; thumb++)
           files.push_back(items[thumb]->GetPath());
         std::string thumb = CTextureUtils::GetWrappedImageURL(pItem->GetPath(), "picturefolder");

@@ -229,17 +229,16 @@ void CGUIDialogMediaSource::OnMediaSourceChanged(const std::string& type, const 
 
 void CGUIDialogMediaSource::OnPathBrowse(int item)
 {
-  if (item < 0 || item > m_paths->Size()) return;
+  if (item < 0 || item >= m_paths->Size()) return;
   // Browse is called.  Open the filebrowser dialog.
   // Ignore current path is best at this stage??
-  std::string path;
+  std::string path = m_paths->Get(item)->GetPath();
   bool allowNetworkShares(m_type != "programs");
   VECSOURCES extraShares;
 
-  if (m_name != CUtil::GetTitleFromPath(m_paths->Get(item)->GetPath()))
+  if (m_name != CUtil::GetTitleFromPath(path))
     m_bNameChanged = true;
-
-  std::string strDevices = g_localizeStrings.Get(33040); //"% Devices"
+  path.clear();
 
   if (m_type == "music")
   {
@@ -417,12 +416,12 @@ void CGUIDialogMediaSource::OnPathBrowse(int item)
 
 void CGUIDialogMediaSource::OnPath(int item)
 {
-  if (item < 0 || item > m_paths->Size()) return;
-
-  if (m_name != CUtil::GetTitleFromPath(m_paths->Get(item)->GetPath()))
-    m_bNameChanged = true;
+  if (item < 0 || item >= m_paths->Size()) return;
 
   std::string path(m_paths->Get(item)->GetPath());
+  if (m_name != CUtil::GetTitleFromPath(path))
+    m_bNameChanged = true;
+
   CGUIKeyboardFactory::ShowAndGetInput(path, CVariant{ g_localizeStrings.Get(1021) }, false);
   m_paths->Get(item)->SetPath(path);
 
@@ -550,7 +549,7 @@ int CGUIDialogMediaSource::GetSelectedItem()
   CGUIMessage message(GUI_MSG_ITEM_SELECTED, GetID(), CONTROL_PATH);
   OnMessage(message);
   int value = message.GetParam1();
-  if (value < 0 || value > m_paths->Size()) return 0;
+  if (value < 0 || value >= m_paths->Size()) return 0;
   return value;
 }
 

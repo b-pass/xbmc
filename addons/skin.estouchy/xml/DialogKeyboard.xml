@@ -169,6 +169,12 @@
 						<ondown>131</ondown>
 						<include>KeyboardButton</include>
 					</control>
+					<control type="button" id="112">
+						<description>(0,12) key button</description>
+						<onup>306</onup>
+                                                <ondown>132</ondown>
+                                                <include>KeyboardButton</include>
+                                        </control>
 					<control type="group">
 						<posx>0</posx>
 						<posy>0</posy>
@@ -564,8 +570,8 @@
 						<font>font25</font>
 						<align>center</align>
 						<aligny>center</aligny>
-						<label>@#$!</label>
-						<altlabel>[COLOR=blue]@#$%[/COLOR]</altlabel>
+						<label>ãéö</label>
+						<altlabel>[COLOR=blue]abc[/COLOR]</altlabel>
 					</control>
 					<control type="group">
 						<posx>0</posx>

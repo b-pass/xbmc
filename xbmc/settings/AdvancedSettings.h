@@ -8,14 +8,15 @@
 
 #pragma once
 
+#include "pictures/PictureScalingAlgorithm.h"
+#include "settings/lib/ISettingCallback.h"
+#include "settings/lib/ISettingsHandler.h"
+#include "utils/SortUtils.h"
+
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "pictures/PictureScalingAlgorithm.h"
-#include "settings/lib/ISettingCallback.h"
-#include "settings/lib/ISettingsHandler.h"
 
 #define CACHE_BUFFER_MODE_INTERNET      0
 #define CACHE_BUFFER_MODE_ALL           1
@@ -27,6 +28,7 @@ class CAppParamParser;
 class CProfileManager;
 class CSettingsManager;
 class CVariant;
+struct IntegerSettingOption;
 
 class TiXmlElement;
 namespace ADDON
@@ -110,7 +112,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     void OnSettingsLoaded() override;
     void OnSettingsUnloaded() override;
 
-    void OnSettingChanged(std::shared_ptr<const CSetting> setting) override;
+    void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
 
     void Initialize(const CAppParamParser &params, CSettingsManager& settingsMgr);
     void Uninitialize(CSettingsManager& settingsMgr);
@@ -122,20 +124,13 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     static void GetCustomRegexps(TiXmlElement *pRootElement, std::vector<std::string> &settings);
     static void GetCustomExtensions(TiXmlElement *pRootElement, std::string& extensions);
 
-    bool CanLogComponent(int component) const;
-    static void SettingOptionsLoggingComponentsFiller(std::shared_ptr<const CSetting> setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data);
-
-    int m_audioHeadRoom;
-    float m_ac3Gain;
     std::string m_audioDefaultPlayer;
     float m_audioPlayCountMinimumPercent;
     bool m_VideoPlayerIgnoreDTSinWAV;
     float m_limiterHold;
     float m_limiterRelease;
 
-    bool  m_omxDecodeStartWithValidFrame;
-
-    bool  m_omlSync = false;
+    bool  m_omlSync = true;
 
     float m_videoSubsDelayRange;
     float m_videoAudioDelayRange;
@@ -149,7 +144,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_videoPercentSeekForwardBig;
     int m_videoPercentSeekBackwardBig;
     std::vector<int> m_seekSteps;
-    std::string m_videoPPFFmpegDeint;
     std::string m_videoPPFFmpegPostProc;
     bool m_videoVDPAUtelecine;
     bool m_videoVDPAUdeintSkipChromaHD;
@@ -165,10 +159,8 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_videoIgnoreSecondsAtStart;
     float m_videoIgnorePercentAtEnd;
     float m_audioApplyDrc;
-    bool m_useFfmpegVda;
 
     int   m_videoVDPAUScaling;
-    bool  m_videoVAAPIforced;
     float m_videoNonLinStretchRatio;
     bool  m_videoEnableHighQualityHwScalers;
     float m_videoAutoScaleMaxFps;
@@ -178,10 +170,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int  m_videoCaptureUseOcclusionQuery;
     bool m_DXVACheckCompatibility;
     bool m_DXVACheckCompatibilityPresent;
-    bool m_DXVAForceProcessorRenderer;
-    bool m_DXVAAllowHqScaling;
     int  m_videoFpsDetect;
-    bool m_mediacodecForceSoftwareRendering;
     float m_maxTempo;
     bool m_videoPreferStereoStream = false;
 
@@ -195,8 +184,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_songInfoDuration;
     int m_logLevel;
     int m_logLevelHint;
-    bool m_extraLogEnabled;
-    int m_extraLogLevels;
     std::string m_cddbAddress;
     bool m_addSourceOnTop; //!< True to put 'add source' buttons on top
 
@@ -225,7 +212,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     typedef std::vector< std::pair<std::string, std::string> > StringMapping;
     StringMapping m_pathSubstitutions;
     int m_remoteDelay; ///< \brief number of remote messages to ignore before repeating
-    float m_controllerDeadzone;
     bool m_bScanIRServer;
 
     bool m_playlistAsFolders;
@@ -242,9 +228,9 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_bHTTPDirectoryStatFilesize;
 
     bool m_bFTPThumbs;
+    bool m_bShoutcastArt;
 
     std::string m_musicThumbs;
-    std::string m_fanartImages;
     std::vector<std::string> m_musicArtistExtraArt;
     std::vector<std::string> m_musicAlbumExtraArt;
 
@@ -253,6 +239,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_bMusicLibraryAllItemsOnBottom;
     bool m_bMusicLibraryCleanOnUpdate;
     bool m_bMusicLibraryArtistSortOnUpdate;
+    bool m_bMusicLibraryUseISODates;
     std::string m_strMusicLibraryAlbumFormat;
     bool m_prioritiseAPEv2tags;
     std::string m_musicItemSeparator;
@@ -264,7 +251,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_iVideoLibraryRecentlyAddedItems;
     bool m_bVideoLibraryCleanOnUpdate;
     bool m_bVideoLibraryUseFastHash;
-    bool m_bVideoLibraryExportAutoThumbs;
     bool m_bVideoLibraryImportWatchedState;
     bool m_bVideoLibraryImportResumePoint;
     std::vector<std::string> m_videoEpisodeExtraArt;
@@ -300,6 +286,9 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_curllowspeedtime;
     int m_curlretries;
     bool m_curlDisableIPV6;
+    bool m_curlDisableHTTP2;
+
+    std::string m_caTrustFile;
 
     bool m_fullScreen;
     bool m_startFullScreen;
@@ -312,20 +301,17 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_GLRectangleHack;
     int m_iSkipLoopFilter;
 
-    unsigned int m_RestrictCapsMask;
-    float m_sleepBeforeFlip; ///< if greater than zero, XBMC waits for raster to be this amount through the frame prior to calling the flip
+    /*!< @brief Decision flag to show or hide specific dependencies in the list of the AddonInfo dialog
+    as this information usually adds no value for a consumer.
+    True to recursively show any dependency of the selected add-on
+    False to hide 'low-level' dependencies like e.g. scripts/modules (default) */
+    bool m_showAllDependencies;
+
     bool m_bVirtualShares;
-    bool m_bAllowDeferredRendering;
     bool m_bTry10bitOutput;
 
     std::string m_cpuTempCmd;
     std::string m_gpuTempCmd;
-
-    // Touchscreen
-    int m_screenAlign_xOffset;
-    int m_screenAlign_yOffset;
-    float m_screenAlign_xStretchFactor;
-    float m_screenAlign_yStretchFactor;
 
     /* PVR/TV related advanced settings */
     int m_iPVRTimeCorrection;     /*!< @brief correct all times (epg tags, timer tags, recording tags) by this amount of minutes. defaults to 0. */
@@ -335,11 +321,14 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_iPVRNumericChannelSwitchTimeout; /*!< @brief time in msecs after that a channel switch occurs after entering a channel number, if confirmchannelswitch is disabled */
     int m_iPVRTimeshiftThreshold; /*!< @brief time diff between current playing time and timeshift buffer end, in seconds, before a playing stream is displayed as timeshifting. */
     bool m_bPVRTimeshiftSimpleOSD; /*!< @brief use simple timeshift OSD (with progress only for the playing event instead of progress for the whole ts buffer). */
+    SortDescription m_PVRDefaultSortOrder; /*!< @brief SortDecription used to store default recording sort type and sort order */
+
     DatabaseSettings m_databaseMusic; // advanced music database setup
     DatabaseSettings m_databaseVideo; // advanced video database setup
     DatabaseSettings m_databaseTV;    // advanced tv database setup
     DatabaseSettings m_databaseEpg;   /*!< advanced EPG database setup */
-    DatabaseSettings m_databaseSavestates; /*!< advanced savestate database setup */
+
+    bool m_useLocaleCollation;
 
     bool m_guiVisualizeDirtyRegions;
     int  m_guiAlgorithmDirtyRegions;
@@ -348,6 +337,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
 
     unsigned int m_cacheMemSize;
     unsigned int m_cacheBufferMode;
+    unsigned int m_cacheChunkSize;
     float m_cacheReadFactor;
 
     bool m_jsonOutputCompact;
@@ -376,9 +366,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     std::string m_stereoscopicregex_sbs;
     std::string m_stereoscopicregex_tab;
 
-    bool m_useDisplayControlHWStereo;
-    bool m_allowUseSeparateDeviceForDecoding;
-
     /*!< @brief position behavior of ass subtitles when setting "subtitle position on screen" set to "fixed"
     True to show at the fixed position set in video calibration
     False to show at the bottom of video (default) */
@@ -387,10 +374,11 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_openGlDebugging;
 
     std::string m_userAgent;
+    uint32_t m_nfsTimeout;
 
   private:
-    void SetExtraLogLevel(const std::vector<CVariant> &components);
     void Initialize();
     void Clear();
     void SetExtraArtwork(const TiXmlElement* arttypes, std::vector<std::string>& artworkMap);
+    void MigrateOldArtSettings();
 };

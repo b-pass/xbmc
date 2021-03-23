@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include <map>
-
-#include "settings/dialogs/GUIDialogSettingsManualBase.h"
 #include "settings/LibExportSettings.h"
+#include "settings/dialogs/GUIDialogSettingsManualBase.h"
+
+#include <map>
 
 class CGUIDialogLibExportSettings : public CGUIDialogSettingsManualBase
 {
@@ -27,13 +27,13 @@ protected:
   void OnInitWindow() override;
 
   // implementations of ISettingCallback
-  void OnSettingChanged(std::shared_ptr<const CSetting> setting) override;
-  void OnSettingAction(std::shared_ptr<const CSetting> setting) override;
+  void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
+  void OnSettingAction(const std::shared_ptr<const CSetting>& setting) override;
 
   // specialization of CGUIDialogSettingsBase
   bool OnMessage(CGUIMessage& message) override;
   bool AllowResettingSettings() const override { return false; }
-  void Save() override;
+  bool Save() override;
   void SetupView() override;
 
   // specialization of CGUIDialogSettingsManualBase
@@ -44,12 +44,17 @@ protected:
 
 private:
   void SetLabel2(const std::string &settingid, const std::string &label);
+  void SetLabel(const std::string &settingid, const std::string &label);
   void ToggleState(const std::string &settingid, bool enabled);
 
   using CGUIDialogSettingsManualBase::SetFocus;
   void SetFocus(const std::string &settingid);
-  static int GetExportItemsFromSetting(SettingConstPtr setting);
+  static int GetExportItemsFromSetting(const SettingConstPtr& setting);
+  void UpdateToggles();
+  void UpdateDescription();
 
   CLibExportSettings m_settings;
   bool m_destinationChecked = false;
+  std::shared_ptr<CSettingBool> m_settingNFO;
+  std::shared_ptr<CSettingBool> m_settingArt;
 };

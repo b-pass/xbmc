@@ -8,11 +8,11 @@
 
 #pragma once
 
-#include <vector>
-
+#include "MediaSource.h"
 #include "utils/LabelFormatter.h"
 #include "utils/SortUtils.h"
-#include "MediaSource.h"
+
+#include <vector>
 
 class CViewState; // forward
 class CFileItemList;
@@ -73,7 +73,7 @@ protected:
    \param items the list of items for the view state.
    \param label_mask the label masks for formatting items.
    */
-  void AddPlaylistOrder(const CFileItemList &items, LABEL_MASKS label_masks);
+  void AddPlaylistOrder(const CFileItemList& items, const LABEL_MASKS& label_masks);
 
   void AddSortMethod(SortBy sortBy, int buttonLabel, const LABEL_MASKS &labelMasks, SortAttribute sortAttributes = SortAttributeNone, SortOrder sortOrder = SortOrderNone);
   void AddSortMethod(SortBy sortBy, SortAttribute sortAttributes, int buttonLabel, const LABEL_MASKS &labelMasks, SortOrder sortOrder = SortOrderNone);

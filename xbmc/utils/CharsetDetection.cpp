@@ -6,13 +6,15 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <algorithm>
 #include "CharsetDetection.h"
+
+#include "LangInfo.h"
 #include "utils/CharsetConverter.h"
 #include "utils/StringUtils.h"
 #include "utils/Utf8Utils.h"
-#include "LangInfo.h"
 #include "utils/log.h"
+
+#include <algorithm>
 
 /* XML declaration can be virtually any size (with many-many whitespaces)
  * but for in real world we don't need to process megabytes of data
@@ -582,7 +584,8 @@ size_t CCharsetDetection::GetHtmlAttribute(const std::string& htmlContent, size_
   return std::string::npos; // rest of htmlContent was attribute value
 }
 
-std::string CCharsetDetection::ExtractEncodingFromHtmlMeta(std::string metaContent, size_t pos /*= 0*/)
+std::string CCharsetDetection::ExtractEncodingFromHtmlMeta(const std::string& metaContent,
+                                                           size_t pos /*= 0*/)
 {
   size_t len = metaContent.length();
   if (pos >= len)

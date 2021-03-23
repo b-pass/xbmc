@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "profiles/Profile.h"
 #include "settings/dialogs/GUIDialogSettingsManualBase.h"
+
+#include <string>
 
 class CGUIDialogProfileSettings : public CGUIDialogSettingsManualBase
 {
@@ -26,12 +26,12 @@ protected:
   void OnWindowLoaded() override;
 
   // implementations of ISettingCallback
-  void OnSettingChanged(std::shared_ptr<const CSetting> setting) override;
-  void OnSettingAction(std::shared_ptr<const CSetting> setting) override;
+  void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
+  void OnSettingAction(const std::shared_ptr<const CSetting>& setting) override;
 
   // specialization of CGUIDialogSettingsBase
   bool AllowResettingSettings() const override { return false; }
-  void Save() override { }
+  bool Save() override { return true; }
   void OnCancel() override;
   void SetupView() override;
 

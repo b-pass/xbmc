@@ -8,13 +8,15 @@
 
 #pragma once
 
+#include "cores/AudioEngine/AESinkFactory.h"
+#include "cores/AudioEngine/Engines/ActiveAE/ActiveAEBuffer.h"
+#include "cores/AudioEngine/Interfaces/AE.h"
+#include "cores/AudioEngine/Interfaces/AESink.h"
 #include "threads/Event.h"
 #include "threads/Thread.h"
 #include "utils/ActorProtocol.h"
-#include "cores/AudioEngine/Interfaces/AE.h"
-#include "cores/AudioEngine/Interfaces/AESink.h"
-#include "cores/AudioEngine/AESinkFactory.h"
-#include "cores/AudioEngine/Engines/ActiveAE/ActiveAEBuffer.h"
+
+#include <utility>
 
 class CAEBitstreamPacker;
 
@@ -42,7 +44,8 @@ struct SinkReply
 class CSinkControlProtocol : public Protocol
 {
 public:
-  CSinkControlProtocol(std::string name, CEvent* inEvent, CEvent *outEvent) : Protocol(name, inEvent, outEvent) {};
+  CSinkControlProtocol(std::string name, CEvent* inEvent, CEvent* outEvent)
+    : Protocol(std::move(name), inEvent, outEvent){};
   enum OutSignal
   {
     CONFIGURE,
@@ -66,7 +69,8 @@ public:
 class CSinkDataProtocol : public Protocol
 {
 public:
-  CSinkDataProtocol(std::string name, CEvent* inEvent, CEvent *outEvent) : Protocol(name, inEvent, outEvent) {};
+  CSinkDataProtocol(std::string name, CEvent* inEvent, CEvent* outEvent)
+    : Protocol(std::move(name), inEvent, outEvent){};
   enum OutSignal
   {
     SAMPLE = 0,
@@ -83,20 +87,21 @@ class CActiveAESink : private CThread
 {
 public:
   explicit CActiveAESink(CEvent *inMsgEvent);
-  void EnumerateSinkList(bool force);
+  void EnumerateSinkList(bool force, std::string driver);
   void EnumerateOutputDevices(AEDeviceList &devices, bool passthrough);
   void Start();
   void Dispose();
   AEDeviceType GetDeviceType(const std::string &device);
   bool HasPassthroughDevice();
   bool SupportsFormat(const std::string &device, AEAudioFormat &format);
+  bool DeviceExist(std::string driver, const std::string& device);
   CSinkControlProtocol m_controlPort;
   CSinkDataProtocol m_dataPort;
 
 protected:
   void Process() override;
   void StateMachine(int signal, Protocol *port, Message *msg);
-  void PrintSinks();
+  void PrintSinks(std::string& driver);
   void GetDeviceFriendlyName(std::string &device);
   void OpenSink();
   void ReturnBuffers();

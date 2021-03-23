@@ -15,8 +15,8 @@
 //////////////////////////////////////////////////////////////////////
 
 
-#include "filesystem/IFile.h"
 #include "URL.h"
+#include "filesystem/IFile.h"
 #include "threads/CriticalSection.h"
 
 #define NT_STATUS_CONNECTION_REFUSED long(0xC0000000 | 0x0236)
@@ -35,6 +35,8 @@ public:
   ~CSMB();
   void Init();
   void Deinit();
+  /* Makes sense to be called after acquiring the lock */
+  bool IsSmbValid() const { return m_context != nullptr; };
   void CheckIfIdle();
   void SetActivityTime();
   void AddActiveConnection();
@@ -43,13 +45,13 @@ public:
   std::string URLEncode(const CURL &url);
 
   DWORD ConvertUnixToNT(int error);
+  static CURL GetResolvedUrl(const CURL& url);
+
 private:
   SMBCCTX *m_context;
-#ifdef TARGET_POSIX
   int m_OpenConnections;
   unsigned int m_IdleTimeout;
   static bool IsFirstInit;
-#endif
 };
 
 extern CSMB smb;

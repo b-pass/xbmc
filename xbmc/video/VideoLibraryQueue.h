@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include <map>
-#include <set>
-
 #include "FileItem.h"
 #include "threads/CriticalSection.h"
 #include "utils/JobManager.h"
+
+#include <map>
+#include <set>
 
 class CGUIDialogProgressBarHandle;
 class CVideoLibraryJob;
@@ -105,7 +105,7 @@ public:
 
    \param[in] item Item to reset the resume point for
    */
-  void ResetResumePoint(const CFileItemPtr item);
+  void ResetResumePoint(const CFileItemPtr& item);
 
   /*!
    \brief Adds the given job to the queue.

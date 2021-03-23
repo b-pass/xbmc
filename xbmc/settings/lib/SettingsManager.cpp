@@ -8,15 +8,18 @@
 
 #include "SettingsManager.h"
 
-#include <algorithm>
-#include <utility>
-
+#include "ServiceBroker.h"
+#include "Setting.h"
 #include "SettingDefinitions.h"
 #include "SettingSection.h"
-#include "Setting.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/XBMCTinyXML.h"
+#include "utils/log.h"
+
+#include <algorithm>
+#include <map>
+#include <unordered_set>
+#include <utility>
 
 const uint32_t CSettingsManager::Version = 2;
 const uint32_t CSettingsManager::MinimumSupportedVersion = 0;
@@ -48,12 +51,15 @@ bool ParseSettingIdentifier(const std::string& settingId, std::string& categoryT
   return true;
 }
 
+CSettingsManager::CSettingsManager() : CStaticLoggerBase("CSettingsManager")
+{
+}
+
 CSettingsManager::~CSettingsManager()
 {
   // first clear all registered settings handler and subsettings
   // implementations because we can't be sure that they are still valid
   m_settingsHandlers.clear();
-  m_subSettings.clear();
   m_settingCreators.clear();
   m_settingControlCreators.clear();
 
@@ -78,23 +84,26 @@ bool CSettingsManager::Initialize(const TiXmlElement *root)
 
   if (!StringUtils::EqualsNoCase(root->ValueStr(), SETTING_XML_ROOT))
   {
-    CLog::Log(LOGERROR, "CSettingsManager: error reading settings definition: doesn't contain <settings> tag");
+    s_logger->error("error reading settings definition: doesn't contain <" SETTING_XML_ROOT
+                    "> tag");
     return false;
   }
 
   // try to get and check the version
   uint32_t version = ParseVersion(root);
   if (version == 0)
-    CLog::Log(LOGWARNING, "CSettingsManager: missing %s attribute", SETTING_XML_ROOT_VERSION);
+    s_logger->warn("missing " SETTING_XML_ROOT_VERSION " attribute", SETTING_XML_ROOT_VERSION);
 
   if (MinimumSupportedVersion >= version+1)
   {
-    CLog::Log(LOGERROR, "CSettingsManager: unable to read setting definitions from version %u (minimum version: %u)", version, MinimumSupportedVersion);
+    s_logger->error("unable to read setting definitions from version {} (minimum version: {})",
+                    version, MinimumSupportedVersion);
     return false;
   }
   if (version > Version)
   {
-    CLog::Log(LOGERROR, "CSettingsManager: unable to read setting definitions from version %u (current version: %u)", version, Version);
+    s_logger->error("unable to read setting definitions from version {} (current version: {})",
+                    version, Version);
     return false;
   }
 
@@ -116,7 +125,7 @@ bool CSettingsManager::Initialize(const TiXmlElement *root)
         AddSection(section);
       else
       {
-        CLog::Log(LOGWARNING, "CSettingsManager: unable to read section \"%s\"", sectionId.c_str());
+        s_logger->warn("unable to read section \"{}\"", sectionId);
       }
     }
 
@@ -139,64 +148,45 @@ bool CSettingsManager::Load(const TiXmlElement *root, bool &updated, bool trigge
   // try to get and check the version
   uint32_t version = ParseVersion(root);
   if (version == 0)
-    CLog::Log(LOGWARNING, "CSettingsManager: missing %s attribute", SETTING_XML_ROOT_VERSION);
+    s_logger->warn("missing {} attribute", SETTING_XML_ROOT_VERSION);
 
   if (MinimumSupportedVersion >= version+1)
   {
-    CLog::Log(LOGERROR, "CSettingsManager: unable to read setting values from version %u (minimum version: %u)", version, MinimumSupportedVersion);
+    s_logger->error("unable to read setting values from version {} (minimum version: {})", version,
+                    MinimumSupportedVersion);
     return false;
   }
   if (version > Version)
   {
-    CLog::Log(LOGERROR, "CSettingsManager: unable to read setting values from version %u (current version: %u)", version, Version);
+    s_logger->error("unable to read setting values from version {} (current version: {})", version,
+                    Version);
     return false;
   }
 
   if (!Deserialize(root, updated, loadedSettings))
     return false;
 
-  bool ret = true;
-  // load any ISubSettings implementations
-  if (triggerEvents)
-    ret = Load(root);
-
   if (triggerEvents)
     OnSettingsLoaded();
 
-  return ret;
+  return true;
 }
 
-bool CSettingsManager::Save(TiXmlNode *root) const
+bool CSettingsManager::Save(
+  const ISettingsValueSerializer* serializer, std::string& serializedValues) const
 {
+  if (serializer == nullptr)
+    return false;
+
   CSharedLock lock(m_critical);
   CSharedLock settingsLock(m_settingsCritical);
-  if (!m_initialized || root == nullptr)
+  if (!m_initialized)
     return false;
 
   if (!OnSettingsSaving())
     return false;
 
-  // save the current version
-  auto rootElement = root->ToElement();
-  if (rootElement == nullptr)
-  {
-    CLog::Log(LOGERROR, "CSettingsManager: failed to save settings");
-    return false;
-  }
-  rootElement->SetAttribute(SETTING_XML_ROOT_VERSION, Version);
-
-  if (!Serialize(root))
-  {
-    CLog::Log(LOGERROR, "CSettingsManager: failed to save settings");
-    return false;
-  }
-
-  // save any ISubSettings implementations
-  for (const auto& subSetting : m_subSettings)
-  {
-    if (!subSetting->Save(root))
-      return false;
-  }
+  serializedValues = serializer->SerializeValues(this);
 
   OnSettingsSaved();
 
@@ -228,9 +218,6 @@ void CSettingsManager::Clear()
   m_sections.clear();
 
   OnSettingsCleared();
-
-  for (auto& subSetting : m_subSettings)
-    subSetting->Clear();
 
   m_initialized = false;
 }
@@ -275,7 +262,7 @@ void CSettingsManager::SetInitialized()
     ResolveSettingDependencies(setting.second);
 }
 
-void CSettingsManager::AddSection(SettingSectionPtr section)
+void CSettingsManager::AddSection(const SettingSectionPtr& section)
 {
   if (section == nullptr)
     return;
@@ -317,8 +304,10 @@ void CSettingsManager::AddSection(SettingSectionPtr section)
   }
 }
 
-bool CSettingsManager::AddSetting(std::shared_ptr<CSetting> setting, std::shared_ptr<CSettingSection> section,
-  std::shared_ptr<CSettingCategory> category, std::shared_ptr<CSettingGroup> group)
+bool CSettingsManager::AddSetting(const std::shared_ptr<CSetting>& setting,
+                                  const std::shared_ptr<CSettingSection>& section,
+                                  const std::shared_ptr<CSettingCategory>& category,
+                                  const std::shared_ptr<CSettingGroup>& group)
 {
   if (setting == nullptr || section == nullptr || category == nullptr || group == nullptr)
     return false;
@@ -423,14 +412,19 @@ void CSettingsManager::RegisterSettingControl(const std::string &controlType, IS
     m_settingControlCreators.insert(std::make_pair(controlType, settingControlCreator));
 }
 
-void CSettingsManager::RegisterSettingsHandler(ISettingsHandler *settingsHandler)
+void CSettingsManager::RegisterSettingsHandler(ISettingsHandler *settingsHandler, bool bFront /* = false */)
 {
   if (settingsHandler == nullptr)
     return;
 
   CExclusiveLock lock(m_critical);
   if (find(m_settingsHandlers.begin(), m_settingsHandlers.end(), settingsHandler) == m_settingsHandlers.end())
-    m_settingsHandlers.push_back(settingsHandler);
+  {
+    if (bFront)
+      m_settingsHandlers.insert(m_settingsHandlers.begin(), settingsHandler);
+    else
+      m_settingsHandlers.emplace_back(settingsHandler);
+  }
 }
 
 void CSettingsManager::UnregisterSettingsHandler(ISettingsHandler *settingsHandler)
@@ -442,24 +436,6 @@ void CSettingsManager::UnregisterSettingsHandler(ISettingsHandler *settingsHandl
   auto it = std::find(m_settingsHandlers.begin(), m_settingsHandlers.end(), settingsHandler);
   if (it != m_settingsHandlers.end())
     m_settingsHandlers.erase(it);
-}
-
-void CSettingsManager::RegisterSubSettings(ISubSettings *subSettings)
-{
-  CExclusiveLock lock(m_critical);
-  if (subSettings == nullptr)
-    return;
-
-  m_subSettings.insert(subSettings);
-}
-
-void CSettingsManager::UnregisterSubSettings(ISubSettings *subSettings)
-{
-  CExclusiveLock lock(m_critical);
-  if (subSettings == nullptr)
-    return;
-
-  m_subSettings.erase(subSettings);
 }
 
 void CSettingsManager::RegisterSettingOptionsFiller(const std::string &identifier, IntegerSettingOptionsFiller optionsFiller)
@@ -484,7 +460,7 @@ void CSettingsManager::UnregisterSettingOptionsFiller(const std::string &identif
   m_optionsFillers.erase(identifier);
 }
 
-void* CSettingsManager::GetSettingOptionsFiller(SettingConstPtr setting)
+void* CSettingsManager::GetSettingOptionsFiller(const SettingConstPtr& setting)
 {
   CSharedLock lock(m_critical);
   if (setting == nullptr)
@@ -534,6 +510,11 @@ void* CSettingsManager::GetSettingOptionsFiller(SettingConstPtr setting)
   return fillerIt->second.filler;
 }
 
+bool CSettingsManager::HasSettings() const
+{
+  return !m_settings.empty();
+}
+
 SettingPtr CSettingsManager::GetSetting(const std::string &id) const
 {
   CSharedLock lock(m_settingsCritical);
@@ -542,9 +523,13 @@ SettingPtr CSettingsManager::GetSetting(const std::string &id) const
 
   auto setting = FindSetting(id);
   if (setting != m_settings.end())
+  {
+    if (setting->second.setting->IsReference())
+      return GetSetting(setting->second.setting->GetReferencedId());
     return setting->second.setting;
+  }
 
-  CLog::Log(LOGDEBUG, "CSettingsManager: requested setting (%s) was not found.", id.c_str());
+  s_logger->debug("requested setting ({}) was not found.", id);
   return nullptr;
 }
 
@@ -570,7 +555,7 @@ SettingSectionPtr CSettingsManager::GetSection(std::string section) const
   if (sectionIt != m_sections.end())
     return sectionIt->second;
 
-  CLog::Log(LOGDEBUG, "CSettingsManager: requested setting section (%s) was not found.", section.c_str());
+  s_logger->debug("requested setting section ({}) was not found.", section);
   return nullptr;
 }
 
@@ -584,7 +569,7 @@ SettingDependencyMap CSettingsManager::GetDependencies(const std::string &id) co
   return setting->second.dependencies;
 }
 
-SettingDependencyMap CSettingsManager::GetDependencies(SettingConstPtr setting) const
+SettingDependencyMap CSettingsManager::GetDependencies(const SettingConstPtr& setting) const
 {
   if (setting == nullptr)
     return SettingDependencyMap();
@@ -702,14 +687,6 @@ bool CSettingsManager::SetList(const std::string &id, const std::vector< std::sh
   return std::static_pointer_cast<CSettingList>(setting)->SetValue(value);
 }
 
-bool CSettingsManager::FindIntInList(const std::string &id, int value) const
-{
-  CSharedLock lock(m_settingsCritical);
-  std::shared_ptr<CSettingList> setting(std::dynamic_pointer_cast<CSettingList>(GetSetting(id)));
-
-  return setting && setting->FindIntInList(value);
-}
-
 bool CSettingsManager::SetDefault(const std::string &id)
 {
   CSharedLock lock(m_settingsCritical);
@@ -764,7 +741,8 @@ bool CSettingsManager::Serialize(TiXmlNode *parent) const
 
   for (const auto& setting : m_settings)
   {
-    if (setting.second.setting->GetType() == SettingType::Action)
+    if (setting.second.setting->IsReference() ||
+        setting.second.setting->GetType() == SettingType::Action)
       continue;
 
     TiXmlElement settingElement(SETTING_XML_ELM_SETTING);
@@ -780,7 +758,8 @@ bool CSettingsManager::Serialize(TiXmlNode *parent) const
 
     if (parent->InsertEndChild(settingElement) == nullptr)
     {
-      CLog::Log(LOGWARNING, "CSetting: unable to write <" SETTING_XML_ELM_SETTING " id=\"%s\"> tag", setting.second.setting->GetId().c_str());
+      s_logger->warn("unable to write <" SETTING_XML_ELM_SETTING " id=\"{}\"> tag",
+                     setting.second.setting->GetId());
       continue;
     }
   }
@@ -813,7 +792,7 @@ bool CSettingsManager::Deserialize(const TiXmlNode *node, bool &updated, std::ma
   return true;
 }
 
-bool CSettingsManager::OnSettingChanging(std::shared_ptr<const CSetting> setting)
+bool CSettingsManager::OnSettingChanging(const std::shared_ptr<const CSetting>& setting)
 {
   if (setting == nullptr)
     return false;
@@ -836,10 +815,42 @@ bool CSettingsManager::OnSettingChanging(std::shared_ptr<const CSetting> setting
       return false;
   }
 
+  // if this is a reference setting apply the same change to the referenced setting
+  if (setting->IsReference())
+  {
+    CSharedLock lock(m_settingsCritical);
+    auto referencedSettingIt = FindSetting(setting->GetReferencedId());
+    if (referencedSettingIt != m_settings.end())
+    {
+      Setting referencedSettingData = referencedSettingIt->second;
+      // now that we have a copy of the setting's data, we can leave the lock
+      lock.Leave();
+
+      referencedSettingData.setting->FromString(setting->ToString());
+    }
+  }
+  else if (!settingData.references.empty())
+  {
+    // if the changed setting is referenced by other settings apply the same change to the referencing settings
+    std::unordered_set<SettingPtr> referenceSettings;
+    CSharedLock lock(m_settingsCritical);
+    for (const auto& reference : settingData.references)
+    {
+      auto referenceSettingIt = FindSetting(reference);
+      if (referenceSettingIt != m_settings.end())
+        referenceSettings.insert(referenceSettingIt->second.setting);
+    }
+    // now that we have a copy of the setting's data, we can leave the lock
+    lock.Leave();
+
+    for (auto& referenceSetting : referenceSettings)
+      referenceSetting->FromString(setting->ToString());
+  }
+
   return true;
 }
 
-void CSettingsManager::OnSettingChanged(std::shared_ptr<const CSetting> setting)
+void CSettingsManager::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
   CSharedLock lock(m_settingsCritical);
   if (!m_loaded || setting == nullptr)
@@ -865,7 +876,7 @@ void CSettingsManager::OnSettingChanged(std::shared_ptr<const CSetting> setting)
   }
 }
 
-void CSettingsManager::OnSettingAction(std::shared_ptr<const CSetting> setting)
+void CSettingsManager::OnSettingAction(const std::shared_ptr<const CSetting>& setting)
 {
   CSharedLock lock(m_settingsCritical);
   if (!m_loaded || setting == nullptr)
@@ -883,7 +894,9 @@ void CSettingsManager::OnSettingAction(std::shared_ptr<const CSetting> setting)
     callback->OnSettingAction(setting);
 }
 
-bool CSettingsManager::OnSettingUpdate(SettingPtr setting, const char *oldSettingId, const TiXmlNode *oldSettingNode)
+bool CSettingsManager::OnSettingUpdate(const SettingPtr& setting,
+                                       const char* oldSettingId,
+                                       const TiXmlNode* oldSettingNode)
 {
   CSharedLock lock(m_settingsCritical);
   if (setting == nullptr)
@@ -904,7 +917,8 @@ bool CSettingsManager::OnSettingUpdate(SettingPtr setting, const char *oldSettin
   return ret;
 }
 
-void CSettingsManager::OnSettingPropertyChanged(std::shared_ptr<const CSetting> setting, const char *propertyName)
+void CSettingsManager::OnSettingPropertyChanged(const std::shared_ptr<const CSetting>& setting,
+                                                const char* propertyName)
 {
   CSharedLock lock(m_settingsCritical);
   if (!m_loaded || setting == nullptr)
@@ -948,8 +962,6 @@ SettingPtr CSettingsManager::CreateSetting(const std::string &settingType, const
     return std::make_shared<CSettingString>(settingId, const_cast<CSettingsManager*>(this));
   else if (StringUtils::EqualsNoCase(settingType, "action"))
     return std::make_shared<CSettingAction>(settingId, const_cast<CSettingsManager*>(this));
-  else if (StringUtils::EqualsNoCase(settingType, "reference"))
-    return std::make_shared<CSettingReference>(settingId, const_cast<CSettingsManager*>(this));
   else if (settingType.size() > 6 &&
            StringUtils::StartsWith(settingType, "list[") &&
            StringUtils::EndsWith(settingType, "]"))
@@ -1033,17 +1045,7 @@ void CSettingsManager::OnSettingsCleared()
     settingsHandler->OnSettingsCleared();
 }
 
-bool CSettingsManager::Load(const TiXmlNode *settings)
-{
-  bool ok = true;
-  CSharedLock lock(m_critical);
-  for (const auto& subSetting : m_subSettings)
-    ok &= subSetting->Load(settings);
-
-  return ok;
-}
-
-bool CSettingsManager::LoadSetting(const TiXmlNode *node, SettingPtr setting, bool &updated)
+bool CSettingsManager::LoadSetting(const TiXmlNode* node, const SettingPtr& setting, bool& updated)
 {
   updated = false;
 
@@ -1054,6 +1056,8 @@ bool CSettingsManager::LoadSetting(const TiXmlNode *node, SettingPtr setting, bo
     return false;
 
   auto settingId = setting->GetId();
+  if (setting->IsReference())
+    settingId = setting->GetReferencedId();
 
   const TiXmlElement* settingElement = nullptr;
   // try to split the setting identifier into category and subsetting identifer (v1-)
@@ -1091,7 +1095,7 @@ bool CSettingsManager::LoadSetting(const TiXmlNode *node, SettingPtr setting, bo
 
   if (!setting->FromString(settingElement->FirstChild() != nullptr ? settingElement->FirstChild()->ValueStr() : StringUtils::Empty))
   {
-    CLog::Log(LOGWARNING, "CSettingsManager: unable to read value of setting \"%s\"", settingId.c_str());
+    s_logger->warn("unable to read value of setting \"{}\"", settingId);
     return false;
   }
 
@@ -1108,7 +1112,9 @@ bool CSettingsManager::LoadSetting(const TiXmlNode *node, SettingPtr setting, bo
   return true;
 }
 
-bool CSettingsManager::UpdateSetting(const TiXmlNode *node, SettingPtr setting, const CSettingUpdate& update)
+bool CSettingsManager::UpdateSetting(const TiXmlNode* node,
+                                     const SettingPtr& setting,
+                                     const CSettingUpdate& update)
 {
   if (node == nullptr || setting == nullptr || update.GetType() == SettingUpdateType::Unknown)
     return false;
@@ -1141,7 +1147,8 @@ bool CSettingsManager::UpdateSetting(const TiXmlNode *node, SettingPtr setting, 
     if (setting->FromString(oldSettingNode->FirstChild() != nullptr ? oldSettingNode->FirstChild()->ValueStr() : StringUtils::Empty))
       updated = true;
     else
-      CLog::Log(LOGWARNING, "CSetting: unable to update \"%s\" through automatically renaming from \"%s\"", setting->GetId().c_str(), oldSetting);
+      s_logger->warn("unable to update \"{}\" through automatically renaming from \"{}\"",
+                     setting->GetId(), oldSetting);
   }
 
   updated |= OnSettingUpdate(setting, oldSetting, oldSettingNode);
@@ -1155,7 +1162,10 @@ void CSettingsManager::UpdateSettingByDependency(const std::string &settingId, c
 
 void CSettingsManager::UpdateSettingByDependency(const std::string &settingId, SettingDependencyType dependencyType)
 {
-  SettingPtr setting = GetSetting(settingId);
+  auto settingIt = FindSetting(settingId);
+  if (settingIt == m_settings.end())
+    return;
+  SettingPtr setting = settingIt->second.setting;
   if (setting == nullptr)
     return;
 
@@ -1199,7 +1209,7 @@ void CSettingsManager::UpdateSettingByDependency(const std::string &settingId, S
   }
 }
 
-void CSettingsManager::AddSetting(std::shared_ptr<CSetting> setting)
+void CSettingsManager::AddSetting(const std::shared_ptr<CSetting>& setting)
 {
   setting->CheckRequirements();
 
@@ -1218,9 +1228,16 @@ void CSettingsManager::AddSetting(std::shared_ptr<CSetting> setting)
   }
 }
 
-void CSettingsManager::ResolveReferenceSettings(std::shared_ptr<CSettingSection> section)
+void CSettingsManager::ResolveReferenceSettings(const std::shared_ptr<CSettingSection>& section)
 {
-  // resolve any reference settings
+  struct GroupedReferenceSettings
+  {
+    SettingPtr referencedSetting;
+    std::unordered_set<SettingPtr> referenceSettings;
+  };
+  std::map<std::string, GroupedReferenceSettings> groupedReferenceSettings;
+
+  // collect and group all reference(d) settings
   auto categories = section->GetCategories();
   for (const auto& category : categories)
   {
@@ -1228,29 +1245,83 @@ void CSettingsManager::ResolveReferenceSettings(std::shared_ptr<CSettingSection>
     for (auto& group : groups)
     {
       auto settings = group->GetSettings();
-      SettingList referenceSettings;
       for (const auto& setting : settings)
       {
-        if (setting->GetType() == SettingType::Reference)
-          referenceSettings.push_back(setting);
-      }
-
-      for (const auto& referenceSetting : referenceSettings)
-      {
-        auto referencedSettingId = std::static_pointer_cast<const CSettingReference>(referenceSetting)->GetReferencedId();
-        SettingPtr referencedSetting = nullptr;
-        auto itReferencedSetting = FindSetting(referencedSettingId);
-        if (itReferencedSetting == m_settings.end())
-          CLog::Log(LOGWARNING, "CSettingsManager: missing referenced setting \"%s\"", referencedSettingId.c_str());
-        else
+        if (setting->IsReference())
         {
-          referencedSetting = itReferencedSetting->second.setting;
-          itReferencedSetting = FindSetting(referenceSetting->GetId());
-          if (itReferencedSetting != m_settings.end())
-            m_settings.erase(itReferencedSetting);
-        }
+          auto referencedSettingId = setting->GetReferencedId();
+          auto itGroupedReferenceSetting = groupedReferenceSettings.find(referencedSettingId);
+          if (itGroupedReferenceSetting == groupedReferenceSettings.end())
+          {
+            SettingPtr referencedSetting = nullptr;
+            auto itReferencedSetting = FindSetting(referencedSettingId);
+            if (itReferencedSetting == m_settings.end())
+            {
+              s_logger->warn("missing referenced setting \"{}\"", referencedSettingId);
+              continue;
+            }
 
-        group->ReplaceSetting(referenceSetting, referencedSetting);
+            GroupedReferenceSettings groupedReferenceSetting;
+            groupedReferenceSetting.referencedSetting = itReferencedSetting->second.setting;
+
+            itGroupedReferenceSetting = groupedReferenceSettings.insert(
+              std::make_pair(referencedSettingId, groupedReferenceSetting)).first;
+          }
+
+          itGroupedReferenceSetting->second.referenceSettings.insert(setting);
+        }
+      }
+    }
+  }
+
+  if (groupedReferenceSettings.empty())
+    return;
+
+  // merge all reference settings into the referenced setting
+  for (const auto& groupedReferenceSetting : groupedReferenceSettings)
+  {
+    auto itReferencedSetting = FindSetting(groupedReferenceSetting.first);
+    if (itReferencedSetting == m_settings.end())
+      continue;
+
+    for (const auto& referenceSetting : groupedReferenceSetting.second.referenceSettings)
+    {
+      groupedReferenceSetting.second.referencedSetting->MergeDetails(*referenceSetting);
+
+      itReferencedSetting->second.references.insert(referenceSetting->GetId());
+    }
+  }
+
+  // resolve any reference settings
+  for (const auto& category : categories)
+  {
+    auto groups = category->GetGroups();
+    for (auto& group : groups)
+    {
+      auto settings = group->GetSettings();
+      for (const auto& setting : settings)
+      {
+        if (setting->IsReference())
+        {
+          auto referencedSettingId = setting->GetReferencedId();
+          auto itGroupedReferenceSetting = groupedReferenceSettings.find(referencedSettingId);
+          if (itGroupedReferenceSetting != groupedReferenceSettings.end())
+          {
+            const auto referencedSetting = itGroupedReferenceSetting->second.referencedSetting;
+
+            // clone the referenced setting and copy the general properties of the reference setting
+            auto clonedReferencedSetting = referencedSetting->Clone(setting->GetId());
+            clonedReferencedSetting->SetReferencedId(referencedSettingId);
+            clonedReferencedSetting->MergeBasics(*setting);
+
+            group->ReplaceSetting(setting, clonedReferencedSetting);
+
+            // update the setting
+            auto itReferenceSetting = FindSetting(setting->GetId());
+            if (itReferenceSetting != m_settings.end())
+              itReferenceSetting->second.setting = clonedReferencedSetting;
+          }
+        }
       }
     }
   }
@@ -1264,12 +1335,7 @@ void CSettingsManager::CleanupIncompleteSettings()
     auto tmpIterator = setting++;
     if (tmpIterator->second.setting == nullptr)
     {
-      CLog::Log(LOGWARNING, "CSettingsManager: removing empty setting \"%s\"", tmpIterator->first.c_str());
-      m_settings.erase(tmpIterator);
-    }
-    else if (tmpIterator->second.setting->GetType() == SettingType::Reference)
-    {
-      CLog::Log(LOGWARNING, "CSettingsManager: removing missing reference setting \"%s\"", tmpIterator->first.c_str());
+      s_logger->warn("removing empty setting \"{}\"", tmpIterator->first);
       m_settings.erase(tmpIterator);
     }
   }
@@ -1286,7 +1352,7 @@ void CSettingsManager::RegisterSettingOptionsFiller(const std::string &identifie
   m_optionsFillers.insert(make_pair(identifier, optionsFiller));
 }
 
-void CSettingsManager::ResolveSettingDependencies(std::shared_ptr<CSetting> setting)
+void CSettingsManager::ResolveSettingDependencies(const std::shared_ptr<CSetting>& setting)
 {
   if (setting == nullptr)
     return;

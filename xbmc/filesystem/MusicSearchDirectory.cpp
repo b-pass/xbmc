@@ -6,13 +6,14 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "threads/SystemClock.h"
 #include "MusicSearchDirectory.h"
-#include "music/MusicDatabase.h"
-#include "URL.h"
+
 #include "FileItem.h"
-#include "utils/log.h"
+#include "URL.h"
 #include "guilib/LocalizeStrings.h"
+#include "music/MusicDatabase.h"
+#include "threads/SystemClock.h"
+#include "utils/log.h"
 
 using namespace XFILE;
 
@@ -24,7 +25,7 @@ bool CMusicSearchDirectory::GetDirectory(const CURL& url, CFileItemList &items)
 {
   // break up our path
   // format is:  musicsearch://<url encoded search string>
-  std::string search(url.GetHostName());
+  const std::string& search(url.GetHostName());
 
   if (search.empty())
     return false;

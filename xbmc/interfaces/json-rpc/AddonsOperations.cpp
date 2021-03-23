@@ -7,14 +7,15 @@
  */
 
 #include "AddonsOperations.h"
+
 #include "JSONUtils.h"
 #include "ServiceBroker.h"
-#include "addons/AddonManager.h"
-#include "addons/AddonDatabase.h"
-#include "addons/PluginSource.h"
-#include "messaging/ApplicationMessenger.h"
 #include "TextureCache.h"
+#include "addons/AddonDatabase.h"
+#include "addons/AddonManager.h"
+#include "addons/PluginSource.h"
 #include "filesystem/File.h"
+#include "messaging/ApplicationMessenger.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 
@@ -66,10 +67,10 @@ JSONRPC_STATUS CAddonsOperations::GetAddons(const std::string &method, ITranspor
     addonTypes.push_back(addonType);
 
   VECADDONS addons;
-  for (std::vector<TYPE>::const_iterator typeIt = addonTypes.begin(); typeIt != addonTypes.end(); ++typeIt)
+  for (const auto& typeIt : addonTypes)
   {
     VECADDONS typeAddons;
-    if (*typeIt == ADDON_UNKNOWN)
+    if (typeIt == ADDON_UNKNOWN)
     {
       if (!enabled.isBoolean()) //All
       {
@@ -88,14 +89,14 @@ JSONRPC_STATUS CAddonsOperations::GetAddons(const std::string &method, ITranspor
       if (!enabled.isBoolean()) //All
       {
         if (!installed.isBoolean() || installed.asBoolean())
-          CServiceBroker::GetAddonMgr().GetInstalledAddons(typeAddons, *typeIt);
+          CServiceBroker::GetAddonMgr().GetInstalledAddons(typeAddons, typeIt);
         if (!installed.isBoolean() || (installed.isBoolean() && !installed.asBoolean()))
-          CServiceBroker::GetAddonMgr().GetInstallableAddons(typeAddons, *typeIt);
+          CServiceBroker::GetAddonMgr().GetInstallableAddons(typeAddons, typeIt);
       }
       else if (enabled.asBoolean() && (!installed.isBoolean() || installed.asBoolean())) //Enabled
-        CServiceBroker::GetAddonMgr().GetAddons(typeAddons, *typeIt);
+        CServiceBroker::GetAddonMgr().GetAddons(typeAddons, typeIt);
       else if (!installed.isBoolean() || installed.asBoolean())
-        CServiceBroker::GetAddonMgr().GetDisabledAddons(typeAddons, *typeIt);
+        CServiceBroker::GetAddonMgr().GetDisabledAddons(typeAddons, typeIt);
     }
 
     addons.insert(addons.end(), typeAddons.begin(), typeAddons.end());
@@ -130,8 +131,8 @@ JSONRPC_STATUS CAddonsOperations::GetAddonDetails(const std::string &method, ITr
 {
   std::string id = parameterObject["addonid"].asString();
   AddonPtr addon;
-  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, false) || addon.get() == NULL ||
-      addon->Type() <= ADDON_UNKNOWN || addon->Type() >= ADDON_MAX)
+  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, OnlyEnabled::NO) ||
+      addon.get() == NULL || addon->Type() <= ADDON_UNKNOWN || addon->Type() >= ADDON_MAX)
     return InvalidParams;
 
   CAddonDatabase addondb;
@@ -144,20 +145,29 @@ JSONRPC_STATUS CAddonsOperations::SetAddonEnabled(const std::string &method, ITr
 {
   std::string id = parameterObject["addonid"].asString();
   AddonPtr addon;
-  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, false) || addon == nullptr ||
-    addon->Type() <= ADDON_UNKNOWN || addon->Type() >= ADDON_MAX)
+  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, OnlyEnabled::NO) ||
+      addon == nullptr || addon->Type() <= ADDON_UNKNOWN || addon->Type() >= ADDON_MAX)
     return InvalidParams;
 
   bool disabled = false;
   if (parameterObject["enabled"].isBoolean())
+  {
     disabled = !parameterObject["enabled"].asBoolean();
+  }
   // we need to toggle the current disabled state of the addon
   else if (parameterObject["enabled"].isString())
+  {
     disabled = !CServiceBroker::GetAddonMgr().IsAddonDisabled(id);
+  }
   else
+  {
     return InvalidParams;
+  }
 
-  bool success = disabled ? CServiceBroker::GetAddonMgr().DisableAddon(id) : CServiceBroker::GetAddonMgr().EnableAddon(id);
+  bool success = disabled
+                     ? CServiceBroker::GetAddonMgr().DisableAddon(id, AddonDisabledReason::USER)
+                     : CServiceBroker::GetAddonMgr().EnableAddon(id);
+
   return success ? ACK : InvalidParams;
 }
 
@@ -165,8 +175,8 @@ JSONRPC_STATUS CAddonsOperations::ExecuteAddon(const std::string &method, ITrans
 {
   std::string id = parameterObject["addonid"].asString();
   AddonPtr addon;
-  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon) || addon.get() == NULL ||
-      addon->Type() < ADDON_VIZ || addon->Type() >= ADDON_MAX)
+  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon, ADDON_UNKNOWN, OnlyEnabled::YES) ||
+      addon.get() == NULL || addon->Type() < ADDON_VIZ || addon->Type() >= ADDON_MAX)
     return InvalidParams;
 
   std::string argv;
@@ -229,14 +239,19 @@ static CVariant Serialize(const AddonPtr& addon)
   {
     CVariant info(CVariant::VariantTypeObject);
     info["addonid"] = dep.id;
-    info["version"] = dep.requiredVersion.asString();
+    info["minversion"] = dep.versionMin.asString();
+    info["version"] = dep.version.asString();
     info["optional"] = dep.optional;
     variant["dependencies"].push_back(std::move(info));
   }
-  if (!addon->IsBroken())
-    variant["broken"] = false;
+  if (addon->LifecycleState() == AddonLifecycleState::BROKEN)
+    variant["broken"] = addon->LifecycleStateDescription();
   else
-    variant["broken"] = addon->Broken();
+    variant["broken"] = false;
+  if (addon->LifecycleState() == AddonLifecycleState::DEPRECATED)
+    variant["deprecated"] = addon->LifecycleStateDescription();
+  else
+    variant["deprecated"] = false;
   variant["extrainfo"] = CVariant(CVariant::VariantTypeArray);
   for (const auto& kv : addon->ExtraInfo())
   {
@@ -249,7 +264,11 @@ static CVariant Serialize(const AddonPtr& addon)
   return variant;
 }
 
-void CAddonsOperations::FillDetails(AddonPtr addon, const CVariant& fields, CVariant &result, CAddonDatabase &addondb, bool append /* = false */)
+void CAddonsOperations::FillDetails(const AddonPtr& addon,
+                                    const CVariant& fields,
+                                    CVariant& result,
+                                    CAddonDatabase& addondb,
+                                    bool append /* = false */)
 {
   if (addon.get() == NULL)
     return;

@@ -10,6 +10,8 @@
 
 #include "settings/dialogs/GUIDialogSettingsManualBase.h"
 
+struct StringSettingOption;
+
 class CGUIDialogCMSSettings : public CGUIDialogSettingsManualBase
 {
 public:
@@ -18,21 +20,20 @@ public:
 
 protected:
   // implementations of ISettingCallback
-  void OnSettingChanged(std::shared_ptr<const CSetting> setting) override;
+  void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
 
   // specialization of CGUIDialogSettingsBase
   bool AllowResettingSettings() const override { return false; }
   bool OnBack(int actionID) override;
-  void Save() override;
+  bool Save() override;
   void SetupView() override;
 
   // specialization of CGUIDialogSettingsManualBase
   void InitializeSettings() override;
 
 private:
-  static void Cms3dLutsFiller(
-    std::shared_ptr<const CSetting> setting,
-    std::vector< std::pair<std::string, std::string> > &list,
-    std::string &current,
-    void *data);
+  static void Cms3dLutsFiller(const std::shared_ptr<const CSetting>& setting,
+                              std::vector<StringSettingOption>& list,
+                              std::string& current,
+                              void* data);
 };

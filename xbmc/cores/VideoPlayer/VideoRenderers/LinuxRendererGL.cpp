@@ -49,8 +49,6 @@
 //! is a multiple of 128 and deinterlacing is on
 #define PBO_OFFSET 16
 
-#define BUFFER_OFFSET(i) ((char *)NULL + (i))
-
 using namespace Shaders;
 
 static const GLubyte stipple_weave[] = {
@@ -97,8 +95,6 @@ CLinuxRendererGL::CPictureBuffer::CPictureBuffer()
   videoBuffer = nullptr;
   loaded = false;
 }
-
-CLinuxRendererGL::CPictureBuffer::~CPictureBuffer() = default;
 
 CBaseRenderer* CLinuxRendererGL::Create(CVideoBuffer *buffer)
 {
@@ -174,12 +170,6 @@ bool CLinuxRendererGL::ValidateRenderTarget()
 {
   if (!m_bValidated)
   {
-    if (!CServiceBroker::GetRenderSystem()->IsExtSupported("GL_ARB_texture_non_power_of_two") &&
-         CServiceBroker::GetRenderSystem()->IsExtSupported("GL_ARB_texture_rectangle"))
-    {
-      m_textureTarget = GL_TEXTURE_RECTANGLE_ARB;
-    }
-
     // function pointer for texture might change in
     // call to LoadShaders
     glFinish();
@@ -197,10 +187,10 @@ bool CLinuxRendererGL::ValidateRenderTarget()
     if (m_renderMethod < 0)
       return false;
 
-    if (m_textureTarget == GL_TEXTURE_RECTANGLE_ARB)
-      CLog::Log(LOGNOTICE, "Using GL_TEXTURE_RECTANGLE_ARB");
+    if (m_textureTarget == GL_TEXTURE_RECTANGLE)
+      CLog::Log(LOGINFO, "Using GL_TEXTURE_RECTANGLE");
     else
-      CLog::Log(LOGNOTICE, "Using GL_TEXTURE_2D");
+      CLog::Log(LOGINFO, "Using GL_TEXTURE_2D");
 
     for (int i = 0 ; i < m_NumYV12Buffers ; i++)
       CreateTexture(i);
@@ -250,7 +240,7 @@ bool CLinuxRendererGL::Configure(const VideoPicture &picture, float fps, unsigne
   // load 3DLUT
   if (m_ColorManager->IsEnabled())
   {
-    if (!m_ColorManager->CheckConfiguration(m_cmsToken, m_iFlags))
+    if (!m_ColorManager->CheckConfiguration(m_cmsToken, m_srcPrimaries))
     {
       CLog::Log(LOGDEBUG, "CMS configuration changed, reload LUT");
       if (!LoadCLUT())
@@ -405,7 +395,7 @@ void CLinuxRendererGL::LoadPlane(CYuvPlane& plane, int type,
 {
 
   if (plane.pbo)
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, plane.pbo);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, plane.pbo);
 
   int bps = bpp * glFormatElementByteCount(type);
 
@@ -435,7 +425,7 @@ void CLinuxRendererGL::LoadPlane(CYuvPlane& plane, int type,
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
   glBindTexture(m_textureTarget, 0);
   if (plane.pbo)
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
 bool CLinuxRendererGL::Flush(bool saveBuffers)
@@ -680,7 +670,7 @@ void CLinuxRendererGL::UpdateVideoFilter()
                             (m_pixelRatio > 1.001f || m_pixelRatio < 0.999f);
   bool nonLinStretchChanged = false;
   bool cmsChanged = (m_cmsOn != m_ColorManager->IsEnabled()) ||
-                    (m_cmsOn && !m_ColorManager->CheckConfiguration(m_cmsToken, m_iFlags));
+                    (m_cmsOn && !m_ColorManager->CheckConfiguration(m_cmsToken, m_srcPrimaries));
   if (m_nonLinStretchGui != CDisplaySettings::GetInstance().IsNonLinearStretched() || pixelRatioChanged)
   {
     m_nonLinStretchGui = CDisplaySettings::GetInstance().IsNonLinearStretched();
@@ -720,7 +710,7 @@ void CLinuxRendererGL::UpdateVideoFilter()
   {
     if (m_ColorManager->IsEnabled())
     {
-      if (!m_ColorManager->CheckConfiguration(m_cmsToken, m_iFlags))
+      if (!m_ColorManager->CheckConfiguration(m_cmsToken, m_srcPrimaries))
       {
         CLog::Log(LOGDEBUG, "CMS configuration changed, reload LUT");
         LoadCLUT();
@@ -810,7 +800,11 @@ void CLinuxRendererGL::UpdateVideoFilter()
   case VS_SCALINGMETHOD_LANCZOS2:
   case VS_SCALINGMETHOD_SPLINE36:
   case VS_SCALINGMETHOD_LANCZOS3:
-  case VS_SCALINGMETHOD_CUBIC:
+  case VS_SCALINGMETHOD_CUBIC_B_SPLINE:
+  case VS_SCALINGMETHOD_CUBIC_MITCHELL:
+  case VS_SCALINGMETHOD_CUBIC_CATMULL:
+  case VS_SCALINGMETHOD_CUBIC_0_075:
+  case VS_SCALINGMETHOD_CUBIC_0_1:
     if (m_renderMethod & RENDER_GLSL)
     {
       if (!m_fbo.fbo.Initialize())
@@ -892,6 +886,7 @@ void CLinuxRendererGL::LoadShaders(int field)
     // if single pass, create GLSLOutput helper and pass it to YUV2RGB shader
     EShaderFormat shaderFormat = GetShaderFormat();
     std::shared_ptr<GLSLOutput> out;
+    m_toneMapMethod = m_videoSettings.m_ToneMapMethod;
     if (m_renderQuality == RQ_SINGLEPASS)
     {
       out = std::make_shared<GLSLOutput>(GLSLOutput(4, m_useDithering, m_ditherDepth,
@@ -901,15 +896,16 @@ void CLinuxRendererGL::LoadShaders(int field)
 
       if (m_scalingMethod == VS_SCALINGMETHOD_LANCZOS3_FAST || m_scalingMethod == VS_SCALINGMETHOD_SPLINE36_FAST)
       {
-        m_pYUVShader = new YUV2RGBFilterShader4(m_textureTarget == GL_TEXTURE_RECTANGLE_ARB,
+        m_pYUVShader = new YUV2RGBFilterShader4(m_textureTarget == GL_TEXTURE_RECTANGLE,
                                                 shaderFormat, m_nonLinStretch,
                                                 AVColorPrimaries::AVCOL_PRI_BT709, m_srcPrimaries,
                                                 m_toneMap,
+                                                m_toneMapMethod,
                                                 m_scalingMethod, out);
         if (!m_cmsOn)
           m_pYUVShader->SetConvertFullColorRange(m_fullRange);
 
-        CLog::Log(LOGNOTICE, "GL: Selecting YUV 2 RGB shader with filter");
+        CLog::Log(LOGINFO, "GL: Selecting YUV 2 RGB shader with filter");
 
         if (m_pYUVShader && m_pYUVShader->CompileAndLink())
         {
@@ -927,14 +923,14 @@ void CLinuxRendererGL::LoadShaders(int field)
 
     if (!m_pYUVShader)
     {
-      m_pYUVShader = new YUV2RGBProgressiveShader(m_textureTarget == GL_TEXTURE_RECTANGLE_ARB, shaderFormat,
+      m_pYUVShader = new YUV2RGBProgressiveShader(m_textureTarget == GL_TEXTURE_RECTANGLE, shaderFormat,
                                                   m_nonLinStretch && m_renderQuality == RQ_SINGLEPASS,
-                                                  AVColorPrimaries::AVCOL_PRI_BT709, m_srcPrimaries, m_toneMap, out);
+                                                  AVColorPrimaries::AVCOL_PRI_BT709, m_srcPrimaries, m_toneMap, m_toneMapMethod, out);
 
       if (!m_cmsOn)
         m_pYUVShader->SetConvertFullColorRange(m_fullRange);
 
-      CLog::Log(LOGNOTICE, "GL: Selecting YUV 2 RGB shader");
+      CLog::Log(LOGINFO, "GL: Selecting YUV 2 RGB shader");
 
       if (m_pYUVShader && m_pYUVShader->CompileAndLink())
       {
@@ -948,23 +944,9 @@ void CLinuxRendererGL::LoadShaders(int field)
     }
   }
 
-  // determine whether GPU supports NPOT textures
-  if (!m_renderSystem->IsExtSupported("GL_ARB_texture_non_power_of_two"))
-  {
-    if (!m_renderSystem->IsExtSupported("GL_ARB_texture_rectangle"))
-    {
-      CLog::Log(LOGWARNING, "GL: GL_ARB_texture_rectangle not supported and OpenGL version is not 2.x");
-    }
-    else
-      CLog::Log(LOGNOTICE, "GL: NPOT textures are supported through GL_ARB_texture_rectangle extension");
-  }
-  else
-    CLog::Log(LOGNOTICE, "GL: NPOT texture support detected");
-
-
   if (m_pboSupported)
   {
-    CLog::Log(LOGNOTICE, "GL: Using GL_ARB_pixel_buffer_object");
+    CLog::Log(LOGINFO, "GL: Using GL_ARB_pixel_buffer_object");
     m_pboUsed = true;
   }
   else
@@ -1045,44 +1027,29 @@ void CLinuxRendererGL::RenderSinglePass(int index, int field)
   CPictureBuffer &buf = m_buffers[index];
   CYuvPlane (&planes)[YuvImage::MAX_PLANES] = m_buffers[index].fields[field];
 
-  AVColorPrimaries srcPrim = GetSrcPrimaries(buf.m_srcPrimaries, buf.image.width, buf.image.height);
-  if (srcPrim != m_srcPrimaries)
-  {
-    m_srcPrimaries = srcPrim;
-    m_reloadShaders = true;
-  }
-
-  bool toneMap = false;
-  if (m_videoSettings.m_ToneMapMethod != VS_TONEMAPMETHOD_OFF)
-  {
-    if (buf.hasLightMetadata || (buf.hasDisplayMetadata && buf.displayMetadata.has_luminance))
-      toneMap = true;
-  }
-
-  if (toneMap != m_toneMap)
-    m_reloadShaders = true;
-  m_toneMap = toneMap;
+  CheckVideoParameters(index);
 
   if (m_reloadShaders)
   {
+    m_reloadShaders = 0;
     LoadShaders(field);
   }
 
   glDisable(GL_DEPTH_TEST);
 
   // Y
-  glActiveTextureARB(GL_TEXTURE0);
+  glActiveTexture(GL_TEXTURE0);
   glBindTexture(m_textureTarget, planes[0].id);
 
   // U
-  glActiveTextureARB(GL_TEXTURE1);
+  glActiveTexture(GL_TEXTURE1);
   glBindTexture(m_textureTarget, planes[1].id);
 
   // V
-  glActiveTextureARB(GL_TEXTURE2);
+  glActiveTexture(GL_TEXTURE2);
   glBindTexture(m_textureTarget, planes[2].id);
 
-  glActiveTextureARB(GL_TEXTURE0);
+  glActiveTexture(GL_TEXTURE0);
   VerifyGLState();
 
   m_pYUVShader->SetBlack(m_videoSettings.m_Brightness * 0.01f - 0.5f);
@@ -1092,7 +1059,7 @@ void CLinuxRendererGL::RenderSinglePass(int index, int field)
   m_pYUVShader->SetColParams(buf.m_srcColSpace, buf.m_srcBits, !buf.m_srcFullRange, buf.m_srcTextureBits);
   m_pYUVShader->SetDisplayMetadata(buf.hasDisplayMetadata, buf.displayMetadata,
                                    buf.hasLightMetadata, buf.lightMetadata);
-  m_pYUVShader->SetToneMapParam(m_videoSettings.m_ToneMapParam);
+  m_pYUVShader->SetToneMapParam(m_toneMapMethod, m_videoSettings.m_ToneMapParam);
 
   //disable non-linear stretch when a dvd menu is shown, parts of the menu are rendered through the overlay renderer
   //having non-linear stretch on breaks the alignment
@@ -1170,11 +1137,15 @@ void CLinuxRendererGL::RenderSinglePass(int index, int field)
   glBindBuffer(GL_ARRAY_BUFFER, vertexVBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(PackedVertex)*4, &vertex[0], GL_STATIC_DRAW);
 
-  glVertexAttribPointer(vertLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, x)));
-  glVertexAttribPointer(Yloc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u1)));
-  glVertexAttribPointer(Uloc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u2)));
+  glVertexAttribPointer(vertLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, x)));
+  glVertexAttribPointer(Yloc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u1)));
+  glVertexAttribPointer(Uloc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u2)));
   if (Vloc != -1)
-    glVertexAttribPointer(Vloc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u3)));
+    glVertexAttribPointer(Vloc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                          reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u3)));
 
   glEnableVertexAttribArray(vertLoc);
   glEnableVertexAttribArray(Yloc);
@@ -1211,23 +1182,7 @@ void CLinuxRendererGL::RenderToFBO(int index, int field, bool weave /*= false*/)
   CPictureBuffer &buf = m_buffers[index];
   CYuvPlane (&planes)[YuvImage::MAX_PLANES] = m_buffers[index].fields[field];
 
-  AVColorPrimaries srcPrim = GetSrcPrimaries(buf.m_srcPrimaries, buf.image.width, buf.image.height);
-  if (srcPrim != m_srcPrimaries)
-  {
-    m_srcPrimaries = srcPrim;
-    m_reloadShaders = true;
-  }
-
-  bool toneMap = false;
-  if (m_videoSettings.m_ToneMapMethod != VS_TONEMAPMETHOD_OFF)
-  {
-    if (buf.hasLightMetadata || (buf.hasDisplayMetadata && buf.displayMetadata.has_luminance))
-      toneMap = true;
-  }
-
-  if (toneMap != m_toneMap)
-    m_reloadShaders = true;
-  m_toneMap = toneMap;
+  CheckVideoParameters(index);
 
   if (m_reloadShaders)
   {
@@ -1253,21 +1208,21 @@ void CLinuxRendererGL::RenderToFBO(int index, int field, bool weave /*= false*/)
   glDisable(GL_DEPTH_TEST);
 
   // Y
-  glActiveTextureARB(GL_TEXTURE0);
+  glActiveTexture(GL_TEXTURE0);
   glBindTexture(m_textureTarget, planes[0].id);
   VerifyGLState();
 
   // U
-  glActiveTextureARB(GL_TEXTURE1);
+  glActiveTexture(GL_TEXTURE1);
   glBindTexture(m_textureTarget, planes[1].id);
   VerifyGLState();
 
   // V
-  glActiveTextureARB(GL_TEXTURE2);
+  glActiveTexture(GL_TEXTURE2);
   glBindTexture(m_textureTarget, planes[2].id);
   VerifyGLState();
 
-  glActiveTextureARB(GL_TEXTURE0);
+  glActiveTexture(GL_TEXTURE0);
   VerifyGLState();
 
   // make sure the yuv shader is loaded and ready to go
@@ -1288,7 +1243,7 @@ void CLinuxRendererGL::RenderToFBO(int index, int field, bool weave /*= false*/)
   m_pYUVShader->SetColParams(buf.m_srcColSpace, buf.m_srcBits, !buf.m_srcFullRange, buf.m_srcTextureBits);
   m_pYUVShader->SetDisplayMetadata(buf.hasDisplayMetadata, buf.displayMetadata,
                                    buf.hasLightMetadata, buf.lightMetadata);
-  m_pYUVShader->SetToneMapParam(m_videoSettings.m_ToneMapParam);
+  m_pYUVShader->SetToneMapParam(m_toneMapMethod, m_videoSettings.m_ToneMapParam);
 
   if (field == FIELD_TOP)
     m_pYUVShader->SetField(1);
@@ -1395,11 +1350,15 @@ void CLinuxRendererGL::RenderToFBO(int index, int field, bool weave /*= false*/)
   glBindBuffer(GL_ARRAY_BUFFER, vertexVBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(PackedVertex)*4, &vertex[0], GL_STATIC_DRAW);
 
-  glVertexAttribPointer(vertLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, x)));
-  glVertexAttribPointer(Yloc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u1)));
-  glVertexAttribPointer(Uloc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u2)));
+  glVertexAttribPointer(vertLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, x)));
+  glVertexAttribPointer(Yloc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u1)));
+  glVertexAttribPointer(Uloc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u2)));
   if (Vloc != -1)
-    glVertexAttribPointer(Vloc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u3)));
+    glVertexAttribPointer(Vloc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                          reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u3)));
 
   glEnableVertexAttribArray(vertLoc);
   glEnableVertexAttribArray(Yloc);
@@ -1439,7 +1398,7 @@ void CLinuxRendererGL::RenderToFBO(int index, int field, bool weave /*= false*/)
 
 void CLinuxRendererGL::RenderFromFBO()
 {
-  glActiveTextureARB(GL_TEXTURE0);
+  glActiveTexture(GL_TEXTURE0);
   VerifyGLState();
 
   // Use regular normalized texture coordinates
@@ -1520,8 +1479,10 @@ void CLinuxRendererGL::RenderFromFBO()
   glBindBuffer(GL_ARRAY_BUFFER, vertexVBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(PackedVertex)*4, &vertex[0], GL_STATIC_DRAW);
 
-  glVertexAttribPointer(vertLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, x)));
-  glVertexAttribPointer(loc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u1)));
+  glVertexAttribPointer(vertLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, x)));
+  glVertexAttribPointer(loc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u1)));
 
   glEnableVertexAttribArray(vertLoc);
   glEnableVertexAttribArray(loc);
@@ -1579,7 +1540,7 @@ void CLinuxRendererGL::RenderRGB(int index, int field)
 {
   CYuvPlane &plane = m_buffers[index].fields[FIELD_FULL][0];
 
-  glActiveTextureARB(GL_TEXTURE0);
+  glActiveTexture(GL_TEXTURE0);
 
   glBindTexture(m_textureTarget, plane.id);
 
@@ -1657,8 +1618,10 @@ void CLinuxRendererGL::RenderRGB(int index, int field)
   glBindBuffer(GL_ARRAY_BUFFER, vertexVBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(PackedVertex)*4, &vertex[0], GL_STATIC_DRAW);
 
-  glVertexAttribPointer(vertLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, x)));
-  glVertexAttribPointer(loc, 2, GL_FLOAT, 0, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, u1)));
+  glVertexAttribPointer(vertLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, x)));
+  glVertexAttribPointer(loc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                        reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u1)));
 
   glEnableVertexAttribArray(vertLoc);
   glEnableVertexAttribArray(loc);
@@ -1887,13 +1850,13 @@ bool CLinuxRendererGL::CreateYV12Texture(int index)
   if (m_pboUsed)
   {
     pboSetup = true;
-    glGenBuffersARB(3, pbo);
+    glGenBuffers(3, pbo);
 
     for (int i = 0; i < 3; i++)
     {
-      glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[i]);
-      glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, im.planesize[i] + PBO_OFFSET, 0, GL_STREAM_DRAW_ARB);
-      void* pboPtr = glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB);
+      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[i]);
+      glBufferData(GL_PIXEL_UNPACK_BUFFER, im.planesize[i] + PBO_OFFSET, 0, GL_STREAM_DRAW);
+      void* pboPtr = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
       if (pboPtr)
       {
         im.plane[i] = (uint8_t*) pboPtr + PBO_OFFSET;
@@ -1911,14 +1874,14 @@ bool CLinuxRendererGL::CreateYV12Texture(int index)
     {
       for (int i = 0; i < 3; i++)
       {
-        glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[i]);
-        glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[i]);
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       }
-      glDeleteBuffersARB(3, pbo);
+      glDeleteBuffers(3, pbo);
       memset(m_buffers[index].pbo, 0, sizeof(m_buffers[index].pbo));
     }
 
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
   }
 
   if (!pboSetup)
@@ -2080,12 +2043,12 @@ void CLinuxRendererGL::DeleteYV12Texture(int index)
     {
       if (im.plane[p])
       {
-        glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[p]);
-        glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[p]);
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         im.plane[p] = NULL;
-        glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
       }
-      glDeleteBuffersARB(1, pbo + p);
+      glDeleteBuffers(1, pbo + p);
       pbo[p] = 0;
     }
     else
@@ -2193,13 +2156,13 @@ bool CLinuxRendererGL::CreateNV12Texture(int index)
   if (m_pboUsed)
   {
     pboSetup = true;
-    glGenBuffersARB(2, pbo);
+    glGenBuffers(2, pbo);
 
     for (int i = 0; i < 2; i++)
     {
-      glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[i]);
-      glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, im.planesize[i] + PBO_OFFSET, 0, GL_STREAM_DRAW_ARB);
-      void* pboPtr = glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB);
+      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[i]);
+      glBufferData(GL_PIXEL_UNPACK_BUFFER, im.planesize[i] + PBO_OFFSET, 0, GL_STREAM_DRAW);
+      void* pboPtr = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
       if (pboPtr)
       {
         im.plane[i] = (uint8_t*)pboPtr + PBO_OFFSET;
@@ -2217,14 +2180,14 @@ bool CLinuxRendererGL::CreateNV12Texture(int index)
     {
       for (int i = 0; i < 2; i++)
       {
-        glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[i]);
-        glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[i]);
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       }
-      glDeleteBuffersARB(2, pbo);
+      glDeleteBuffers(2, pbo);
       memset(m_buffers[index].pbo, 0, sizeof(m_buffers[index].pbo));
     }
 
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
   }
 
   if (!pboSetup)
@@ -2322,12 +2285,12 @@ void CLinuxRendererGL::DeleteNV12Texture(int index)
     {
       if (im.plane[p])
       {
-        glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[p]);
-        glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[p]);
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         im.plane[p] = NULL;
-        glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
       }
-      glDeleteBuffersARB(1, pbo + p);
+      glDeleteBuffers(1, pbo + p);
       pbo[p] = 0;
     }
     else
@@ -2408,12 +2371,12 @@ void CLinuxRendererGL::DeleteYUV422PackedTexture(int index)
   {
     if (im.plane[0])
     {
-      glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[0]);
-      glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
+      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[0]);
+      glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       im.plane[0] = NULL;
-      glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
     }
-    glDeleteBuffersARB(1, pbo);
+    glDeleteBuffers(1, pbo);
     pbo[0] = 0;
   }
   else
@@ -2461,11 +2424,11 @@ bool CLinuxRendererGL::CreateYUV422PackedTexture(int index)
   if (m_pboUsed)
   {
     pboSetup = true;
-    glGenBuffersARB(1, pbo);
+    glGenBuffers(1, pbo);
 
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[0]);
-    glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, im.planesize[0] + PBO_OFFSET, 0, GL_STREAM_DRAW_ARB);
-    void* pboPtr = glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[0]);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, im.planesize[0] + PBO_OFFSET, 0, GL_STREAM_DRAW);
+    void* pboPtr = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
     if (pboPtr)
     {
       im.plane[0] = (uint8_t*)pboPtr + PBO_OFFSET;
@@ -2479,13 +2442,13 @@ bool CLinuxRendererGL::CreateYUV422PackedTexture(int index)
 
     if (!pboSetup)
     {
-      glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, *pbo);
-      glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
-      glDeleteBuffersARB(1, pbo);
+      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, *pbo);
+      glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+      glDeleteBuffers(1, pbo);
       memset(m_buffers[index].pbo, 0, sizeof(m_buffers[index].pbo));
     }
 
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
   }
 
   if (!pboSetup)
@@ -2598,7 +2561,11 @@ bool CLinuxRendererGL::Supports(ESCALINGMETHOD method)
       method == VS_SCALINGMETHOD_AUTO)
     return true;
 
-  if (method == VS_SCALINGMETHOD_CUBIC ||
+  if (method == VS_SCALINGMETHOD_CUBIC_B_SPLINE ||
+      method == VS_SCALINGMETHOD_CUBIC_MITCHELL ||
+      method == VS_SCALINGMETHOD_CUBIC_CATMULL ||
+      method == VS_SCALINGMETHOD_CUBIC_0_075 ||
+      method == VS_SCALINGMETHOD_CUBIC_0_1 ||
       method == VS_SCALINGMETHOD_LANCZOS2 ||
       method == VS_SCALINGMETHOD_SPLINE36_FAST ||
       method == VS_SCALINGMETHOD_LANCZOS3_FAST ||
@@ -2643,12 +2610,12 @@ void CLinuxRendererGL::BindPbo(CPictureBuffer& buff)
       continue;
     pbo = true;
 
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, buff.pbo[plane]);
-    glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buff.pbo[plane]);
+    glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
     buff.image.plane[plane] = (uint8_t*)PBO_OFFSET;
   }
   if (pbo)
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
 void CLinuxRendererGL::UnBindPbo(CPictureBuffer& buff)
@@ -2660,12 +2627,12 @@ void CLinuxRendererGL::UnBindPbo(CPictureBuffer& buff)
       continue;
     pbo = true;
 
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, buff.pbo[plane]);
-    glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, buff.image.planesize[plane] + PBO_OFFSET, NULL, GL_STREAM_DRAW_ARB);
-    buff.image.plane[plane] = (uint8_t*)glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB) + PBO_OFFSET;
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buff.pbo[plane]);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, buff.image.planesize[plane] + PBO_OFFSET, NULL, GL_STREAM_DRAW);
+    buff.image.plane[plane] = (uint8_t*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY) + PBO_OFFSET;
   }
   if (pbo)
-    glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
 CRenderInfo CLinuxRendererGL::GetRenderInfo()
@@ -2683,14 +2650,15 @@ bool CLinuxRendererGL::LoadCLUT()
 
   int clutSize, dataSize;
   if (!CColorManager::Get3dLutSize(CMS_DATA_FMT_RGB, &clutSize, &dataSize))
-    return 0;
+    return false;
 
   // allocate buffer
   m_CLUTsize = clutSize;
   m_CLUT = static_cast<uint16_t*>(malloc(dataSize));
 
   // load 3DLUT
-  if ( !m_ColorManager->GetVideo3dLut(m_iFlags, &m_cmsToken, CMS_DATA_FMT_RGB, m_CLUTsize, m_CLUT) )
+  if (!m_ColorManager->GetVideo3dLut(m_srcPrimaries, &m_cmsToken, CMS_DATA_FMT_RGB, m_CLUTsize,
+                                     m_CLUT))
   {
     free(m_CLUT);
     CLog::Log(LOGERROR, "Error loading the LUT");
@@ -2701,7 +2669,7 @@ bool CLinuxRendererGL::LoadCLUT()
   CLog::Log(LOGDEBUG, "LinuxRendererGL: creating 3DLUT");
   glGenTextures(1, &m_tCLUTTex);
   glActiveTexture(GL_TEXTURE4);
-  if ( m_tCLUTTex <= 0 )
+  if (m_tCLUTTex <= 0)
   {
     CLog::Log(LOGERROR, "Error creating 3DLUT texture");
     return false;
@@ -2718,7 +2686,8 @@ bool CLinuxRendererGL::LoadCLUT()
   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
   // load 3DLUT data
-  glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB16, m_CLUTsize, m_CLUTsize, m_CLUTsize, 0, GL_RGB16, GL_UNSIGNED_SHORT, m_CLUT);
+  glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB16, m_CLUTsize, m_CLUTsize, m_CLUTsize, 0, GL_RGB,
+               GL_UNSIGNED_SHORT, m_CLUT);
   free(m_CLUT);
   glActiveTexture(GL_TEXTURE0);
   return true;
@@ -2732,6 +2701,35 @@ void CLinuxRendererGL::DeleteCLUT()
     glDeleteTextures(1, &m_tCLUTTex);
     m_tCLUTTex = 0;
   }
+}
+
+void CLinuxRendererGL::CheckVideoParameters(int index)
+{
+  CPictureBuffer &buf = m_buffers[index];
+  int method = m_videoSettings.m_ToneMapMethod;
+
+  AVColorPrimaries srcPrim = GetSrcPrimaries(buf.m_srcPrimaries, buf.image.width, buf.image.height);
+  if (srcPrim != m_srcPrimaries)
+  {
+    m_srcPrimaries = srcPrim;
+    m_reloadShaders = true;
+  }
+
+  bool toneMap = false;
+  if (method != VS_TONEMAPMETHOD_OFF)
+  {
+    if (buf.hasLightMetadata || (buf.hasDisplayMetadata && buf.displayMetadata.has_luminance))
+    {
+      toneMap = true;
+    }
+  }
+
+  if (toneMap != m_toneMap || (m_toneMapMethod != method))
+  {
+    m_reloadShaders = true;
+  }
+  m_toneMap = toneMap;
+  m_toneMapMethod = method;
 }
 
 AVColorPrimaries CLinuxRendererGL::GetSrcPrimaries(AVColorPrimaries srcPrimaries, unsigned int width, unsigned int height)

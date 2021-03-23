@@ -12,6 +12,7 @@ set(SOURCES ActorProtocol.cpp
             CharsetConverter.cpp
             CharsetDetection.cpp
             ColorUtils.cpp
+            ContentUtils.cpp
             CPUInfo.cpp
             Crc32.cpp
             CryptThreading.cpp
@@ -54,12 +55,12 @@ set(SOURCES ActorProtocol.cpp
             Screenshot.cpp
             SortUtils.cpp
             Speed.cpp
+            StaticLoggerBase.cpp
             Stopwatch.cpp
             StreamDetails.cpp
             StreamUtils.cpp
             StringUtils.cpp
             StringValidation.cpp
-            SysfsUtils.cpp
             SystemInfo.cpp
             Temperature.cpp
             TextSearch.cpp
@@ -89,6 +90,7 @@ set(HEADERS ActorProtocol.h
             CPUInfo.h
             Color.h
             ColorUtils.h
+            ContentUtils.h
             Crc32.h
             CryptThreading.h
             DatabaseUtils.h
@@ -112,7 +114,9 @@ set(HEADERS ActorProtocol.h
             IBufferObject.h
             ILocalizer.h
             InfoLoader.h
+            IPlatformLog.h
             IRssObserver.h
+            IScreenshotSurface.h
             ISerializable.h
             ISortable.h
             IXmlDeserializable.h
@@ -125,7 +129,9 @@ set(HEADERS ActorProtocol.h
             LegacyPathTranslation.h
             Locale.h
             log.h
+            logtypes.h
             MathUtils.h
+            MemUtils.h
             Mime.h
             Observer.h
             params_check_macros.h
@@ -144,12 +150,12 @@ set(HEADERS ActorProtocol.h
             Screenshot.h
             SortUtils.h
             Speed.h
+            StaticLoggerBase.h
             Stopwatch.h
             StreamDetails.h
             StreamUtils.h
             StringUtils.h
             StringValidation.h
-            SysfsUtils.h
             SystemInfo.h
             Temperature.h
             TextSearch.h
@@ -169,8 +175,10 @@ if(XSLT_FOUND)
   list(APPEND HEADERS XSLTUtils.h)
 endif()
 if(EGL_FOUND)
-  list(APPEND SOURCES EGLUtils.cpp)
-  list(APPEND HEADERS EGLUtils.h)
+  list(APPEND SOURCES EGLUtils.cpp
+                      EGLFence.cpp)
+  list(APPEND HEADERS EGLUtils.h
+                      EGLFence.h)
 endif()
 
 # The large map trips the clang optimizer
@@ -178,28 +186,40 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
   set_source_files_properties(Mime.cpp PROPERTIES COMPILE_FLAGS -O0)
 endif()
 
-if(NOT CORE_SYSTEM_NAME STREQUAL windows AND NOT CORE_SYSTEM_NAME STREQUAL windowsstore)
+if(OPENGL_FOUND OR OPENGLES_FOUND)
   list(APPEND SOURCES GLUtils.cpp)
   list(APPEND HEADERS GLUtils.h)
 endif()
 
-if(CORE_SYSTEM_NAME STREQUAL android OR AML_FOUND)
-  list(APPEND SOURCES AMLUtils.cpp)
-  list(APPEND HEADERS AMLUtils.h)
-endif()
+if("gbm" IN_LIST CORE_PLATFORM_NAME_LC OR "wayland" IN_LIST CORE_PLATFORM_NAME_LC)
+  list(APPEND SOURCES BufferObject.cpp
+                      BufferObjectFactory.cpp)
+  list(APPEND HEADERS BufferObject.h
+                      BufferObjectFactory.h)
 
-if(AML_FOUND)
-  list(APPEND HEADERS ScreenshotAML.cpp)
-  list(APPEND HEADERS ScreenshotAML.h)
-endif()
+  if("gbm" IN_LIST CORE_PLATFORM_NAME_LC)
+    list(APPEND SOURCES DumbBufferObject.cpp)
+    list(APPEND SOURCES DumbBufferObject.h)
+  endif()
 
-if(CORE_PLATFORM_NAME_LC STREQUAL gbm)
-  list(APPEND SOURCES EGLImage.cpp)
-  list(APPEND HEADERS EGLImage.h)
+  if(HAVE_LINUX_MEMFD AND HAVE_LINUX_UDMABUF)
+    list(APPEND SOURCES UDMABufferObject.cpp)
+    list(APPEND HEADERS UDMABufferObject.h)
+  endif()
 
-  if(GBM_HAS_BO_MAP)
+  if(HAVE_LINUX_DMA_HEAP)
+    list(APPEND SOURCES DMAHeapBufferObject.cpp)
+    list(APPEND HEADERS DMAHeapBufferObject.h)
+  endif()
+
+  if(GBM_HAS_BO_MAP AND "gbm" IN_LIST CORE_PLATFORM_NAME_LC)
     list(APPEND SOURCES GBMBufferObject.cpp)
     list(APPEND HEADERS GBMBufferObject.h)
+  endif()
+
+  if(EGL_FOUND)
+    list(APPEND SOURCES EGLImage.cpp)
+    list(APPEND HEADERS EGLImage.h)
   endif()
 endif()
 

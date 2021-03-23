@@ -11,16 +11,17 @@
 /*----------------------------------------------------------------------
 |   includes
 +---------------------------------------------------------------------*/
+#include "File.h"
+#include "FileFactory.h"
+#include "URL.h"
+#include "Util.h"
+
 #include <limits>
+
 #include <Neptune/Source/Core/NptDebug.h>
 #include <Neptune/Source/Core/NptFile.h>
 #include <Neptune/Source/Core/NptStrings.h>
 #include <Neptune/Source/Core/NptUtils.h>
-
-#include "File.h"
-#include "FileFactory.h"
-#include "Util.h"
-#include "URL.h"
 
 #ifdef TARGET_WINDOWS
 #define S_IWUSR _S_IWRITE
@@ -39,8 +40,7 @@ class NPT_XbmcFileStream
 {
 public:
     // constructors and destructor
-    explicit NPT_XbmcFileStream(NPT_XbmcFileReference file) :
-      m_FileReference(file) {}
+  explicit NPT_XbmcFileStream(const NPT_XbmcFileReference& file) : m_FileReference(file) {}
 
     // NPT_FileInterface methods
     NPT_Result Seek(NPT_Position offset);

@@ -10,16 +10,16 @@
 
 #include "IDirectory.h"
 #include "SortFileItem.h"
-
-#include <atomic>
-#include <string>
-#include <map>
-#include "threads/CriticalSection.h"
 #include "addons/IAddon.h"
-#include "PlatformDefs.h"
-
+#include "threads/CriticalSection.h"
 #include "threads/Event.h"
 #include "threads/Thread.h"
+
+#include <atomic>
+#include <map>
+#include <string>
+
+#include "PlatformDefs.h"
 
 class CURL;
 class CFileItem;
@@ -60,7 +60,7 @@ public:
   static bool AddItem(int handle, const CFileItem *item, int totalItems);
   static bool AddItems(int handle, const CFileItemList *items, int totalItems);
   static void EndOfDirectory(int handle, bool success, bool replaceListing, bool cacheToDisc);
-  static void AddSortMethod(int handle, SORT_METHOD sortMethod, const std::string &label2Mask);
+  static void AddSortMethod(int handle, SORT_METHOD sortMethod, const std::string &labelMask, const std::string &label2Mask);
   static std::string GetSetting(int handle, const std::string &key);
   static void SetSetting(int handle, const std::string &key, const std::string &value);
   static void SetContent(int handle, const std::string &strContent);
@@ -75,7 +75,7 @@ private:
 
   static std::map<int,CPluginDirectory*> globalHandles;
   static int getNewHandle(CPluginDirectory *cp);
-  static void reuseHandle(int handle, CPluginDirectory *cp);
+  static void reuseHandle(int handle, CPluginDirectory* cp);
 
   static void removeHandle(int handle);
   static CPluginDirectory *dirFromHandle(int handle);

@@ -7,23 +7,24 @@
  */
 
 #include "Directory.h"
+
+#include "Application.h"
+#include "DirectoryCache.h"
 #include "DirectoryFactory.h"
 #include "FileDirectoryFactory.h"
-#include "ServiceBroker.h"
-#include "commons/Exception.h"
 #include "FileItem.h"
-#include "DirectoryCache.h"
+#include "PasswordManager.h"
+#include "ServiceBroker.h"
+#include "URL.h"
+#include "commons/Exception.h"
+#include "dialogs/GUIDialogBusy.h"
+#include "guilib/GUIWindowManager.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "utils/log.h"
 #include "utils/Job.h"
 #include "utils/JobManager.h"
-#include "Application.h"
-#include "guilib/GUIWindowManager.h"
-#include "dialogs/GUIDialogBusy.h"
 #include "utils/URIUtils.h"
-#include "URL.h"
-#include "PasswordManager.h"
+#include "utils/log.h"
 
 using namespace XFILE;
 
@@ -123,8 +124,11 @@ bool CDirectory::GetDirectory(const std::string& strPath, CFileItemList &items, 
   return GetDirectory(pathToUrl, items, hints);
 }
 
-bool CDirectory::GetDirectory(const std::string& strPath, std::shared_ptr<IDirectory> pDirectory,
-                              CFileItemList &items, const std::string &strMask, int flags)
+bool CDirectory::GetDirectory(const std::string& strPath,
+                              const std::shared_ptr<IDirectory>& pDirectory,
+                              CFileItemList& items,
+                              const std::string& strMask,
+                              int flags)
 {
   CHints hints;
   hints.flags = flags;
@@ -154,13 +158,15 @@ bool CDirectory::GetDirectory(const CURL& url, CFileItemList &items, const CHint
   return CDirectory::GetDirectory(url, pDirectory, items, hints);
 }
 
-bool CDirectory::GetDirectory(const CURL& url, std::shared_ptr<IDirectory> pDirectory,
-                              CFileItemList &items, const CHints &hints)
+bool CDirectory::GetDirectory(const CURL& url,
+                              const std::shared_ptr<IDirectory>& pDirectory,
+                              CFileItemList& items,
+                              const CHints& hints)
 {
   try
   {
     CURL realURL = URIUtils::SubstitutePath(url);
-    if (!pDirectory.get())
+    if (!pDirectory)
       return false;
 
     // check our cache for this path
@@ -322,7 +328,7 @@ bool CDirectory::Create(const CURL& url)
       CPasswordManager::GetInstance().AuthenticateURL(realURL);
 
     std::unique_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realURL));
-    if (pDirectory.get())
+    if (pDirectory)
       if(pDirectory->Create(realURL))
         return true;
   }
@@ -361,7 +367,7 @@ bool CDirectory::Exists(const CURL& url, bool bUseCache /* = true */)
       CPasswordManager::GetInstance().AuthenticateURL(realURL);
 
     std::unique_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realURL));
-    if (pDirectory.get())
+    if (pDirectory)
       return pDirectory->Exists(realURL);
   }
   XBMCCOMMONS_HANDLE_UNCHECKED
@@ -394,7 +400,7 @@ bool CDirectory::Remove(const CURL& url)
       CPasswordManager::GetInstance().AuthenticateURL(authUrl);
 
     std::unique_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realURL));
-    if (pDirectory.get())
+    if (pDirectory)
       if(pDirectory->Remove(authUrl))
       {
         g_directoryCache.ClearFile(realURL.Get());
@@ -420,7 +426,7 @@ bool CDirectory::RemoveRecursive(const CURL& url)
       CPasswordManager::GetInstance().AuthenticateURL(authUrl);
 
     std::unique_ptr<IDirectory> pDirectory(CDirectoryFactory::Create(realURL));
-    if (pDirectory.get())
+    if (pDirectory)
       if(pDirectory->RemoveRecursive(authUrl))
       {
         g_directoryCache.ClearFile(realURL.Get());
@@ -446,7 +452,7 @@ void CDirectory::FilterFileDirectories(CFileItemList &items, const std::string &
     if (!pItem->m_bIsFolder && pItem->IsFileFolder(mode))
     {
       std::unique_ptr<IFileDirectory> pDirectory(CFileDirectoryFactory::Create(pItem->GetURL(),pItem.get(),mask));
-      if (pDirectory.get())
+      if (pDirectory)
         pItem->m_bIsFolder = true;
       else
         if (pItem->m_bIsFolder)

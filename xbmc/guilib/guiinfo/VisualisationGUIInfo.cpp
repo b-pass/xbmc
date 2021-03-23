@@ -14,12 +14,11 @@
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIVisualisationControl.h"
 #include "guilib/GUIWindowManager.h"
+#include "guilib/guiinfo/GUIInfo.h"
+#include "guilib/guiinfo/GUIInfoLabels.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/URIUtils.h"
-
-#include "guilib/guiinfo/GUIInfo.h"
-#include "guilib/guiinfo/GUIInfoLabels.h"
 
 using namespace KODI::GUILIB::GUIINFO;
 
@@ -55,7 +54,9 @@ bool CVisualisationGUIInfo::GetLabel(std::string& value, const CFileItem *item, 
     {
       ADDON::AddonPtr addon;
       value = CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(CSettings::SETTING_MUSICPLAYER_VISUALISATION);
-      if (CServiceBroker::GetAddonMgr().GetAddon(value, addon) && addon)
+      if (CServiceBroker::GetAddonMgr().GetAddon(value, addon, ADDON::ADDON_UNKNOWN,
+                                                 ADDON::OnlyEnabled::YES) &&
+          addon)
       {
         value = addon->Name();
         return true;

@@ -9,20 +9,30 @@
 #pragma once
 
 #include "WinSystemX11.h"
-
-#include "EGL/egl.h"
 #include "rendering/gl/RenderSystemGL.h"
-#include "platform/linux/OptionalsReg.h"
+#include "system_egl.h"
+
 #include <memory>
 
 class CGLContext;
+
+namespace KODI
+{
+namespace WINDOWING
+{
+namespace X11
+{
+
 class CVaapiProxy;
 
 class CWinSystemX11GLContext : public CWinSystemX11, public CRenderSystemGL
 {
 public:
-  CWinSystemX11GLContext();
+  CWinSystemX11GLContext() = default;
   ~CWinSystemX11GLContext() override;
+
+  static void Register();
+  static std::unique_ptr<CWinSystemBase> CreateWinSystem();
 
   // Implementation of CWinSystem via CWinSystemX11
   CRenderSystemBase *GetRenderSystem() override { return this; }
@@ -62,6 +72,8 @@ protected:
     void operator()(CVaapiProxy *p) const;
   };
   std::unique_ptr<CVaapiProxy, delete_CVaapiProxy> m_vaapiProxy;
-
-  std::unique_ptr<OPTIONALS::CLircContainer, OPTIONALS::delete_CLircContainer> m_lirc;
 };
+
+}
+}
+}

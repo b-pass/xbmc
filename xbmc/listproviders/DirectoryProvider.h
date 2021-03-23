@@ -8,15 +8,17 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-#include "addons/AddonEvents.h"
 #include "IListProvider.h"
+#include "addons/AddonEvents.h"
+#include "addons/RepositoryUpdater.h"
 #include "favourites/FavouritesService.h"
 #include "guilib/GUIStaticItem.h"
-#include "utils/Job.h"
-#include "threads/CriticalSection.h"
 #include "interfaces/IAnnouncer.h"
+#include "threads/CriticalSection.h"
+#include "utils/Job.h"
+
+#include <string>
+#include <vector>
 
 class TiXmlElement;
 class CVariant;
@@ -31,7 +33,8 @@ enum class InfoTagType
   VIDEO,
   AUDIO,
   PICTURE,
-  PROGRAM
+  PROGRAM,
+  PVR,
 };
 
 class CDirectoryProvider :
@@ -51,7 +54,10 @@ public:
   ~CDirectoryProvider() override;
 
   bool Update(bool forceRefresh) override;
-  void Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data) override;
+  void Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                const std::string& sender,
+                const std::string& message,
+                const CVariant& data) override;
   void Fetch(std::vector<CGUIListItemPtr> &items) override;
   void Reset() override;
   bool OnClick(const CGUIListItemPtr &item) override;
@@ -82,6 +88,8 @@ private:
   bool UpdateLimit();
   bool UpdateSort();
   void OnAddonEvent(const ADDON::AddonEvent& event);
+  void OnAddonRepositoryEvent(const ADDON::CRepositoryUpdater::RepositoryUpdated& event);
   void OnPVRManagerEvent(const PVR::PVREvent& event);
   void OnFavouritesEvent(const CFavouritesService::FavouritesUpdated& event);
+  std::string GetTarget(const CFileItem& item) const;
 };

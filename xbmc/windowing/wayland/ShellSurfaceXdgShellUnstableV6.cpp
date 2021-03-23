@@ -8,8 +8,8 @@
 
 #include "ShellSurfaceXdgShellUnstableV6.h"
 
-#include "messaging/ApplicationMessenger.h"
 #include "Registry.h"
+#include "messaging/ApplicationMessenger.h"
 
 using namespace KODI::WINDOWING::WAYLAND;
 
@@ -67,15 +67,16 @@ CShellSurfaceXdgShellUnstableV6::CShellSurfaceXdgShellUnstableV6(IShellSurfaceHa
   {
     m_handler.OnClose();
   };
-  m_xdgToplevel.on_configure() = [this](std::int32_t width, std::int32_t height, std::vector<wayland::zxdg_toplevel_v6_state> states)
-  {
-    m_configuredSize.Set(width, height);
-    m_configuredState.reset();
-    for (auto state : states)
-    {
-      m_configuredState.set(ConvertStateFlag(state));
-    }
-  };
+  m_xdgToplevel.on_configure() =
+      [this](std::int32_t width, std::int32_t height,
+             const std::vector<wayland::zxdg_toplevel_v6_state>& states) {
+        m_configuredSize.Set(width, height);
+        m_configuredState.reset();
+        for (auto state : states)
+        {
+          m_configuredState.set(ConvertStateFlag(state));
+        }
+      };
   m_xdgToplevel.set_app_id(app_id);
   m_xdgToplevel.set_title(title);
   // Set sensible minimum size

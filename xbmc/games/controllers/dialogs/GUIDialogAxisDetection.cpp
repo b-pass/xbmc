@@ -7,10 +7,11 @@
  */
 
 #include "GUIDialogAxisDetection.h"
+
 #include "guilib/LocalizeStrings.h"
-#include "input/joysticks/interfaces/IButtonMap.h"
 #include "input/joysticks/DriverPrimitive.h"
 #include "input/joysticks/JoystickTranslator.h"
+#include "input/joysticks/interfaces/IButtonMap.h"
 #include "utils/StringUtils.h"
 
 #include <algorithm>
@@ -21,7 +22,7 @@ using namespace GAME;
 std::string CGUIDialogAxisDetection::GetDialogText()
 {
   // "Press all analog buttons now to detect them:[CR][CR]%s"
-  std::string dialogText = g_localizeStrings.Get(35020);
+  const std::string& dialogText = g_localizeStrings.Get(35020);
 
   std::vector<std::string> primitives;
 
@@ -53,16 +54,17 @@ bool CGUIDialogAxisDetection::AcceptsPrimitive(JOYSTICK::PRIMITIVE_TYPE type) co
 {
   switch (type)
   {
-  case JOYSTICK::PRIMITIVE_TYPE::SEMIAXIS:
-    return true;
-  default:
-    break;
+    case JOYSTICK::PRIMITIVE_TYPE::SEMIAXIS:
+      return true;
+    default:
+      break;
   }
 
   return false;
 }
 
-void CGUIDialogAxisDetection::OnLateAxis(const JOYSTICK::IButtonMap* buttonMap, unsigned int axisIndex)
+void CGUIDialogAxisDetection::OnLateAxis(const JOYSTICK::IButtonMap* buttonMap,
+                                         unsigned int axisIndex)
 {
   AddAxis(buttonMap->DeviceName(), axisIndex);
 }
@@ -70,11 +72,9 @@ void CGUIDialogAxisDetection::OnLateAxis(const JOYSTICK::IButtonMap* buttonMap, 
 void CGUIDialogAxisDetection::AddAxis(const std::string& deviceName, unsigned int axisIndex)
 {
   auto it = std::find_if(m_detectedAxes.begin(), m_detectedAxes.end(),
-    [&deviceName, axisIndex](const AxisEntry& axis)
-    {
-      return axis.first == deviceName &&
-             axis.second == axisIndex;
-    });
+                         [&deviceName, axisIndex](const AxisEntry& axis) {
+                           return axis.first == deviceName && axis.second == axisIndex;
+                         });
 
   if (it == m_detectedAxes.end())
   {

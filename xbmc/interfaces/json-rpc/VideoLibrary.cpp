@@ -7,9 +7,10 @@
  */
 
 #include "VideoLibrary.h"
-#include "messaging/ApplicationMessenger.h"
+
 #include "TextureDatabase.h"
 #include "Util.h"
+#include "messaging/ApplicationMessenger.h"
 #include "utils/SortUtils.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
@@ -546,7 +547,7 @@ JSONRPC_STATUS CVideoLibrary::SetMovieDetails(const std::string &method, ITransp
 
   UpdateResumePoint(parameterObject, infos, videodatabase);
 
-  CJSONRPCUtils::NotifyItemUpdated(infos);
+  CJSONRPCUtils::NotifyItemUpdated(infos, artwork);
   return ACK;
 }
 
@@ -885,11 +886,11 @@ JSONRPC_STATUS CVideoLibrary::Export(const std::string &method, ITransportLayer 
   else
   {
     cmd = "exportlibrary2(video, separate, dummy";
-    if (parameterObject["options"].isMember("images"))
+    if (parameterObject["options"].asBoolean("images"))
       cmd += ", artwork";
-    if (parameterObject["options"].isMember("overwrite"))
+    if (parameterObject["options"].asBoolean("overwrite"))
       cmd += ", overwrite";
-    if (parameterObject["options"].isMember("actorthumbs"))
+    if (parameterObject["options"].asBoolean("actorthumbs"))
       cmd += ", actorthumbs";
     cmd += ")";
   }
@@ -900,11 +901,16 @@ JSONRPC_STATUS CVideoLibrary::Export(const std::string &method, ITransportLayer 
 
 JSONRPC_STATUS CVideoLibrary::Clean(const std::string &method, ITransportLayer *transport, IClient *client, const CVariant &parameterObject, CVariant &result)
 {
+  std::string directory = parameterObject["directory"].asString();
   std::string cmd;
   if (parameterObject["content"].empty())
-    cmd = StringUtils::Format("cleanlibrary(video, {0})", parameterObject["showdialogs"].asBoolean() ? "true" : "false");
+    cmd = StringUtils::Format("cleanlibrary(video, {0}, {1})",
+                              parameterObject["showdialogs"].asBoolean() ? "true" : "false",
+                              StringUtils::Paramify(directory).c_str());
   else
-    cmd = StringUtils::Format("cleanlibrary({0}, {1})", parameterObject["content"].asString(), parameterObject["showdialogs"].asBoolean() ? "true" : "false");
+    cmd = StringUtils::Format("cleanlibrary({0}, {1}, {2})", parameterObject["content"].asString(),
+                              parameterObject["showdialogs"].asBoolean() ? "true" : "false",
+                              StringUtils::Paramify(directory).c_str());
 
   CApplicationMessenger::GetInstance().SendMsg(TMSG_EXECUTE_BUILT_IN, -1, -1, nullptr, cmd);
   return ACK;
@@ -1049,14 +1055,14 @@ void CVideoLibrary::UpdateResumePoint(const CVariant &parameterObject, CVideoInf
 {
   if (!parameterObject["resume"].isNull())
   {
-    int position = (int)parameterObject["resume"]["position"].asInteger();
-    if (position == 0)
+    double position = (double)parameterObject["resume"]["position"].asDouble();
+    if (position == 0.0)
       videodatabase.ClearBookMarksOfFile(details.m_strFileNameAndPath, CBookmark::RESUME);
     else
     {
       CBookmark bookmark;
-      int total = (int)parameterObject["resume"]["total"].asInteger();
-      if (total <= 0 && !videodatabase.GetResumeBookMark(details.m_strFileNameAndPath, bookmark))
+      double total = (double)parameterObject["resume"]["total"].asDouble();
+      if (total <= 0.0 && !videodatabase.GetResumeBookMark(details.m_strFileNameAndPath, bookmark))
         bookmark.totalTimeInSeconds = details.m_streamDetails.GetVideoDuration();
       else
         bookmark.totalTimeInSeconds = total;

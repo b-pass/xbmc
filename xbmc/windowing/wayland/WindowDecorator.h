@@ -8,22 +8,23 @@
 
 #pragma once
 
+#include "Connection.h"
+#include "Registry.h"
+#include "Seat.h"
+#include "ShellSurface.h"
+#include "Util.h"
+#include "WindowDecorationHandler.h"
+#include "threads/CriticalSection.h"
+#include "utils/Geometry.h"
+
+#include "platform/posix/utils/SharedMemory.h"
+
 #include <array>
 #include <memory>
 #include <set>
 
 #include <wayland-client-protocol.hpp>
 #include <wayland-cursor.hpp>
-
-#include "Connection.h"
-#include "Registry.h"
-#include "Seat.h"
-#include "ShellSurface.h"
-#include "threads/CriticalSection.h"
-#include "Util.h"
-#include "utils/Geometry.h"
-#include "platform/posix/utils/SharedMemory.h"
-#include "WindowDecorationHandler.h"
 
 namespace KODI
 {
@@ -143,10 +144,22 @@ private:
   CWindowDecorator& operator=(CWindowDecorator const& other) = delete;
 
   // IRawInputHandlerTouch
-  void OnTouchDown(CSeat* seat, std::uint32_t serial, std::uint32_t time, wayland::surface_t surface, std::int32_t id, double x, double y) override;
+  void OnTouchDown(CSeat* seat,
+                   std::uint32_t serial,
+                   std::uint32_t time,
+                   const wayland::surface_t& surface,
+                   std::int32_t id,
+                   double x,
+                   double y) override;
   // IRawInputHandlerPointer
-  void OnPointerEnter(CSeat* seat, std::uint32_t serial, wayland::surface_t surface, double surfaceX, double surfaceY) override;
-  void OnPointerLeave(CSeat* seat, std::uint32_t serial, wayland::surface_t surface) override;
+  void OnPointerEnter(CSeat* seat,
+                      std::uint32_t serial,
+                      const wayland::surface_t& surface,
+                      double surfaceX,
+                      double surfaceY) override;
+  void OnPointerLeave(CSeat* seat,
+                      std::uint32_t serial,
+                      const wayland::surface_t& surface) override;
   void OnPointerMotion(CSeat* seat, std::uint32_t time, double surfaceX, double surfaceY) override;
   void OnPointerButton(CSeat* seat, std::uint32_t serial, std::uint32_t time, std::uint32_t button, wayland::pointer_button_state state) override;
 

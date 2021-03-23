@@ -2,84 +2,100 @@
 
 set -x
 
-#this is the list of binaries we have to sign for being able to run un-jailbroken
-LIST_BINARY_EXTENSIONS="dylib so"
+# This is the list of binaries we have to sign for being able to run un-jailbroken
+LIST_BINARY_EXTENSIONS="dylib so app"
 
-export CODESIGN_ALLOCATE=`xcodebuild -find codesign_allocate`
-
-GEN_ENTITLEMENTS="$NATIVEPREFIX/bin/gen_entitlements.py"
-IOS11_ENTITLEMENTS="$XBMC_DEPENDS/share/ios11_entitlements.xml"
+DARWIN_EMBEDDED_ENTITLEMENTS="$XBMC_DEPENDS/share/darwin_embedded_entitlements.xml"
 LDID="$NATIVEPREFIX/bin/ldid"
 
-if [ ! -f ${GEN_ENTITLEMENTS} ]; then
-  echo "error: $GEN_ENTITLEMENTS not found. Codesign won't work."
-  exit -1
+if [ "${PLATFORM_NAME}" == "macosx" ]; then
+  MACOS=1
 fi
 
+if [ "$MACOS" ]; then
+  CONTENTS_PATH="${CODESIGNING_FOLDER_PATH}/Contents"
+else
+  CONTENTS_PATH="${CODESIGNING_FOLDER_PATH}"
+fi
 
-if [ "${PLATFORM_NAME}" == "iphoneos" ] || [ "${PLATFORM_NAME}" == "appletvos" ]; then
-  if [ -f "/Users/Shared/buildslave/keychain_unlock.sh" ]; then
-    /Users/Shared/buildslave/keychain_unlock.sh
-  fi
+# Pull the CFBundleIdentifier out of the built xxx.app
+BUNDLEID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "${CONTENTS_PATH}/Info.plist")
+echo "CFBundleIdentifier is '${BUNDLEID}'"
 
-  #do fake sign - needed for jailbroken ios5.1 devices for some reason
-  if [ -f ${LDID} ]; then
-    find ${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/ -name "*.dylib" | xargs ${LDID} -S${IOS11_ENTITLEMENTS}
-    find ${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/ -name "*.so" | xargs ${LDID} -S${IOS11_ENTITLEMENTS}
-    ${LDID} -S${IOS11_ENTITLEMENTS} ${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/${APP_NAME}
-    
-    #repackage python eggs
-    EGGS=`find ${CODESIGNING_FOLDER_PATH} -name "*.egg" -type f`
-        for i in $EGGS; do
-          echo $i
-          mkdir del
-          unzip $i -d del
-          find ./del/ -name "*.so" -type f |  xargs ${LDID} -S${IOS11_ENTITLEMENTS}
-          rm $i
-          cd del && zip -r $i ./* &&  cd ..
-          rm -r ./del/
-        done
-  fi
+# Prefer the expanded name, if available.
+CODE_SIGN_IDENTITY_FOR_ITEMS="${EXPANDED_CODE_SIGN_IDENTITY_NAME}"
+if [ "${CODE_SIGN_IDENTITY_FOR_ITEMS}" = "" ] ; then
+  # Fall back to old behavior.
+  CODE_SIGN_IDENTITY_FOR_ITEMS="${CODE_SIGN_IDENTITY}"
+fi
+echo "Code sign identity is '${CODE_SIGN_IDENTITY_FOR_ITEMS}'"
 
-  # pull the CFBundleIdentifier out of the built xxx.app
-  BUNDLEID=`mdls -raw -name kMDItemCFBundleIdentifier ${CODESIGNING_FOLDER_PATH}`
-  if [ "${BUNDLEID}" == "(null)" ] ; then
-    BUNDLEID=`/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' ${CODESIGNING_FOLDER_PATH}/Info.plist`
-  fi
+# Delete existing codesign and provisioning file
+rm -f "${CONTENTS_PATH}/embedded.mobileprovision"
+rm -rf "${CONTENTS_PATH}/_CodeSignature"
 
-  echo "CFBundleIdentifier is ${BUNDLEID}"
+# If user has set a code_sign_identity we do a real codesign (for deployment on non-jailbroken devices)
+if ! [ -z "${CODE_SIGN_IDENTITY_FOR_ITEMS}" ]; then
+  if egrep -q --max-count=1 -e '^iPhone (Developer|Distribution): ' -e '^Apple (Development|Distribution): ' -e '^[[:xdigit:]]+$' -e '^Developer ID Application: ' <<<"${CODE_SIGN_IDENTITY_FOR_ITEMS}"; then
+    echo "Doing a full bundle sign using genuine identity '${CODE_SIGN_IDENTITY_FOR_ITEMS}'"
 
-
-  # Prefer the expanded name, if available.
-  CODE_SIGN_IDENTITY_FOR_ITEMS="${EXPANDED_CODE_SIGN_IDENTITY_NAME}"
- if [ "${CODE_SIGN_IDENTITY_FOR_ITEMS}" = "" ] ; then
-   # Fall back to old behavior.
-   CODE_SIGN_IDENTITY_FOR_ITEMS="${CODE_SIGN_IDENTITY}"
- fi
- echo "${CODE_SIGN_IDENTITY_FOR_ITEMS}"
-
-  ${GEN_ENTITLEMENTS} "${BUNDLEID}" "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/${PROJECT_NAME}.xcent";
-  codesign -v -f -s "${CODE_SIGN_IDENTITY_FOR_ITEMS}" --entitlements "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/${PROJECT_NAME}.xcent" "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/"
-
-  #if user has set a code_sign_identity different from iPhone Developer we do a real codesign (for deployment on non-jailbroken devices)
-  if ! [ -z "${CODE_SIGN_IDENTITY}" ] && [ "${CODE_SIGN_IDENTITY}" == "iPhone Developer" ] && [ "${CODE_SIGN_IDENTITY}" != "Don't Code Sign"  ]; then
-    echo "Doing a full bundle sign using genuine identity ${CODE_SIGN_IDENTITY}"
     for binext in $LIST_BINARY_EXTENSIONS
     do
-      codesign --deep -fvvv -s "${CODE_SIGN_IDENTITY_FOR_ITEMS}" -i "${BUNDLEID}" `find ${CODESIGNING_FOLDER_PATH} -name "*.$binext" -type f` ${CODESIGNING_FOLDER_PATH}
+      echo "Signing binaries with '$binext' extension"
+      # Check if at least 1 file with the extension exists to sign, otherwise do nothing
+      FINDOUTPUT=$(find "${CONTENTS_PATH}" -iname "*.$binext" -type f)
+      if [ `echo $FINDOUTPUT | wc -l` != 0 ]; then
+        for singlefile in $FINDOUTPUT; do
+          codesign -s "${CODE_SIGN_IDENTITY_FOR_ITEMS}" -fvvv -i "${BUNDLEID}" "${singlefile}"
+        done
+      fi
     done
-    echo "In case your app crashes with SIG_SIGN check the variable LIST_BINARY_EXTENSIONS in tools/darwin/Support/Codesign.command"
 
-    #repackage python eggs
-    EGGS=`find ${CODESIGNING_FOLDER_PATH} -name "*.egg" -type f`
-    for i in $EGGS; do
-      echo $i
-      mkdir del
-      unzip $i -d del
-      codesign --deep -fvvv -s "${CODE_SIGN_IDENTITY_FOR_ITEMS}" -i "${BUNDLEID}" `find ./del/ -name "*.$binext" -type f` ./del/
-      rm $i
-      cd del && zip -r $i ./* &&  cd ..
-      rm -r ./del/
+    for FRAMEWORK_PATH in $(find "${CONTENTS_PATH}" -iname "*.framework" -type d)
+    do
+      DYLIB_BASENAME=$(basename "${FRAMEWORK_PATH%.framework}")
+      echo "Signing Framework: ${DYLIB_BASENAME}.framework"
+      FRAMEWORKBUNDLEID="${BUNDLEID}.framework.${DYLIB_BASENAME}"
+      codesign -s "${CODE_SIGN_IDENTITY_FOR_ITEMS}" -fvvv -i "${FRAMEWORKBUNDLEID}" "${FRAMEWORK_PATH}/${DYLIB_BASENAME}"
+      codesign -s "${CODE_SIGN_IDENTITY_FOR_ITEMS}" -fvvv -i "${FRAMEWORKBUNDLEID}" "${FRAMEWORK_PATH}"
     done
+
+    if [ "$MACOS" ]; then
+      # Sign and repackage python eggs for osx
+      EGGS=$(find "${CONTENTS_PATH}" -iname "*.egg" -type f)
+      echo "Signing Eggs"
+      for i in $EGGS; do
+        echo $i
+        mkdir del
+        unzip -q $i -d del
+        for binext in $LIST_BINARY_EXTENSIONS
+        do
+          # Check if at least 1 file with the extension exists to sign, otherwise do nothing
+          FINDOUTPUT=$(find ./del/ -iname "*.$binext" -type f)
+          if [ `echo $FINDOUTPUT | wc -l` != 0 ]; then
+            for singlefile in $FINDOUTPUT; do
+              codesign -s "${CODE_SIGN_IDENTITY_FOR_ITEMS}" -fvvv -i "${BUNDLEID}" "${singlefile}"
+            done
+          fi
+        done
+        rm $i
+        cd del && zip -qr $i ./* && cd ..
+        rm -r ./del/
+      done
+    fi
   fi
+elif [ ! "$MACOS" ]; then
+  # Do fake sign - needed for iOS >=5.1 and tvOS >=10.2 jailbroken devices
+  # See http://www.saurik.com/id/8
+  echo "Doing a fake sign using ldid for jailbroken devices (main kodi binary and all Mach-O files)"
+
+  # Main 'kodi' binary
+  "${LDID}" -S"${DARWIN_EMBEDDED_ENTITLEMENTS}" "${CONTENTS_PATH}/${EXECUTABLE_NAME}"
+
+  # All Mach-O files (except TopShelf)
+  for f in $(find "${CONTENTS_PATH}/AppData" "${CONTENTS_PATH}/Frameworks" -type f); do
+    if [[ $(file ${f}) == *"Mach-O"* ]]; then
+      "${LDID}" -S "${f}"
+    fi
+  done
 fi

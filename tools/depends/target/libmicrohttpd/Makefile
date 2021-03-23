@@ -3,7 +3,7 @@ DEPS= ../../Makefile.include Makefile
 
 # lib name, version
 LIBNAME=libmicrohttpd
-VERSION=0.9.55
+VERSION=0.9.71
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 
@@ -26,12 +26,10 @@ $(PLATFORM): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	cd $(PLATFORM); $(CONFIGURE)
 
 $(LIBDYLIB): $(PLATFORM)
-	$(MAKE) -C $(PLATFORM)/src/microhttpd
-	$(MAKE) -C $(PLATFORM)/src/include install
+	$(MAKE) -C $(PLATFORM)
 
 .installed-$(PLATFORM): $(LIBDYLIB)
-	rm -f $(PREFIX)/lib/libmicrohttpd.so $(PREFIX)/lib/libmicrohttpd.so.5 $(PREFIX)/lib/libmicrohttpd.so.5.2.1
-	$(MAKE) -C $(PLATFORM)/src/microhttpd install
+	$(MAKE) -C $(PLATFORM) install
 	touch $@
 
 clean:

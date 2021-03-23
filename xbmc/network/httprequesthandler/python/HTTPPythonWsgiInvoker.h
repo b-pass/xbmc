@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-
 #include "interfaces/python/PythonInvoker.h"
 #include "network/httprequesthandler/python/HTTPPythonInvoker.h"
 #include "network/httprequesthandler/python/HTTPPythonRequest.h"
+
+#include <map>
+#include <string>
 
 namespace XBMCAddon
 {
@@ -34,12 +34,13 @@ public:
 
 protected:
   // overrides of CPythonInvoker
-  void executeScript(void *fp, const std::string &script, void *module, void *moduleDict) override;
+  void executeScript(FILE* fp, const std::string& script, PyObject* moduleDict) override;
   std::map<std::string, PythonModuleInitialization> getModules() const override;
   const char* getInitializationScript() const override;
 
 private:
-  static std::map<std::string, std::string> createCgiEnvironment(const HTTPPythonRequest* httpRequest, ADDON::AddonPtr addon);
+  static std::map<std::string, std::string> createCgiEnvironment(
+      const HTTPPythonRequest* httpRequest, const ADDON::AddonPtr& addon);
   static void addWsgiEnvironment(HTTPPythonRequest* request, void* environment);
 
   XBMCAddon::xbmcwsgi::WsgiResponse* m_wsgiResponse;

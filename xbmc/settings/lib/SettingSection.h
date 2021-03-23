@@ -8,12 +8,14 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "ISetting.h"
 #include "Setting.h"
 #include "SettingCategoryAccess.h"
+#include "utils/StaticLoggerBase.h"
+
+#include <string>
+#include <utility>
+#include <vector>
 
 class CSettingsManager;
 
@@ -23,7 +25,7 @@ class CSettingsManager;
  \sa CSettingCategory
  \sa CSetting
  */
-class CSettingGroup : public ISetting
+class CSettingGroup : public ISetting, protected CStaticLoggerBase
 {
 public:
   /*!
@@ -54,14 +56,15 @@ public:
    */
   SettingList GetSettings(SettingLevel level) const;
 
-  void AddSetting(std::shared_ptr<CSetting> setting);
+  void AddSetting(const std::shared_ptr<CSetting>& setting);
   void AddSettings(const SettingList &settings);
 
-  bool ReplaceSetting(std::shared_ptr<const CSetting> currentSetting, std::shared_ptr<CSetting> newSetting);
+  bool ReplaceSetting(const std::shared_ptr<const CSetting>& currentSetting,
+                      const std::shared_ptr<CSetting>& newSetting);
 
   std::shared_ptr<const ISettingControl> GetControl() const { return m_control; }
   std::shared_ptr<ISettingControl> GetControl() { return m_control; }
-  void SetControl(std::shared_ptr<ISettingControl> control) { m_control = control; }
+  void SetControl(std::shared_ptr<ISettingControl> control) { m_control = std::move(control); }
 
 private:
   SettingList m_settings;
@@ -77,7 +80,7 @@ using SettingGroupList = std::vector<SettingGroupPtr>;
  \sa CSettingSection
  \sa CSettingGroup
  */
-class CSettingCategory : public ISetting
+class CSettingCategory : public ISetting, protected CStaticLoggerBase
 {
 public:
   /*!
@@ -116,7 +119,7 @@ public:
    */
   bool CanAccess() const;
 
-  void AddGroup(SettingGroupPtr group);
+  void AddGroup(const SettingGroupPtr& group);
   void AddGroups(const SettingGroupList &groups);
 
 private:
@@ -133,7 +136,7 @@ using SettingCategoryList = std::vector<SettingCategoryPtr>;
  \sa CSettings
  \sa CSettingCategory
  */
-class CSettingSection : public ISetting
+class CSettingSection : public ISetting, protected CStaticLoggerBase
 {
 public:
   /*!
@@ -165,7 +168,7 @@ public:
    */
   SettingCategoryList GetCategories(SettingLevel level) const;
 
-  void AddCategory(SettingCategoryPtr category);
+  void AddCategory(const SettingCategoryPtr& category);
   void AddCategories(const SettingCategoryList &categories);
 
 private:

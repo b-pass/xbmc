@@ -7,17 +7,17 @@
  */
 
 
-
 #include "GLShader.h"
+
 #include "ServiceBroker.h"
-#include "utils/log.h"
-#include "rendering/RenderSystem.h"
 #include "rendering/MatrixGL.h"
+#include "rendering/RenderSystem.h"
+#include "utils/log.h"
 #include "windowing/GraphicContext.h"
 
 using namespace Shaders;
 
-CGLShader::CGLShader(const char *shader, std::string prefix)
+CGLShader::CGLShader(const char* shader, const std::string& prefix)
 {
   m_proj = nullptr;
   m_model  = nullptr;
@@ -27,7 +27,7 @@ CGLShader::CGLShader(const char *shader, std::string prefix)
   PixelShader()->LoadSource(shader, prefix);
 }
 
-CGLShader::CGLShader(const char *vshader, const char *fshader, std::string prefix)
+CGLShader::CGLShader(const char* vshader, const char* fshader, const std::string& prefix)
 {
   m_proj = nullptr;
   m_model  = nullptr;

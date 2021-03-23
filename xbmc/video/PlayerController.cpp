@@ -7,27 +7,28 @@
  */
 
 #include "PlayerController.h"
+
+#include "Application.h"
 #include "ServiceBroker.h"
+#include "cores/IPlayer.h"
+#include "cores/VideoPlayer/VideoRenderers/OverlayRendererGUI.h"
+#include "dialogs/GUIDialogKaiToast.h"
 #include "dialogs/GUIDialogSelect.h"
 #include "dialogs/GUIDialogSlider.h"
+#include "guilib/GUIComponent.h"
+#include "guilib/GUISliderControl.h"
+#include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
+#include "input/Key.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/DisplaySettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "cores/IPlayer.h"
-#include "input/Key.h"
-#include "guilib/GUIComponent.h"
-#include "guilib/LocalizeStrings.h"
-#include "guilib/GUISliderControl.h"
-#include "guilib/GUIWindowManager.h"
-#include "dialogs/GUIDialogKaiToast.h"
-#include "video/dialogs/GUIDialogAudioSettings.h"
-#include "cores/VideoPlayer/VideoRenderers/OverlayRendererGUI.h"
-#include "Application.h"
 #include "utils/LangCodeExpander.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
+#include "video/dialogs/GUIDialogAudioSettings.h"
 
 CPlayerController::~CPlayerController() = default;
 
@@ -49,7 +50,12 @@ bool CPlayerController::OnAction(const CAction &action)
       case ACTION_SHOW_SUBTITLES:
       {
         if (g_application.GetAppPlayer().GetSubtitleCount() == 0)
+        {
+          CGUIDialogKaiToast::QueueNotification(
+              CGUIDialogKaiToast::Info, g_localizeStrings.Get(287), g_localizeStrings.Get(10005),
+              DisplTime, false, MsgTime);
           return true;
+        }
 
         bool subsOn = !g_application.GetAppPlayer().GetSubtitleVisible();
         g_application.GetAppPlayer().SetSubtitleVisible(subsOn);
@@ -446,7 +452,7 @@ bool CPlayerController::OnAction(const CAction &action)
         {
           int playing = 0;
           int idx = 0;
-          for (auto prog : programs)
+          for (const auto& prog : programs)
           {
             dialog->Add(prog.name);
             if (prog.playing)

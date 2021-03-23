@@ -179,6 +179,26 @@ static int PlayerControl(const std::vector<std::string>& params)
       g_application.GetAppPlayer().SetTempo(playTempo);
     }
   }
+  else if (StringUtils::StartsWithNoCase(params[0], "tempo"))
+  {
+    if (params[0].size() == 5)
+      CLog::Log(LOGERROR, "PlayerControl(tempo(n)) called with no argument");
+    else if (params[0].size() < 8) // arg must be at least "(N)"
+      CLog::Log(LOGERROR, "PlayerControl(tempo(n)) called with invalid argument: \"%s\"",
+                params[0].substr(6).c_str());
+    else
+    {
+      CApplicationPlayer& player = g_application.GetAppPlayer();
+      if (player.SupportsTempo() && player.IsPlaying() && !player.IsPaused())
+      {
+        std::string strTempo = params[0].substr(6);
+        StringUtils::TrimRight(strTempo, ")");
+        float playTempo = strtof(strTempo.c_str(), nullptr);
+
+        player.SetTempo(playTempo);
+      }
+    }
+  }
   else if (paramlow == "next")
   {
     g_application.OnAction(CAction(ACTION_NEXT_ITEM));
@@ -333,7 +353,7 @@ static int PlayerControl(const std::vector<std::string>& params)
   else if (StringUtils::StartsWithNoCase(params[0], "resumelivetv"))
   {
     CFileItem& fileItem(g_application.CurrentFileItem());
-    PVR::CPVRChannelPtr channel = fileItem.HasPVRRecordingInfoTag() ? fileItem.GetPVRRecordingInfoTag()->Channel() : PVR::CPVRChannelPtr();
+    std::shared_ptr<PVR::CPVRChannel> channel = fileItem.HasPVRRecordingInfoTag() ? fileItem.GetPVRRecordingInfoTag()->Channel() : std::shared_ptr<PVR::CPVRChannel>();
 
     if (channel)
     {
@@ -363,7 +383,7 @@ static int PlayDVD(const std::vector<std::string>& params)
   bool restart = false;
   if (!params.empty() && StringUtils::EqualsNoCase(params[0], "restart"))
     restart = true;
-  MEDIA_DETECT::CAutorun::PlayDisc(g_mediaManager.GetDiscPath(), true, restart);
+  MEDIA_DETECT::CAutorun::PlayDisc(CServiceBroker::GetMediaManager().GetDiscPath(), true, restart);
 #endif
 
   return 0;
@@ -403,7 +423,7 @@ static int PlayMedia(const std::vector<std::string>& params)
     if (StringUtils::EqualsNoCase(params[i], "isdir"))
       item.m_bIsFolder = true;
     else if (params[i] == "1") // set fullscreen or windowed
-      CMediaSettings::GetInstance().SetVideoStartWindowed(true);
+      CMediaSettings::GetInstance().SetMediaStartWindowed(true);
     else if (StringUtils::EqualsNoCase(params[i], "resume"))
     {
       // force the item to resume (if applicable) (see CApplication::PlayMedia)
@@ -429,11 +449,14 @@ static int PlayMedia(const std::vector<std::string>& params)
     if ( CGUIWindowVideoBase::ShowResumeMenu(item) == false )
       return false;
   }
-  if (item.m_bIsFolder || item.IsPlayList() || item.IsSmartPlayList())
+  if (item.m_bIsFolder || item.IsPlayList())
   {
     CFileItemList items;
     std::string extensions = CServiceBroker::GetFileExtensionProvider().GetVideoExtensions() + "|" + CServiceBroker::GetFileExtensionProvider().GetMusicExtensions();
-    XFILE::CDirectory::GetDirectory(item.GetPath(), items, extensions, XFILE::DIR_FLAG_DEFAULTS);
+    if (item.IsPlayList())
+      CUtil::GetRecursiveListing(item.GetPath(), items, extensions, XFILE::DIR_FLAG_DEFAULTS);
+    else
+      XFILE::CDirectory::GetDirectory(item.GetPath(), items, extensions, XFILE::DIR_FLAG_DEFAULTS);
 
     if (!items.IsEmpty()) // fall through on non expandable playlist
     {
@@ -449,18 +472,24 @@ static int PlayMedia(const std::vector<std::string>& params)
       }
 
       std::unique_ptr<CGUIViewState> state(CGUIViewState::GetViewState(containsVideo ? WINDOW_VIDEO_NAV : WINDOW_MUSIC_NAV, items));
-      if (state.get())
+      if (state)
         items.Sort(state->GetSortMethod());
       else
         items.Sort(SortByLabel, SortOrderAscending);
 
-      int playlist = containsVideo? PLAYLIST_VIDEO : PLAYLIST_MUSIC;;
-      if (containsMusic && containsVideo) //mixed content found in the folder
+      int playlist = containsVideo? PLAYLIST_VIDEO : PLAYLIST_MUSIC;
+      // Mixed playlist item played by music player, mixed content folder has music removed
+      if (containsMusic && containsVideo)
       {
-        for (int i = items.Size() - 1; i >= 0; i--) //remove music entries
+        if (item.IsPlayList())
+          playlist = PLAYLIST_MUSIC;
+        else
         {
-          if (!items[i]->IsVideo())
-            items.Remove(i);
+          for (int i = items.Size() - 1; i >= 0; i--) //remove music entries
+          {
+            if (!items[i]->IsVideo())
+              items.Remove(i);
+          }
         }
       }
 
@@ -471,7 +500,7 @@ static int PlayMedia(const std::vector<std::string>& params)
       return 0;
     }
   }
-  if (item.IsAudio() || item.IsVideo())
+  if ((item.IsAudio() || item.IsVideo()) && !item.IsSmartPlayList())
     CServiceBroker::GetPlaylistPlayer().Play(std::make_shared<CFileItem>(item), "");
   else
     g_application.PlayMedia(item, "", PLAYLIST_NONE);
@@ -527,7 +556,7 @@ static int Seek(const std::vector<std::string>& params)
 ///     <br>
 ///     | Control                 | Video playback behaviour               | Audio playback behaviour    | Added in    |
 ///     |:------------------------|:---------------------------------------|:----------------------------|:------------|
-///     | Play                    | Play/Pause                             | Play/Pause                  |             | 
+///     | Play                    | Play/Pause                             | Play/Pause                  |             |
 ///     | Stop                    | Stop                                   | Stop                        |             |
 ///     | Forward                 | Fast Forward                           | Fast Forward                |             |
 ///     | Rewind                  | Rewind                                 | Rewind                      |             |
@@ -535,6 +564,7 @@ static int Seek(const std::vector<std::string>& params)
 ///     | Previous                | Previous chapter or movie in playlists | Previous track              |             |
 ///     | TempoUp                 | Increases playback speed               | none                        | Kodi v18    |
 ///     | TempoDown               | Decreases playback speed               | none                        | Kodi v18    |
+///     | Tempo(n)                | Sets playback speed to given value     | none                        | Kodi v19    |
 ///     | BigSkipForward          | Big Skip Forward                       | Big Skip Forward            | Kodi v15    |
 ///     | BigSkipBackward         | Big Skip Backward                      | Big Skip Backward           | Kodi v15    |
 ///     | SmallSkipForward        | Small Skip Forward                     | Small Skip Forward          | Kodi v15    |
@@ -583,12 +613,12 @@ static int Seek(const std::vector<std::string>& params)
 ///     ,
 ///     Plays the media. This can be a playlist\, music\, or video file\, directory\,
 ///     plugin or an Url. The optional parameter "\,isdir" can be used for playing
-///     a directory. "\,1" will start a video in a preview window\, instead of
-///     fullscreen. If media is a playlist\, you can use playoffset=xx where xx is
+///     a directory. "\,1" will start the media without switching to fullscreen.
+///     If media is a playlist\, you can use playoffset=xx where xx is
 ///     the position to start playback from.
 ///     @param[in] media                 URL to media to play (optional).
 ///     @param[in] isdir                 Set "isdir" if media is a directory (optional).
-///     @param[in] fullscreen            Set "1" to start playback in fullscreen (optional).
+///     @param[in] windowed              Set "1" to start playback without switching to fullscreen (optional).
 ///     @param[in] resume                Set "resume" to force resuming (optional).
 ///     @param[in] noresume              Set "noresume" to force not resuming (optional).
 ///     @param[in] playeroffset          Set "playoffset=<offset>" to start playback from a given position in a playlist (optional).

@@ -9,7 +9,15 @@
 #pragma once
 
 #include "GLContext.h"
-#include "GL/glx.h"
+
+#include <GL/glx.h>
+
+namespace KODI
+{
+namespace WINDOWING
+{
+namespace X11
+{
 
 class CGLContextGLX : public CGLContext
 {
@@ -34,3 +42,7 @@ protected:
   int m_iVSyncErrors;
   int m_vsyncMode;
 };
+
+}
+}
+}

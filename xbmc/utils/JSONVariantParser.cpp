@@ -40,7 +40,7 @@ private:
     return true;
   }
 
-  void PushObject(CVariant variant);
+  void PushObject(const CVariant& variant);
   void PopObject();
 
   CVariant& m_parsedObject;
@@ -146,7 +146,7 @@ bool CJSONVariantParserHandler::EndArray(rapidjson::SizeType elementCount)
   return true;
 }
 
-void CJSONVariantParserHandler::PushObject(CVariant variant)
+void CJSONVariantParserHandler::PushObject(const CVariant& variant)
 {
   if (m_status == PARSE_STATUS::Object)
   {
@@ -203,7 +203,9 @@ bool CJSONVariantParser::Parse(const char* json, CVariant& data)
   rapidjson::StringStream stringStream(json);
 
   CJSONVariantParserHandler handler(data);
-  if (reader.Parse(stringStream, handler))
+  // use kParseIterativeFlag to eliminate possible stack overflow
+  // from json parsing via reentrant calls
+  if (reader.Parse<rapidjson::kParseIterativeFlag>(stringStream, handler))
     return true;
 
   return false;

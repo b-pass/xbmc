@@ -7,13 +7,14 @@
  */
 
 #include "GUIControlGroupList.h"
-#include "GUIMessage.h"
+
 #include "GUIAction.h"
-#include "input/Key.h"
-#include "guilib/guiinfo/GUIInfoLabels.h"
 #include "GUIControlProfiler.h"
-#include "utils/StringUtils.h"
 #include "GUIFont.h" // for XBFONT_* definitions
+#include "GUIMessage.h"
+#include "guilib/guiinfo/GUIInfoLabels.h"
+#include "input/Key.h"
+#include "utils/StringUtils.h"
 
 CGUIControlGroupList::CGUIControlGroupList(int parentID, int controlID, float posX, float posY, float width, float height, float itemGap, int pageControl, ORIENTATION orientation, bool useControlPositions, uint32_t alignment, const CScroller& scroller)
 : CGUIControlGroup(parentID, controlID, posX, posY, width, height)
@@ -48,8 +49,13 @@ void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &d
     GUIPROFILER_VISIBILITY_END(control);
   }
 
-  ValidateOffset();
-  if (m_pageControl && m_lastScrollerValue != m_scroller.GetValue())
+  // visibility status of some of the list items may have changed. Thus, the group list size
+  // may now be different and the scroller needs to be updated
+  int previousTotalSize = m_totalSize;
+  ValidateOffset(); // m_totalSize is updated here
+  bool sizeChanged = previousTotalSize != m_totalSize;
+
+  if (m_pageControl && (m_lastScrollerValue != m_scroller.GetValue() || sizeChanged))
   {
     CGUIMessage message(GUI_MSG_LABEL_RESET, GetParentID(), m_pageControl, (int)Size(), (int)m_totalSize);
     SendWindowMessage(message);

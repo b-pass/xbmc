@@ -9,13 +9,13 @@
 #pragma once
 
 #include "cores/AudioEngine/Utils/AEAudioFormat.h"
+#include "cores/VideoPlayer/Interface/DemuxPacket.h"
 #include "cores/VideoPlayer/Process/ProcessInfo.h"
-#include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
 
 #include <vector>
 
 extern "C" {
-#include "libavcodec/avcodec.h"
+#include <libavcodec/avcodec.h>
 }
 
 struct AVStream;

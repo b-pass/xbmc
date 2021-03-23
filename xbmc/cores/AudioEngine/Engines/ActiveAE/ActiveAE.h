@@ -8,25 +8,24 @@
 
 #pragma once
 
-#include <list>
-#include <string>
-#include <vector>
-
+#include "ActiveAESink.h"
+#include "cores/AudioEngine/Engines/ActiveAE/ActiveAEBuffer.h"
+#include "cores/AudioEngine/Interfaces/AESound.h"
+#include "cores/AudioEngine/Interfaces/AEStream.h"
+#include "guilib/DispResource.h"
 #include "threads/Thread.h"
 
-#include "ActiveAESink.h"
-#include "cores/AudioEngine/Interfaces/AEStream.h"
-#include "cores/AudioEngine/Interfaces/AESound.h"
-#include "cores/AudioEngine/Engines/ActiveAE/ActiveAEBuffer.h"
-
-#include "guilib/DispResource.h"
+#include <list>
 #include <queue>
+#include <string>
+#include <utility>
+#include <vector>
 
 // ffmpeg
 extern "C" {
-#include "libavformat/avformat.h"
-#include "libavcodec/avcodec.h"
-#include "libavutil/avutil.h"
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libavutil/avutil.h>
 }
 
 class IAESink;
@@ -66,13 +65,15 @@ struct AudioSettings
 class CActiveAEControlProtocol : public Protocol
 {
 public:
-  CActiveAEControlProtocol(std::string name, CEvent* inEvent, CEvent *outEvent) : Protocol(name, inEvent, outEvent) {};
+  CActiveAEControlProtocol(std::string name, CEvent* inEvent, CEvent* outEvent)
+    : Protocol(std::move(name), inEvent, outEvent){};
   enum OutSignal
   {
     INIT = 0,
     RECONFIGURE,
     SUSPEND,
     DEVICECHANGE,
+    DEVICECOUNTCHANGE,
     MUTE,
     VOLUME,
     PAUSESTREAM,
@@ -104,7 +105,8 @@ public:
 class CActiveAEDataProtocol : public Protocol
 {
 public:
-  CActiveAEDataProtocol(std::string name, CEvent* inEvent, CEvent *outEvent) : Protocol(name, inEvent, outEvent) {};
+  CActiveAEDataProtocol(std::string name, CEvent* inEvent, CEvent* outEvent)
+    : Protocol(std::move(name), inEvent, outEvent){};
   enum OutSignal
   {
     NEWSOUND = 0,
@@ -184,7 +186,7 @@ public:
   void GetSyncInfo(CAESyncInfo& info, CActiveAEStream *stream);
   float GetCacheTime(CActiveAEStream *stream);
   float GetCacheTotal();
-  float GetMaxDelay();
+  float GetMaxDelay() const;
   float GetWaterLevel();
   void SetSuspended(bool state);
   void SetCurrentSinkFormat(const AEAudioFormat& SinkFormat);
@@ -254,6 +256,7 @@ public:
   bool IsSettingVisible(const std::string &settingId) override;
   void KeepConfiguration(unsigned int millis) override;
   void DeviceChange() override;
+  void DeviceCountChange(const std::string& driver) override;
   bool GetCurrentSinkFormat(AEAudioFormat &SinkFormat) override;
 
   void RegisterAudioCallback(IAudioCallback* pCallback) override;
@@ -329,6 +332,7 @@ protected:
   unsigned int m_extKeepConfig;
   bool m_extDeferData;
   std::queue<time_t> m_extLastDeviceChange;
+  bool m_extSuspended = false;
   bool m_isWinSysReg = false;
 
   enum

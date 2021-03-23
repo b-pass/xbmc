@@ -8,30 +8,28 @@
 
 #pragma once
 
-#include <time.h>
+#include "Connection.h"
+#include "Output.h"
+#include "Seat.h"
+#include "SeatInputProcessing.h"
+#include "ShellSurface.h"
+#include "Signals.h"
+#include "WindowDecorationHandler.h"
+#include "threads/CriticalSection.h"
+#include "threads/Event.h"
+#include "utils/ActorProtocol.h"
+#include "windowing/WinSystem.h"
 
 #include <atomic>
 #include <ctime>
 #include <list>
 #include <map>
 #include <set>
+#include <time.h>
 
 #include <wayland-client.hpp>
 #include <wayland-cursor.hpp>
 #include <wayland-extra-protocols.hpp>
-
-#include "Connection.h"
-#include "Output.h"
-#include "Seat.h"
-#include "SeatInputProcessing.h"
-#include "Signals.h"
-#include "ShellSurface.h"
-#include "platform/linux/OptionalsReg.h"
-#include "threads/CriticalSection.h"
-#include "threads/Event.h"
-#include "utils/ActorProtocol.h"
-#include "WindowDecorationHandler.h"
-#include "windowing/WinSystem.h"
 
 class IDispResource;
 
@@ -49,7 +47,9 @@ class CWinSystemWayland : public CWinSystemBase, IInputHandler, IWindowDecoratio
 {
 public:
   CWinSystemWayland();
-  virtual ~CWinSystemWayland() noexcept;
+  ~CWinSystemWayland() noexcept override;
+
+  const std::string GetName() override { return "wayland"; }
 
   bool InitWindowSystem() override;
   bool DestroyWindowSystem() override;
@@ -86,7 +86,7 @@ public:
   void Unregister(IDispResource* resource) override;
 
   using PresentationFeedbackHandler = std::function<void(timespec /* tv */, std::uint32_t /* refresh */, std::uint32_t /* sync output id */, float /* sync output fps */, std::uint64_t /* msc */)>;
-  CSignalRegistration RegisterOnPresentationFeedback(PresentationFeedbackHandler handler);
+  CSignalRegistration RegisterOnPresentationFeedback(const PresentationFeedbackHandler& handler);
 
   // Like CWinSystemX11
   void GetConnectedOutputs(std::vector<std::string>* outputs);
@@ -291,8 +291,6 @@ private:
   std::uint32_t m_lastAckedSerial{0u};
   /// Whether this is the first call to SetFullScreen
   bool m_isInitialSetFullScreen{true};
-
-  std::unique_ptr<OPTIONALS::CLircContainer, OPTIONALS::delete_CLircContainer> m_lirc;
 };
 
 

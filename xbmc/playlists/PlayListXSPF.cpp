@@ -9,10 +9,10 @@
 
 #include "PlayListXSPF.h"
 
-#include "utils/log.h"
+#include "URL.h"
 #include "utils/URIUtils.h"
 #include "utils/XBMCTinyXML.h"
-#include "URL.h"
+#include "utils/log.h"
 
 using namespace PLAYLIST;
 
@@ -103,12 +103,12 @@ bool CPlayListXSPF::Load(const std::string& strFileName)
 
       if (!localpath.empty())
       {
+        // We don't use URIUtils::CanonicalizePath because m_strBasePath may be a
+        // protocol e.g. smb
 #ifdef TARGET_WINDOWS
         StringUtils::Replace(localpath, "/", "\\");
-        localpath = URIUtils::CanonicalizePath(localpath, '\\');
-#else
-        localpath = URIUtils::CanonicalizePath(localpath, '/');
 #endif
+        localpath = URIUtils::GetRealPath(localpath);
 
         newItem->SetPath(localpath);
       }

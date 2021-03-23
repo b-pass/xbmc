@@ -6,11 +6,12 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "DVDInputStreams/DVDInputStream.h"
 #include "DVDDemuxBXA.h"
+
 #include "DVDDemuxUtils.h"
+#include "DVDInputStreams/DVDInputStream.h"
+#include "cores/VideoPlayer/Interface/TimingConstants.h"
 #include "utils/StringUtils.h"
-#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
 
 // AirTunes audio Demuxer.
 
@@ -38,7 +39,7 @@ CDVDDemuxBXA::~CDVDDemuxBXA()
   Dispose();
 }
 
-bool CDVDDemuxBXA::Open(std::shared_ptr<CDVDInputStream> pInput)
+bool CDVDDemuxBXA::Open(const std::shared_ptr<CDVDInputStream>& pInput)
 {
   Abort();
 

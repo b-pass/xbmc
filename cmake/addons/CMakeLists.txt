@@ -80,6 +80,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL WindowsStore)
                      -DCMAKE_SYSTEM_VERSION=${CMAKE_SYSTEM_VERSION})
 endif()
 
+include(${CORE_SOURCE_DIR}/cmake/scripts/common/CompilerSettings.cmake)
+
 set(BUILD_ARGS -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
                -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
                -DPACKAGE_CONFIG_PATH=${ADDON_DEPENDS_PATH}/lib/pkgconfig
@@ -119,6 +121,17 @@ if(CMAKE_TOOLCHAIN_FILE)
   list(APPEND BUILD_ARGS -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE})
   message(STATUS "Toolchain specified")
   message(STATUS ${BUILD_ARGS})
+endif()
+
+# used for addons where need special folders to store there content (if
+# not set the addon define it byself).
+# e.g. Google Chromium addon where his git bring:
+# - "unable to create file" ... "Filename too long"
+# see also WARNING by Windows on: https://bitbucket.org/chromiumembedded/cef/wiki/MasterBuildQuickStart
+if(THIRD_PARTY_PATH)
+  message(STATUS "Third party lib path specified")
+  message(STATUS ${THIRD_PARTY_PATH})
+  list(APPEND BUILD_ARGS -DTHIRD_PARTY_PATH=${THIRD_PARTY_PATH})
 endif()
 
 if(NOT ADDONS_TO_BUILD)
@@ -231,21 +244,80 @@ endif()
 # error either in ADDONS_TO_BUILD or in the directory configuration.
 set(SUPPORTED_ADDON_FOUND FALSE)
 
+if(NOT ADDONS_TO_BUILD)
+  set(ADDONS_TO_BUILD "all")
+endif()
+
+if(NOT ADDONS_TO_BUILD STREQUAL "all")
+  # Exact addon match list
+  set(REGEX_ADDONS_TO_BUILD ${ADDONS_TO_BUILD})
+  set(EXACT_MATCH_ADDON_LIST "")
+  set(EXCLUDE_ADDONS "")
+
+  foreach(addon ${ADDONS_TO_BUILD})
+    set(FOUND_EXCLUSION "")
+    string(REGEX MATCH "^[-](.*)" FOUND_EXCLUSION "${addon}")
+    if(NOT FOUND_EXCLUSION STREQUAL "")
+      list(APPEND EXCLUDE_ADDONS ${CMAKE_MATCH_1})
+      list(REMOVE_ITEM REGEX_ADDONS_TO_BUILD "-${CMAKE_MATCH_1}")
+    else()
+      foreach(addonrepoitem ${addons})
+        if(NOT (addonrepoitem MATCHES platforms.txt))
+          # need to strip regex chars, or the filter regex will use
+          string(REPLACE "*" "" strippedregex ${addon})
+          if(${addonrepoitem} MATCHES "^.*\/(${strippedregex}).txt")
+            list(APPEND EXACT_MATCH_ADDON_LIST ${addon})
+            # remove exact matches from addons_to_build
+            list(REMOVE_ITEM REGEX_ADDONS_TO_BUILD "${addon}")
+          endif()
+        endif()
+      endforeach()
+    endif()
+  endforeach()
+
+  message(STATUS "Exclusion list: ${EXCLUDE_ADDONS}")
+  message(STATUS "Exact Match list: ${EXACT_MATCH_ADDON_LIST}")
+  message(STATUS "Regex list: ${REGEX_ADDONS_TO_BUILD}")
+endif()
+
 foreach(addon ${addons})
   if(NOT (addon MATCHES platforms.txt))
     file(STRINGS ${addon} def)
     string(REPLACE " " ";" def ${def})
     list(GET def 0 id)
 
-    set(ADDON_FOUND FALSE)
-    # try to find a perfect match
-    list(FIND ADDONS_TO_BUILD ${id} idx)
-    if(idx GREATER -1 OR "${ADDONS_TO_BUILD}" STREQUAL "all")
+    if("${ADDONS_TO_BUILD}" STREQUAL "all")
       set(ADDON_FOUND TRUE)
-    # Maybe we have a regex
-    elseif(id MATCHES "${ADDONS_TO_BUILD}")
-      message(STATUS "Pattern ${ADDONS_TO_BUILD} matches ${id}, building addon")
-      set(ADDON_FOUND TRUE)
+    else()
+      set(ADDON_EXCLUDE FALSE)
+      set(ADDON_FOUND FALSE)
+      foreach(exclusion ${EXCLUDE_ADDONS})
+        if(id MATCHES "${exclusion}")
+          set(ADDON_EXCLUDE TRUE)
+          message(STATUS "Addon ${id} matches exclusion rule -${exclusion}")
+          break()
+        endif()
+      endforeach()
+
+      if(ADDON_EXCLUDE)
+        continue()
+      endif()
+
+      list(FIND EXACT_MATCH_ADDON_LIST ${id} idx)
+      if(idx GREATER -1)
+        # exact match, so build
+        message(STATUS "Exact match ${id}, building addon")
+        set(ADDON_FOUND TRUE)
+      else()
+        # regex search
+        foreach(ADDONLISTITEM ${REGEX_ADDONS_TO_BUILD})
+          if(id MATCHES "${ADDONLISTITEM}")
+            message(STATUS "Pattern ${ADDONLISTITEM} matches ${id}, building addon")
+            set(ADDON_FOUND TRUE)
+            break()
+          endif()
+        endforeach()
+      endif()
     endif()
 
     if(ADDON_FOUND)
@@ -375,9 +447,6 @@ foreach(addon ${addons})
                                    DEPENDEES configure
                                    DEPENDERS build
                                    ALWAYS 1)
-
-          # add "kodi-platform" as a dependency to every addon
-          add_dependencies(${id} kodi-platform)
 
           set(${id}_DEPENDS_DIR ${SOURCE_DIR}/depends)
 

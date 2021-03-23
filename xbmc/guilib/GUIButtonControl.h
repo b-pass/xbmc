@@ -13,13 +13,12 @@
 \brief
 */
 
+#include "GUIAction.h"
+#include "GUIControl.h"
+#include "GUILabel.h"
+#include "GUITexture.h"
 #include "guilib/guiinfo/GUIInfoLabel.h"
 #include "utils/Color.h"
-
-#include "GUITexture.h"
-#include "GUILabel.h"
-#include "GUIControl.h"
-#include "GUIAction.h"
 
 /*!
  \ingroup controls
@@ -33,7 +32,9 @@ public:
                     const CTextureInfo& textureFocus, const CTextureInfo& textureNoFocus,
                     const CLabelInfo &label, bool wrapMultiline = false);
 
-  ~CGUIButtonControl(void) override;
+  CGUIButtonControl(const CGUIButtonControl& control);
+
+  ~CGUIButtonControl() override = default;
   CGUIButtonControl *Clone() const override { return new CGUIButtonControl(*this); };
 
   void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions) override;
@@ -79,8 +80,8 @@ protected:
   virtual void RenderText();
   virtual CGUILabel::COLOR GetTextColor() const;
 
-  CGUITexture m_imgFocus;
-  CGUITexture m_imgNoFocus;
+  std::unique_ptr<CGUITexture> m_imgFocus;
+  std::unique_ptr<CGUITexture> m_imgNoFocus;
   unsigned int  m_focusCounter;
   unsigned char m_alpha;
 

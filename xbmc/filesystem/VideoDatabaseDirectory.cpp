@@ -7,19 +7,20 @@
  */
 
 #include "VideoDatabaseDirectory.h"
-#include "ServiceBroker.h"
-#include "utils/URIUtils.h"
-#include "VideoDatabaseDirectory/QueryParams.h"
-#include "video/VideoDatabase.h"
-#include "guilib/TextureManager.h"
+
 #include "File.h"
 #include "FileItem.h"
+#include "ServiceBroker.h"
+#include "VideoDatabaseDirectory/QueryParams.h"
+#include "guilib/LocalizeStrings.h"
+#include "guilib/TextureManager.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/Crc32.h"
-#include "guilib/LocalizeStrings.h"
 #include "utils/LegacyPathTranslation.h"
 #include "utils/StringUtils.h"
+#include "utils/URIUtils.h"
+#include "video/VideoDatabase.h"
 
 using namespace XFILE;
 using namespace VIDEODATABASEDIRECTORY;
@@ -35,25 +36,28 @@ bool CVideoDatabaseDirectory::GetDirectory(const CURL& url, CFileItemList &items
   items.m_dwSize = -1;  // No size
   std::unique_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(path));
 
-  if (!pNode.get())
+  if (!pNode)
     return false;
 
   bool bResult = pNode->GetChilds(items);
   for (int i=0;i<items.Size();++i)
   {
     CFileItemPtr item = items[i];
-    if (item->m_bIsFolder && !item->HasIcon() && !item->HasArt("thumb"))
+    if (item->m_bIsFolder && !item->HasArt("icon") && !item->HasArt("thumb"))
     {
       std::string strImage = GetIcon(item->GetPath());
       if (!strImage.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(strImage))
-        item->SetIconImage(strImage);
+        item->SetArt("icon", strImage);
     }
     if (item->GetVideoInfoTag())
     {
       item->SetDynPath(item->GetVideoInfoTag()->GetPath());
     }
   }
-  items.SetLabel(pNode->GetLocalizedName());
+  if (items.HasProperty("customtitle"))
+    items.SetLabel(items.GetProperty("customtitle").asString());
+  else
+    items.SetLabel(pNode->GetLocalizedName());
 
   return bResult;
 }
@@ -63,7 +67,7 @@ NODE_TYPE CVideoDatabaseDirectory::GetDirectoryChildType(const std::string& strP
   std::string path = CLegacyPathTranslation::TranslateVideoDbPath(strPath);
   std::unique_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(path));
 
-  if (!pNode.get())
+  if (!pNode)
     return NODE_TYPE_NONE;
 
   return pNode->GetChildType();
@@ -74,7 +78,7 @@ NODE_TYPE CVideoDatabaseDirectory::GetDirectoryType(const std::string& strPath)
   std::string path = CLegacyPathTranslation::TranslateVideoDbPath(strPath);
   std::unique_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(path));
 
-  if (!pNode.get())
+  if (!pNode)
     return NODE_TYPE_NONE;
 
   return pNode->GetType();
@@ -85,7 +89,7 @@ NODE_TYPE CVideoDatabaseDirectory::GetDirectoryParentType(const std::string& str
   std::string path = CLegacyPathTranslation::TranslateVideoDbPath(strPath);
   std::unique_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(path));
 
-  if (!pNode.get())
+  if (!pNode)
     return NODE_TYPE_NONE;
 
   CDirectoryNode* pParentNode=pNode->GetParent();
@@ -101,7 +105,7 @@ bool CVideoDatabaseDirectory::GetQueryParams(const std::string& strPath, CQueryP
   std::string path = CLegacyPathTranslation::TranslateVideoDbPath(strPath);
   std::unique_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(path));
 
-  if (!pNode.get())
+  if (!pNode)
     return false;
 
   CDirectoryNode::GetDatabaseInfo(strPath,params);
@@ -132,7 +136,7 @@ bool CVideoDatabaseDirectory::GetLabel(const std::string& strDirectory, std::str
 
   std::string path = CLegacyPathTranslation::TranslateVideoDbPath(strDirectory);
   std::unique_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(path));
-  if (!pNode.get() || path.empty())
+  if (!pNode || path.empty())
     return false;
 
   // first see if there's any filter criteria
@@ -298,7 +302,7 @@ bool CVideoDatabaseDirectory::Exists(const CURL& url)
   std::string path = CLegacyPathTranslation::TranslateVideoDbPath(url);
   std::unique_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(path));
 
-  if (!pNode.get())
+  if (!pNode)
     return false;
 
   if (pNode->GetChildType() == VIDEODATABASEDIRECTORY::NODE_TYPE_NONE)
@@ -311,7 +315,7 @@ bool CVideoDatabaseDirectory::CanCache(const std::string& strPath)
 {
   std::string path = CLegacyPathTranslation::TranslateVideoDbPath(strPath);
   std::unique_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(path));
-  if (!pNode.get())
+  if (!pNode)
     return false;
   return pNode->CanCache();
 }

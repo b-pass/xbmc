@@ -40,21 +40,21 @@
 //
 ////////////////////////////////////////////////////////////////////////////////////
 
-#include <cstdlib>
-
 #include "CueDocument.h"
-#include "ServiceBroker.h"
-#include "utils/log.h"
-#include "utils/URIUtils.h"
-#include "utils/StringUtils.h"
-#include "utils/CharsetConverter.h"
-#include "filesystem/File.h"
-#include "filesystem/Directory.h"
+
 #include "FileItem.h"
+#include "ServiceBroker.h"
+#include "Util.h"
+#include "filesystem/Directory.h"
+#include "filesystem/File.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
-#include "Util.h"
+#include "utils/CharsetConverter.h"
+#include "utils/StringUtils.h"
+#include "utils/URIUtils.h"
+#include "utils/log.h"
 
+#include <cstdlib>
 #include <set>
 
 using namespace XFILE;
@@ -137,10 +137,7 @@ public:
     }
 
     StringUtils::Trim(line);
-    if (!line.empty())
-      return true;
-    
-    return false;
+    return !line.empty();
   }
   bool ready() const override
   {
@@ -194,7 +191,7 @@ void CCueDocument::GetSongs(VECSONGS &songs)
     aSong.SetAlbumArtist(StringUtils::Split(m_strArtist, advancedSettings->m_musicItemSeparator));
     aSong.strAlbum = m_strAlbum;
     aSong.genre = StringUtils::Split(m_strGenre, advancedSettings->m_musicItemSeparator);
-    aSong.iYear = m_iYear;
+    aSong.strReleaseDate = StringUtils::Format("%04i", m_iYear);
     aSong.iTrack = track.iTrackNumber;
     if (m_iDiscNumber > 0)
       aSong.iTrack |= (m_iDiscNumber << 16); // see CMusicInfoTag::GetDiscNumber()

@@ -11,8 +11,10 @@ if(VAAPI_FOUND)
     list(APPEND SOURCES RendererVAAPIGLES.cpp)
     list(APPEND HEADERS RendererVAAPIGLES.h)
   endif()
-  list(APPEND SOURCES VaapiEGL.cpp)
-  list(APPEND HEADERS VaapiEGL.h)
+  if(EGL_FOUND)
+    list(APPEND SOURCES VaapiEGL.cpp)
+    list(APPEND HEADERS VaapiEGL.h)
+  endif()
 endif()
 
 if(VDPAU_FOUND)
@@ -27,19 +29,9 @@ if(CORE_SYSTEM_NAME STREQUAL osx)
   list(APPEND HEADERS RendererVTBGL.h)
 endif()
 
-if(CORE_SYSTEM_NAME STREQUAL ios)
+if(CORE_SYSTEM_NAME STREQUAL darwin_embedded)
   list(APPEND SOURCES RendererVTBGLES.cpp)
   list(APPEND HEADERS RendererVTBGLES.h)
-endif()
-
-if(MMAL_FOUND)
-  list(APPEND SOURCES MMALRenderer.cpp)
-  list(APPEND HEADERS MMALRenderer.h)
-endif()
-
-if(AML_FOUND)
-  list(APPEND SOURCES RendererAML.cpp)
-  list(APPEND HEADERS RendererAML.h)
 endif()
 
 if(CORE_SYSTEM_NAME STREQUAL android)
@@ -49,11 +41,14 @@ if(CORE_SYSTEM_NAME STREQUAL android)
                       RendererMediaCodecSurface.h)
 endif()
 
-if(CORE_PLATFORM_NAME_LC STREQUAL gbm)
-  list(APPEND SOURCES RendererDRMPRIME.cpp
-                      VideoLayerBridgeDRMPRIME.cpp)
-  list(APPEND HEADERS RendererDRMPRIME.h
-                      VideoLayerBridgeDRMPRIME.h)
+if("gbm" IN_LIST CORE_PLATFORM_NAME_LC OR "wayland" IN_LIST CORE_PLATFORM_NAME_LC)
+  if("gbm" IN_LIST CORE_PLATFORM_NAME_LC)
+    list(APPEND SOURCES RendererDRMPRIME.cpp
+                        VideoLayerBridgeDRMPRIME.cpp)
+    list(APPEND HEADERS RendererDRMPRIME.h
+                        VideoLayerBridgeDRMPRIME.h)
+  endif()
+
   if(OPENGLES_FOUND)
     list(APPEND SOURCES RendererDRMPRIMEGLES.cpp
                         DRMPRIMEEGL.cpp)

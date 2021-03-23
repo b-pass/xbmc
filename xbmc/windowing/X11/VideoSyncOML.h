@@ -8,9 +8,18 @@
 
 #pragma once
 
-#include "windowing/VideoSync.h"
 #include "guilib/DispResource.h"
+#include "windowing/VideoSync.h"
+
 #include <atomic>
+
+
+namespace KODI
+{
+namespace WINDOWING
+{
+namespace X11
+{
 
 class CWinSystemX11GLContext;
 
@@ -30,3 +39,6 @@ private:
   CWinSystemX11GLContext &m_winSystem;
 };
 
+}
+}
+}

@@ -7,9 +7,11 @@
  */
 
 #include "utils/POUtils.h"
+
 #include "URL.h"
 #include "filesystem/File.h"
 #include "utils/log.h"
+
 #include <stdlib.h>
 
 CPODocument::CPODocument()
@@ -157,8 +159,6 @@ void CPODocument::ParseEntry(bool bisSourceLang)
                         "Failed entry: %s", m_Entry.Content.c_str());
     m_Entry.msgStrPlural.resize(1); // Put 1 element with an empty string into the vector
   }
-
-  return;
 }
 
 const std::string& CPODocument::GetPlurMsgstr(size_t plural) const
@@ -259,7 +259,7 @@ void CPODocument::GetString(CStrEntry &strEntry)
 
   while (startPos < m_Entry.Content.size())
   {
-    nextLFPos = m_Entry.Content.find("\n", startPos);
+    nextLFPos = m_Entry.Content.find('\n', startPos);
     if (nextLFPos == std::string::npos)
       nextLFPos = m_Entry.Content.size();
 
@@ -277,7 +277,7 @@ void CPODocument::GetString(CStrEntry &strEntry)
 
 void CPODocument::ConvertLineEnds(const std::string &filename)
 {
-  size_t foundPos = m_strBuffer.find_first_of("\r");
+  size_t foundPos = m_strBuffer.find_first_of('\r');
   if (foundPos == std::string::npos)
     return; // We have only Linux style line endings in the file, nothing to do
 

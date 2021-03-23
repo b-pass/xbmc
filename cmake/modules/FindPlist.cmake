@@ -15,7 +15,7 @@
 #   Plist::Plist   - The Plist library
 
 if(PKG_CONFIG_FOUND)
-  pkg_check_modules(PC_PLIST libplist QUIET)
+  pkg_search_module(PC_PLIST libplist-2.0 libplist QUIET)
 endif()
 
 find_path(PLIST_INCLUDE_DIR plist/plist.h
@@ -23,20 +23,13 @@ find_path(PLIST_INCLUDE_DIR plist/plist.h
 
 set(PLIST_VERSION ${PC_PLIST_VERSION})
 
-include(FindPackageHandleStandardArgs)
-if(NOT WIN32)
-  find_library(PLIST_LIBRARY NAMES plist
-                                   PATHS ${PC_PLIST_LIBDIR})
+find_library(PLIST_LIBRARY NAMES plist-2.0 plist libplist-2.0 libplist
+                                 PATHS ${PC_PLIST_LIBDIR})
 
-  find_package_handle_standard_args(Plist
-                                    REQUIRED_VARS PLIST_LIBRARY PLIST_INCLUDE_DIR
-                                    VERSION_VAR PLIST_VERSION)
-else()
-  # Dynamically loaded DLL
-  find_package_handle_standard_args(Plist
-                                    REQUIRED_VARS PLIST_INCLUDE_DIR
-                                    VERSION_VAR PLIST_VERSION)
-endif()
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(Plist
+                                  REQUIRED_VARS PLIST_LIBRARY PLIST_INCLUDE_DIR
+                                  VERSION_VAR PLIST_VERSION)
 
 if(PLIST_FOUND)
   set(PLIST_LIBRARIES ${PLIST_LIBRARY})

@@ -6,31 +6,31 @@
  *  See LICENSES/README.md for more information.
  */
 
-#if defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__)
+#include "XBMCHelper.h"
+
+#include "CompileInfo.h"
+#include "ServiceBroker.h"
+#include "URL.h"
+#include "Util.h"
+#include "dialogs/GUIDialogOK.h"
+#include "dialogs/GUIDialogYesNo.h"
+#include "filesystem/Directory.h"
+#include "filesystem/File.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
+#include "settings/lib/Setting.h"
+#include "threads/Atomics.h"
+#include "utils/SystemInfo.h"
+#include "utils/TimeUtils.h"
+#include "utils/log.h"
+
 #include <fstream>
 #include <signal.h>
 #include <sstream>
+
 #include <mach-o/dyld.h>
 
-#include "XBMCHelper.h"
 #include "PlatformDefs.h"
-#include "ServiceBroker.h"
-#include "Util.h"
-#include "CompileInfo.h"
-
-#include "dialogs/GUIDialogOK.h"
-#include "dialogs/GUIDialogYesNo.h"
-#include "utils/log.h"
-#include "settings/lib/Setting.h"
-#include "settings/Settings.h"
-#include "settings/SettingsComponent.h"
-#include "utils/SystemInfo.h"
-#include "utils/TimeUtils.h"
-#include "filesystem/Directory.h"
-#include "filesystem/File.h"
-#include "URL.h"
-
-#include "threads/Atomics.h"
 
 static std::atomic_flag sg_singleton_lock_variable = ATOMIC_FLAG_INIT;
 XBMCHelper* XBMCHelper::smp_instance = 0;
@@ -54,11 +54,6 @@ XBMCHelper::GetInstance()
 
 /////////////////////////////////////////////////////////////////////////////
 XBMCHelper::XBMCHelper()
-  : m_alwaysOn(false)
-  , m_mode(APPLE_REMOTE_DISABLED)
-  , m_sequenceDelay(0)
-  , m_port(0)
-  , m_errorStarting(false)
 {
   // Compute the KODI_HOME path.
   std::string homePath;
@@ -85,7 +80,7 @@ XBMCHelper::XBMCHelper()
 }
 
 /////////////////////////////////////////////////////////////////////////////
-bool XBMCHelper::OnSettingChanging(std::shared_ptr<const CSetting> setting)
+bool XBMCHelper::OnSettingChanging(const std::shared_ptr<const CSetting>& setting)
 {
   if (setting == NULL)
     return false;
@@ -158,7 +153,7 @@ void XBMCHelper::Stop()
   int pid = GetProcessPid(XBMC_HELPER_PROGRAM);
   if (pid != -1)
   {
-    CLog::Log(LOGDEBUG,"XBMCHelper: Sending SIGKILL to %s\n", XBMC_HELPER_PROGRAM);
+    CLog::Log(LOGDEBUG, "XBMCHelper: Sending SIGKILL to %s", XBMC_HELPER_PROGRAM);
     kill(pid, SIGKILL);
   }
 }
@@ -216,12 +211,12 @@ void XBMCHelper::Configure()
     strConfig += strDelay;
 
     // Find out where we're running from.
-    char real_path[2*MAXPATHLEN];
-    char given_path[2*MAXPATHLEN];
-    uint32_t path_size = 2*MAXPATHLEN;
+    char given_path[2 * MAXPATHLEN];
+    uint32_t path_size = 2 * MAXPATHLEN;
 
     if (_NSGetExecutablePath(given_path, &path_size) == 0)
     {
+      char real_path[2 * MAXPATHLEN];
       if (realpath(given_path, real_path) != NULL)
       {
         strConfig += "--appPath \"";
@@ -515,4 +510,3 @@ static int GetBSDProcessList(kinfo_proc **procList, size_t *procCount)
   assert( (err == 0) == (*procList != NULL) );
   return err;
 }
-#endif

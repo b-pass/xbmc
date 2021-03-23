@@ -55,6 +55,7 @@
               <option label="351">0</option> <!-- ADJUST_REFRESHRATE_OFF -->
               <option label="36035">1</option> <!-- ADJUST_REFRESHRATE_ALWAYS -->
               <option label="36036">2</option> <!-- ADJUST_REFRESHRATE_ON_STARTSTOP -->
+              <option label="36050">3</option> <!-- ADJUST_REFRESHRATE_ON_START -->
             </options>
           </constraints>
           <control type="list" format="string" />
@@ -112,81 +113,6 @@
             <formatlabel>14047</formatlabel>
           </control>
         </setting>
-        <setting id="videoplayer.useamcodec" type="boolean" label="13438" help="36422">
-          <requirement>HAVE_AMCODEC</requirement>
-          <level>2</level>
-          <default>true</default>
-          <updates>
-            <update type="change" />
-          </updates>
-          <control type="toggle" />
-        </setting>
-        <setting id="videoplayer.useamcodecmpeg2" type="integer" label="39001" >
-          <requirement>HAVE_AMCODEC</requirement>
-          <level>2</level>
-          <default>0</default>
-          <constraints>
-            <options>
-              <option label="20420">9999</option>   <!-- Never -->
-              <option label="39000">800</option>  <!-- HD -->
-              <option label="20422">0</option>  <!-- Always -->
-            </options>
-          </constraints>
-          <updates>
-            <update type="change" />
-          </updates>
-          <dependencies>
-            <dependency type="enable">
-              <condition setting="videoplayer.useamcodec" operator="is">true</condition> <!-- USE AMCODEC -->
-            </dependency>
-          </dependencies>
-          <control type="spinner" format="string" />
-          <control type="edit" format="integer" />
-        </setting>
-        <setting id="videoplayer.useamcodecmpeg4" type="integer" label="39002">
-          <requirement>HAVE_AMCODEC</requirement>
-          <level>2</level>
-          <default>800</default>
-          <constraints>
-            <options>
-              <option label="20420">9999</option>   <!-- Never -->
-              <option label="39000">800</option>  <!-- HD -->
-              <option label="20422">0</option>  <!-- Always -->
-            </options>
-          </constraints>
-          <updates>
-            <update type="change" />
-          </updates>
-          <dependencies>
-            <dependency type="enable">
-              <condition setting="videoplayer.useamcodec" operator="is">true</condition> <!-- USE AMCODEC -->
-            </dependency>
-          </dependencies>
-          <control type="spinner" format="string" />
-          <control type="edit" format="integer" />
-        </setting>
-        <setting id="videoplayer.useamcodech264" type="integer" label="39003">
-          <requirement>HAVE_AMCODEC</requirement>
-          <level>2</level>
-          <default>0</default>
-          <constraints>
-            <options>
-              <option label="20420">9999</option>   <!-- Never -->
-              <option label="39000">800</option>  <!-- HD -->
-              <option label="20422">0</option>  <!-- Always -->
-            </options>
-          </constraints>
-          <updates>
-            <update type="change" />
-          </updates>
-          <dependencies>
-            <dependency type="enable">
-              <condition setting="videoplayer.useamcodec" operator="is">true</condition> <!-- USE AMCODEC -->
-            </dependency>
-          </dependencies>
-          <control type="spinner" format="string" />
-          <control type="edit" format="integer" />
-        </setting>
         <setting id="videoplayer.usemediacodecsurface" type="boolean" label="13440" help="36544">
           <requirement>HAS_MEDIACODEC</requirement>
           <level>2</level>
@@ -211,14 +137,18 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
-        <setting id="videoplayer.useomxplayer" type="boolean" label="13458" help="13459">
-          <requirement>HAS_OMXPLAYER</requirement>
+        <setting id="videoplayer.usevtb" type="boolean" label="13429" help="36160">
+          <requirement>HasVTB</requirement>
           <level>2</level>
           <default>true</default>
           <control type="toggle" />
         </setting>
-        <setting id="videoplayer.usevtb" type="boolean" label="13429" help="36160">
-          <requirement>HasVTB</requirement>
+        <setting id="winsystem.ishdrdisplay" type="boolean" label="13436" help="36299">
+          <dependencies>
+            <dependency type="visible">
+              <condition on="property" name="ishdrdisplay" />
+            </dependency>
+          </dependencies>
           <level>2</level>
           <default>true</default>
           <control type="toggle" />
@@ -633,12 +563,21 @@
               <option label="765">5</option> <!-- Cyan -->
               <option label="766">6</option> <!-- Light grey -->
               <option label="767">7</option> <!-- Grey -->
+              <option label="768">8</option> <!-- Dark Grey -->
             </options>
           </constraints>
           <dependencies>
             <dependency type="enable" on="property" name="IsUsingTTFSubtitles" setting="subtitles.font" />
           </dependencies>
           <control type="list" format="string" />
+        </setting>
+        <setting id="subtitles.opacity" type="integer" parent="subtitles.font" label="752" help="36295">
+          <level>3</level>
+          <default>100</default>
+          <dependencies>
+            <dependency type="enable" on="property" name="IsUsingTTFSubtitles" setting="subtitles.font" />
+          </dependencies>
+          <control type="slider" format="percentage" range="0,100" />
         </setting>
         <setting id="subtitles.bgcolor" type="integer" parent="subtitles.font" label="745" help="36228">
           <level>3</level>
@@ -925,6 +864,7 @@
               <option label="208">1</option> <!-- SELECT_ACTION_PLAY_OR_RESUME -->
               <option label="13404">2</option> <!-- SELECT_ACTION_RESUME -->
               <option label="22081">3</option> <!-- SELECT_ACTION_INFO -->
+              <option label="13347">7</option> <!-- SELECT_ACTION_QUEUE -->
             </options>
           </constraints>
           <control type="list" format="string" />
@@ -936,11 +876,6 @@
         </setting>
         <setting id="myvideos.extractflags" type="boolean" label="20433" help="36178">
           <level>2</level>
-          <default>true</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="myvideos.extractthumb" type="boolean" label="38190" help="36180">
-          <level>1</level>
           <default>true</default>
           <control type="toggle" />
         </setting>
@@ -989,7 +924,7 @@
           <default>false</default>
           <control type="toggle" />
         </setting>
-        <setting id="videolibrary.groupsingleitemsets" type="boolean" parent="videolibrary.groupmoviesets" label="20470" help="36157">
+        <setting id="videolibrary.groupsingleitemsets" type="boolean" label="20470" help="36157">
           <level>1</level>
           <default>false</default>
           <control type="toggle" />
@@ -1044,15 +979,345 @@
           </dependencies>
           <control type="list" format="string" />
         </setting>
+        <setting id="videolibrary.moviesetsfolder" type="path" label="20226" help="36300">
+          <level>1</level>
+          <default></default>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="button" format="path">
+            <heading>657</heading>
+          </control>
+        </setting>
+        <setting id="videolibrary.musicvideosallperformers" type="boolean" label="20472" help="36308">
+          <level>1</level>
+          <default>true</default>
+          <control type="toggle" />
+         </setting>
+      </group>
+      <group id="4" label="39123">
+        <!-- Hidden setting indicating video art settings have been migrated from old advancedsettings.xml format-->
+        <setting id="videolibrary.artsettingsupdated" type="boolean" label="0" help="">
+          <level>4</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="videolibrary.artworklevel" type="integer" label="39137" help="39138">
+          <level>1</level>
+          <default>0</default>
+          <constraints>
+            <options>
+              <option label="39140">0</option> <!-- VIDEOLIBRARY_ARTWORK_LEVEL_ALL -->
+              <option label="39141">1</option> <!-- VIDEOLIBRARY_ARTWORK_LEVEL_BASIC -->
+              <option label="39142">2</option> <!-- VIDEOLIBRARY_ARTWORK_LEVEL_CUSTOM -->
+              <option label="231">3</option> <!-- VIDEOLIBRARY_ARTWORK_LEVEL_NONE -->
+            </options>
+          </constraints>
+          <control type="list" format="string" />
+        </setting>
+        <setting id="videolibrary.movieartwhitelist" type="list[string]" parent="videolibrary.artworklevel" label="39143" help="39144">
+          <level>2</level>
+          <default></default>
+          <constraints>
+            <options>
+              <option>clearart</option>
+              <option>discart</option>
+              <option>keyart</option>
+              <option>banner</option>
+              <option>landscape</option>
+              <option>clearlogo</option>
+            </options>
+            <delimiter>, </delimiter>
+            <allownewoption>true</allownewoption>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="videolibrary.artworklevel" operator="is">2</dependency>
+          </dependencies>
+          <control type="list" format="string">
+            <multiselect>true</multiselect>
+            <addbuttonlabel>13516</addbuttonlabel>
+          </control>
+        </setting>
+        <setting id="videolibrary.tvshowartwhitelist" type="list[string]" parent="videolibrary.artworklevel" label="39145" help="39146">
+          <level>2</level>
+          <default></default>
+          <constraints>
+            <options>
+              <option>clearart</option>
+              <option>discart</option>
+              <option>keyart</option>
+              <option>banner</option>
+              <option>landscape</option>
+              <option>clearlogo</option>
+            </options>
+            <delimiter>, </delimiter>
+            <allownewoption>true</allownewoption>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="videolibrary.artworklevel" operator="is">2</dependency>
+          </dependencies>
+          <control type="list" format="string">
+            <multiselect>true</multiselect>
+            <addbuttonlabel>13516</addbuttonlabel>
+          </control>
+        </setting>
+        <setting id="videolibrary.episodeartwhitelist" type="list[string]" parent="videolibrary.artworklevel" label="39147" help="39148">
+          <level>2</level>
+          <default></default>
+          <constraints>
+            <options>
+              <option>fanart</option>
+            </options>
+            <delimiter>, </delimiter>
+            <allownewoption>true</allownewoption>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="videolibrary.artworklevel" operator="is">2</dependency>
+          </dependencies>
+          <control type="list" format="string">
+            <multiselect>true</multiselect>
+            <addbuttonlabel>13516</addbuttonlabel>
+          </control>
+        </setting>
+        <setting id="videolibrary.musicvideoartwhitelist" type="list[string]" parent="videolibrary.artworklevel" label="39149" help="39150">
+          <level>2</level>
+          <default></default>
+          <constraints>
+            <options>
+              <option>clearart</option>
+              <option>discart</option>
+              <option>banner</option>
+              <option>landscape</option>
+              <option>clearlogo</option>
+            </options>
+            <delimiter>, </delimiter>
+            <allownewoption>true</allownewoption>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="videolibrary.artworklevel" operator="is">2</dependency>
+          </dependencies>
+          <control type="list" format="string">
+            <multiselect>true</multiselect>
+            <addbuttonlabel>13516</addbuttonlabel>
+          </control>
+        </setting>
         <setting id="videolibrary.actorthumbs" type="boolean" label="20402" help="36143">
           <level>2</level>
           <default>true</default>
+          <dependencies>
+            <dependency type="visible" setting="videolibrary.artworklevel" operator="!is">3</dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
+        <setting id="myvideos.extractthumb" type="boolean" label="38190" help="36180">
+          <level>1</level>
+          <default>true</default>
+          <dependencies>
+            <dependency type="visible" setting="videolibrary.artworklevel" operator="!is">3</dependency>
+          </dependencies>
           <control type="toggle" />
         </setting>
       </group>
     </category>
     <category id="music" label="14216" help="38108">
-      <group id="1" label="593">
+      <group id="1" label="39121">
+        <setting id="musiclibrary.showallitems" type="boolean" label="38011" help="38012">
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="musiclibrary.showcompilationartists" type="boolean" label="13414" help="36255">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="musiclibrary.showdiscs" type="boolean" label="13522" help="13523">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="musiclibrary.useartistsortname" type="boolean" label="20228" help="36294">
+          <level>1</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="musiclibrary.useoriginaldate" type="boolean" label="13524" help="13525">
+          <level>2</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+      </group>
+      <group id="2" label="39122">
+        <setting id="musiclibrary.downloadinfo" type="boolean" label="20192" help="36256">
+          <level>2</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="musiclibrary.artistsfolder" type="path" label="20223" help="36293">
+          <level>1</level>
+          <default></default>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="button" format="path">
+            <heading>657</heading>
+          </control>
+        </setting>
+        <setting id="musiclibrary.albumsscraper" type="addon" label="20193" help="36257">
+          <level>1</level>
+          <default>metadata.generic.albums</default>
+          <constraints>
+            <addontype>xbmc.metadata.scraper.albums</addontype>
+          </constraints>
+          <control type="button" format="addon">
+            <show more="true" details="true">installed</show>
+          </control>
+        </setting>
+        <setting id="musiclibrary.artistsscraper" type="addon" label="20194" help="36258">
+          <level>1</level>
+          <default>metadata.generic.artists</default>
+          <constraints>
+            <addontype>xbmc.metadata.scraper.artists</addontype>
+          </constraints>
+          <control type="button" format="addon">
+            <show more="true" details="true">installed</show>
+          </control>
+        </setting>
+        <setting id="musiclibrary.overridetags" type="boolean" label="20220" help="20221">
+          <level>1</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+      </group>
+      <group id="3" label="39123">
+        <!-- Hidden setting indicating music art settings have been migrated from old advancedsettings.xml format-->
+        <setting id="musiclibrary.artsettings" type="boolean" label="0" help="">
+          <level>4</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="musiclibrary.artworklevel" type="integer" label="39137" help="39138">
+          <level>1</level>
+          <default>0</default>
+          <constraints>
+            <options>
+              <option label="39140">0</option> <!-- MUSICLIBRARY_ARTWORK_LEVEL_ALL -->
+              <option label="39141">1</option> <!-- MUSICLIBRARY_ARTWORK_LEVEL_BASIC -->
+              <option label="39142">2</option> <!-- MUSICLIBRARY_ARTWORK_LEVEL_CUSTOM -->
+              <option label="231">3</option> <!-- MUSICLIBRARY_ARTWORK_LEVEL_NONE -->
+            </options>
+          </constraints>
+          <control type="list" format="string" />
+        </setting>
+        <setting id="musiclibrary.usealllocalart" type="boolean" parent="musiclibrary.artworklevel" label="39127" help="39128">
+          <level>1</level>
+          <default>false</default>
+          <control type="toggle" />
+          <dependencies>
+            <dependency type="visible" setting="musiclibrary.artworklevel" operator="is">2</dependency>
+          </dependencies>
+        </setting>
+        <setting id="musiclibrary.useallremoteart" type="boolean" parent="musiclibrary.artworklevel" label="39129" help="39130">
+          <level>1</level>
+          <default>false</default>
+          <control type="toggle" />
+          <dependencies>
+            <dependency type="visible" setting="musiclibrary.artworklevel" operator="is">2</dependency>
+          </dependencies>
+        </setting>
+        <setting id="musiclibrary.artistartwhitelist" type="list[string]" parent="musiclibrary.artworklevel" label="39131" help="39132">
+          <level>1</level>
+          <default></default>
+          <constraints>
+            <options>
+              <option>banner</option>
+              <option>clearart</option>
+              <option>clearlogo</option>
+              <option>landscape</option>
+              <option>fanart</option>
+            </options>
+            <delimiter>, </delimiter>
+            <allownewoption>true</allownewoption>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="musiclibrary.artworklevel" operator="is">2</dependency>
+            <dependency type="enable">
+              <or>
+                <condition setting="musiclibrary.usealllocalart" operator="is" >false</condition>
+                <condition setting="musiclibrary.useallremoteart" operator="is">false</condition>
+              </or>
+            </dependency>
+          </dependencies>
+          <control type="list" format="string">
+            <multiselect>true</multiselect>
+            <addbuttonlabel>13516</addbuttonlabel>
+          </control>
+        </setting>
+        <setting id="musiclibrary.albumartwhitelist" type="list[string]" parent="musiclibrary.artworklevel" label="39133" help="39134">
+          <level>1</level>
+          <default></default>
+          <constraints>
+            <options>
+              <option>discart</option>
+              <option>back</option>
+              <option>spine</option>
+              <option>3dcase</option>
+              <option>3dflat</option>
+              <option>3dface</option>
+            </options>
+            <delimiter>, </delimiter>
+            <allownewoption>true</allownewoption>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="musiclibrary.artworklevel" operator="is">2</dependency>
+            <dependency type="enable">
+              <or>
+                <condition setting="musiclibrary.usealllocalart" operator="is" >false</condition>
+                <condition setting="musiclibrary.useallremoteart" operator="is">false</condition>
+              </or>
+            </dependency>
+          </dependencies>
+          <control type="list" format="string">
+            <multiselect>true</multiselect>
+            <addbuttonlabel>13516</addbuttonlabel>
+          </control>
+        </setting>
+        <setting id="musiclibrary.musicthumbs" type="list[string]" label="39135" help="39136">
+          <level>3</level>
+          <default>folder.jpg, cover.jpg, cover.jpeg, thumb.jpg</default>
+          <constraints>
+            <options>
+              <option>folder.jpg</option>
+              <option>cover.jpg</option>
+              <option>cover.jpeg</option>
+              <option>thumb.jpg</option>
+            </options>
+            <delimiter>, </delimiter>
+            <allowempty>true</allowempty>
+            <allownewoption>true</allownewoption>
+          </constraints>
+		  <dependencies>
+            <dependency type="enable" setting="musiclibrary.artworklevel" operator="!is">3</dependency>
+          </dependencies>
+          <control type="list" format="string">
+            <multiselect>true</multiselect>
+          </control>
+        </setting>
+        <setting id="musiclibrary.preferonlinealbumart" type="boolean" label="20224" help="20225">
+          <level>1</level>
+          <default>false</default>
+          <control type="toggle" />
+		  <dependencies>
+            <dependency type="enable" setting="musiclibrary.artworklevel" operator="!is">3</dependency>
+          </dependencies>		  
+        </setting>
+      </group>
+      <group id="4" label="128">
+        <setting id="musicfiles.selectaction" type="boolean" label="12381" help="38112">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
         <setting id="musicfiles.trackformat" type="string" label="13307" help="36275">
           <level>3</level>
           <default>[%N. ]%A - %T</default>
@@ -1085,74 +1350,10 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
-      </group>
-      <group id="2" label="744">
-        <setting id="musicfiles.usetags" type="boolean" label="258" help="36274">
+        <setting id="musicfiles.usetags" type="boolean" label="39125" help="36274">
           <level>1</level>
           <default>true</default>
           <control type="toggle" />
-        </setting>
-      </group>
-      <group id="3" label="14022">
-        <setting id="musiclibrary.showallitems" type="boolean" label="38011" help="38012">
-          <level>2</level>
-          <default>true</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="musiclibrary.showcompilationartists" type="boolean" label="13414" help="36255">
-          <level>0</level>
-          <default>true</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="musiclibrary.useartistsortname" type="boolean" label="20228" help="36294">
-          <level>1</level>
-          <default>false</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="musiclibrary.overridetags" type="boolean" label="20220" help="20221">
-          <level>1</level>
-          <default>false</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="musiclibrary.downloadinfo" type="boolean" label="20192" help="36256">
-          <level>2</level>
-          <default>false</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="musiclibrary.artistsfolder" type="path" label="20223" help="36293">
-          <level>1</level>
-          <default></default>
-          <constraints>
-            <allowempty>true</allowempty>
-          </constraints>
-          <control type="button" format="path">
-            <heading>657</heading>
-          </control>
-        </setting>
-        <setting id="musiclibrary.preferonlinealbumart" type="boolean" label="20224" help="20225">
-          <level>1</level>
-          <default>false</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="musiclibrary.albumsscraper" type="addon" label="20193" help="36257">
-          <level>1</level>
-          <default>metadata.album.universal</default>
-          <constraints>
-            <addontype>xbmc.metadata.scraper.albums</addontype>
-          </constraints>
-          <control type="button" format="addon">
-            <show more="true" details="true">installed</show>
-          </control>
-        </setting>
-        <setting id="musiclibrary.artistsscraper" type="addon" label="20194" help="36258">
-          <level>1</level>
-          <default>metadata.artists.universal</default>
-          <constraints>
-            <addontype>xbmc.metadata.scraper.artists</addontype>
-          </constraints>
-          <control type="button" format="addon">
-            <show more="true" details="true">installed</show>
-          </control>
         </setting>
       </group>
     </category>
@@ -1204,14 +1405,14 @@
       <group id="1">
         <setting id="scrapers.moviesdefault" type="addon" label="21413" help="36198">
           <level>4</level>
-          <default>metadata.themoviedb.org</default>
+          <default>metadata.themoviedb.org.python</default>
           <constraints>
             <addontype>xbmc.metadata.scraper.movies</addontype>
           </constraints>
         </setting>
         <setting id="scrapers.tvshowsdefault" type="addon" label="21414" help="36199">
           <level>4</level>
-          <default>metadata.tvshows.themoviedb.org</default>
+          <default>metadata.tvshows.themoviedb.org.python</default>
           <constraints>
             <addontype>xbmc.metadata.scraper.tvshows</addontype>
           </constraints>
@@ -1247,10 +1448,32 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
+        <setting id="pvrmanager.usebackendchannelnumbersalways" type="boolean" label="19329" help="36358">
+          <level>3</level>
+          <dependencies>
+            <dependency type="visible" on="property" name="pvrsettingvisible" setting="pvrmanager.usebackendchannelnumbersalways" operator="is">true</dependency>
+          </dependencies>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
         <setting id="pvrmanager.usebackendchannelnumbers" type="boolean" label="19234" help="36206">
           <level>2</level>
           <dependencies>
+            <dependency type="visible">
+              <or>
+                <condition type="visible" on="property" name="pvrsettingvisible" setting="pvrmanager.usebackendchannelnumbers" operator="is">true</condition>
+                <condition setting="pvrmanager.usebackendchannelnumbersalways" operator="is">true</condition>
+              </or>
+            </dependency>
+          </dependencies>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="pvrmanager.startgroupchannelnumbersfromone" type="boolean" parent="pvrmanager.usebackendchannelnumbers" label="19316" help="36306">
+          <level>2</level>
+          <dependencies>
             <dependency type="visible" on="property" name="pvrsettingvisible" setting="pvrmanager.usebackendchannelnumbers" operator="is">true</dependency>
+            <dependency type="enable" setting="pvrmanager.usebackendchannelnumbers" operator="is">false</dependency>
           </dependencies>
           <default>false</default>
           <control type="toggle" />
@@ -1293,6 +1516,11 @@
           <control type="spinner" format="string">
             <formatlabel>14045</formatlabel>
           </control>
+        </setting>
+        <setting id="pvrmenu.closechannelosdonswitch" type="boolean" label="19303" help="36235">
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
         </setting>
       </group>
       <group id="2" label="14302">
@@ -1384,11 +1612,6 @@
           <default>false</default>
           <control type="toggle" />
         </setting>
-        <setting id="epg.ignoredbforclient" type="boolean" label="19072" help="36223">
-          <level>2</level>
-          <default>false</default>
-          <control type="toggle" />
-        </setting>
         <setting id="epg.resetepg" type="action" label="19185" help="36225">
           <level>1</level>
           <control type="button" format="action" />
@@ -1397,10 +1620,18 @@
     </category>
     <category id="pvrplayback" label="19177" help="36226">
       <group id="1" label="128">
-        <setting id="pvrplayback.switchtofullscreen" type="boolean" label="19171" help="36227">
+        <setting id="pvrplayback.switchtofullscreenchanneltypes" type="integer" label="19171" help="36227">
           <level>1</level>
-          <default>true</default>
-          <control type="toggle" />
+          <default>3</default> <!-- TV and radio channels -->
+          <constraints>
+            <options>
+              <option label="20420">0</option> <!-- Never -->
+              <option label="19180">1</option> <!-- TV channels -->
+              <option label="19183">2</option> <!-- Radio channels -->
+              <option label="19250">3</option> <!-- TV and radio channels -->
+            </options>
+          </constraints>
+          <control type="list" format="string" />
         </setting>
         <setting id="pvrplayback.signalquality" type="boolean" label="19037" help="36229">
           <level>2</level>
@@ -1531,6 +1762,32 @@
         <setting id="pvrrecord.grouprecordings" type="boolean" label="" help="">
           <default>true</default>
           <level>4</level>
+        </setting>
+      </group>
+    </category>
+    <category id="pvrreminders" label="19215" help="36296">
+      <group id="1" label="128">
+        <setting id="pvrreminders.autoclosedelay" type="integer" label="19313" help="36297">
+          <level>1</level>
+          <default>10</default>
+          <constraints>
+            <minimum>1</minimum>
+            <step>1</step>
+            <maximum>60</maximum>
+          </constraints>
+          <control type="spinner" format="string">
+            <formatlabel>14045</formatlabel>
+          </control>
+        </setting>
+        <setting id="pvrreminders.autorecord" type="boolean" label="19314" help="36298">
+          <level>1</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="pvrreminders.autoswitch" type="boolean" label="19330" help="36434">
+          <level>1</level>
+          <default>false</default>
+          <control type="toggle" />
         </setting>
       </group>
     </category>
@@ -1707,18 +1964,17 @@
           </updates>
           <control type="edit" format="integer" />
         </setting>
+        <setting id="services.webserverauthentication" parent="services.webserver" type="boolean" label="1052" help="1053">
+          <level>1</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
         <setting id="services.webserverusername" type="string" parent="services.webserver" label="1048" help="36330">
           <level>1</level>
           <default>kodi</default>
-          <constraints>
-            <allowempty>true</allowempty>
-          </constraints>
           <updates>
             <update type="change" />
           </updates>
-          <dependencies>
-            <dependency type="enable" setting="services.webserver">true</dependency>
-          </dependencies>
           <control type="edit" format="string" />
         </setting>
         <setting id="services.webserverpassword" type="string" parent="services.webserver" label="733" help="36331">
@@ -1727,9 +1983,6 @@
           <constraints>
             <allowempty>true</allowempty>
           </constraints>
-          <dependencies>
-            <dependency type="enable" setting="services.webserver">true</dependency>
-          </dependencies>
           <control type="edit" format="string">
             <hidden>true</hidden>
           </control>
@@ -2105,18 +2358,6 @@
           </dependencies>
           <control type="spinner" format="string" delayed="true" />
         </setting>
-        <setting id="videoscreen.whitelist" type="list[string]" parent="videoscreen.screen" label="14085" help="36356">
-          <level>3</level>
-          <constraints>
-            <options>modes</options>
-            <default></default>
-            <delimiter>,</delimiter>
-            <minimumitems>0</minimumitems>
-          </constraints>
-          <control type="list" format="string">
-            <multiselect>true</multiselect>
-          </control>
-        </setting>
         <setting id="videoscreen.resolution" type="integer" parent="videoscreen.screen" label="169" help="36352">
           <level>0</level>
           <default>16</default> <!-- RES_DESKTOP -->
@@ -2377,7 +2618,37 @@
           <control type="spinner" format="integer" />
         </setting>
       </group>
-      <group id="2" label="14232">
+      <group id="2" label="14126">
+        <setting id="videoscreen.whitelist" type="list[string]" parent="videoscreen.screen" label="14126" help="36443">
+          <level>3</level>
+          <constraints>
+            <options>modes</options>
+            <default></default>
+            <delimiter>,</delimiter>
+            <minimumitems>0</minimumitems>
+          </constraints>
+          <control type="list" format="string">
+            <multiselect>true</multiselect>
+          </control>
+        </setting>
+        <setting id="videoscreen.whitelistpulldown" type="boolean" parent="videoscreen.whitelist" label="14127" help="36444">
+          <level>3</level>
+          <default>false</default>
+          <dependencies>
+            <dependency type="enable" setting="videoscreen.whitelist" operator="!is"></dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
+        <setting id="videoscreen.whitelistdoublerefreshrate" type="boolean" parent="videoscreen.whitelist" label="14128" help="36445">
+          <level>3</level>
+          <default>false</default>
+          <dependencies>
+            <dependency type="enable" setting="videoscreen.whitelist" operator="!is"></dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
+      </group>
+      <group id="3" label="14232">
         <setting id="videoscreen.stereoscopicmode" type="integer" label="36500" help="36539">
           <level>2</level>
           <default>0</default>
@@ -2398,7 +2669,7 @@
           <control type="list" format="integer"/>
         </setting>
       </group>
-      <group id="3" label="496">
+      <group id="4" label="496">
         <setting id="videoscreen.noofbuffers" type="integer" label="36043" help="36552">
           <level>2</level>
           <default>3</default> <!-- triple buffers -->
@@ -2706,7 +2977,12 @@
       </group>
       <group id="2" label="14094">
         <setting id="input.enablemouse" type="boolean" label="21369" help="36377">
-          <level>0</level>
+          <level>2</level>
+          <control type="toggle" />
+          <default>true</default>
+        </setting>
+        <setting id="input.enablejoystick" type="boolean" label="35100" help="36378">
+          <level>2</level>
           <control type="toggle" />
           <default>true</default>
         </setting>
@@ -2923,6 +3199,20 @@
           <level>0</level>
           <default>false</default>
           <control type="toggle" />
+        </setting>
+        <setting id="addons.updatemode" type="integer" parent="addons.unknownsources" label="36422" help="36423">
+          <level>1</level>
+          <default>0</default>
+          <constraints>
+            <options>
+              <option label="36437">0</option> <!-- OFFICIAL_ONLY -->
+              <option label="36438">1</option> <!-- ANY_REPOSITORY -->
+            </options>
+          </constraints>
+          <dependencies>
+            <dependency type="enable" setting="addons.unknownsources" operator="is">true</dependency>
+          </dependencies>
+          <control type="list" format="string" />
         </setting>
       </group>
     </category>

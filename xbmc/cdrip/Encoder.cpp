@@ -7,15 +7,18 @@
  */
 
 #include "Encoder.h"
+
 #include "filesystem/File.h"
 #include "utils/log.h"
+
 #include <string.h>
+#include <utility>
 
 CEncoder::CEncoder(std::shared_ptr<IEncoder> encoder)
 {
   m_file = NULL;
   m_dwWriteBufferPointer = 0;
-  m_impl = encoder;
+  m_impl = std::move(encoder);
 }
 
 CEncoder::~CEncoder()

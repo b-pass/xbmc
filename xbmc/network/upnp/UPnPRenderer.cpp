@@ -5,33 +5,37 @@
  *  SPDX-License-Identifier: GPL-2.0-or-later
  *  See LICENSES/README.md for more information.
  */
-#include <Platinum/Source/Platinum/Platinum.h>
-
-#include "network/Network.h"
 #include "UPnPRenderer.h"
-#include "UPnP.h"
-#include "UPnPInternal.h"
+
 #include "Application.h"
-#include "messaging/ApplicationMessenger.h"
 #include "FileItem.h"
-#include "ServiceBroker.h"
-#include "filesystem/SpecialProtocol.h"
 #include "GUIInfoManager.h"
-#include "guilib/GUIComponent.h"
-#include "guilib/GUIWindowManager.h"
-#include "input/Key.h"
-#include "pictures/GUIWindowSlideShow.h"
-#include "pictures/PictureInfoTag.h"
-#include "interfaces/AnnouncementManager.h"
+#include "GUIUserMessages.h"
 #include "PlayListPlayer.h"
+#include "ServiceBroker.h"
 #include "TextureDatabase.h"
 #include "ThumbLoader.h"
+#include "UPnP.h"
+#include "UPnPInternal.h"
 #include "URL.h"
+#include "filesystem/SpecialProtocol.h"
+#include "guilib/GUIComponent.h"
+#include "guilib/GUIWindowManager.h"
+#include "guilib/guiinfo/GUIInfoLabels.h"
+#include "input/Key.h"
+#include "interfaces/AnnouncementManager.h"
+#include "messaging/ApplicationMessenger.h"
+#include "network/Network.h"
+#include "pictures/GUIWindowSlideShow.h"
+#include "pictures/PictureInfoTag.h"
+#include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
-#include "utils/StringUtils.h"
-#include "GUIUserMessages.h"
-#include "guilib/guiinfo/GUIInfoLabels.h"
+#include "xbmc/interfaces/AnnouncementManager.h"
+
+#include <inttypes.h>
+
+#include <Platinum/Source/Platinum/Platinum.h>
 
 NPT_SET_LOCAL_LOGGER("xbmc.upnp.renderer")
 
@@ -105,6 +109,7 @@ CUPnPRenderer::SetupServices()
         ",http-get:*:audio/RED:*"
         ",http-get:*:audio/VDVI:*"
         ",http-get:*:audio/ac3:*"
+        ",http-get:*:audio/webm:*"
         ",http-get:*:audio/vorbis:*"
         ",http-get:*:audio/speex:*"
         ",http-get:*:audio/flac:*"
@@ -124,6 +129,7 @@ CUPnPRenderer::SetupServices()
         ",http-get:*:image/ief:*"
         ",http-get:*:image/png:*"
         ",http-get:*:image/tiff:*"
+        ",http-get:*:image/webp:*"
         ",http-get:*:video/avi:*"
         ",http-get:*:video/divx:*"
         ",http-get:*:video/mpeg:*"
@@ -147,6 +153,7 @@ CUPnPRenderer::SetupServices()
         ",http-get:*:video/MP1S:*"
         ",http-get:*:video/MP2P:*"
         ",http-get:*:video/BMPEG:*"
+        ",http-get:*:video/webm:*"
         ",http-get:*:video/xvid:*"
         ",http-get:*:video/x-divx:*"
         ",http-get:*:video/x-matroska:*"
@@ -226,58 +233,69 @@ CUPnPRenderer::ProcessHttpGetRequest(NPT_HttpRequest&              request,
 /*----------------------------------------------------------------------
 |   CUPnPRenderer::Announce
 +---------------------------------------------------------------------*/
-void
-CUPnPRenderer::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data)
+void CUPnPRenderer::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                             const std::string& sender,
+                             const std::string& message,
+                             const CVariant& data)
 {
-    if (strcmp(sender, "xbmc") != 0)
+  if (sender != ANNOUNCEMENT::CAnnouncementManager::ANNOUNCEMENT_SENDER)
+    return;
+
+  NPT_AutoLock lock(m_state);
+  PLT_Service *avt, *rct;
+
+  if (flag == ANNOUNCEMENT::Player)
+  {
+    if (NPT_FAILED(FindServiceByType("urn:schemas-upnp-org:service:AVTransport:1", avt)))
       return;
 
-    NPT_AutoLock lock(m_state);
-    PLT_Service *avt, *rct;
+    if (message == "OnPlay" || message == "OnResume")
+    {
+      avt->SetStateVariable("AVTransportURI", g_application.CurrentFile().c_str());
+      avt->SetStateVariable("CurrentTrackURI", g_application.CurrentFile().c_str());
 
-    if (flag == ANNOUNCEMENT::Player) {
-        if (NPT_FAILED(FindServiceByType("urn:schemas-upnp-org:service:AVTransport:1", avt)))
-            return;
-        if (strcmp(message, "OnPlay") == 0 || strcmp(message, "OnResume") == 0 ) {
-            avt->SetStateVariable("AVTransportURI", g_application.CurrentFile().c_str());
-            avt->SetStateVariable("CurrentTrackURI", g_application.CurrentFile().c_str());
+      NPT_String meta;
+      if (NPT_SUCCEEDED(GetMetadata(meta)))
+      {
+        avt->SetStateVariable("CurrentTrackMetadata", meta);
+        avt->SetStateVariable("AVTransportURIMetaData", meta);
+      }
 
-            NPT_String meta;
-            if (NPT_SUCCEEDED(GetMetadata(meta))) {
-                avt->SetStateVariable("CurrentTrackMetadata", meta);
-                avt->SetStateVariable("AVTransportURIMetaData", meta);
-            }
+      avt->SetStateVariable("TransportPlaySpeed",
+                            NPT_String::FromInteger(data["player"]["speed"].asInteger()));
+      avt->SetStateVariable("TransportState", "PLAYING");
 
-            avt->SetStateVariable("TransportPlaySpeed", NPT_String::FromInteger(data["player"]["speed"].asInteger()));
-            avt->SetStateVariable("TransportState", "PLAYING");
-
-            /* this could be a transition to next track, so clear next */
-            avt->SetStateVariable("NextAVTransportURI", "");
-            avt->SetStateVariable("NextAVTransportURIMetaData", "");
-        }
-        else if (strcmp(message, "OnPause") == 0) {
-            int64_t speed = data["player"]["speed"].asInteger();
-            avt->SetStateVariable("TransportPlaySpeed", NPT_String::FromInteger(speed != 0 ? speed : 1));
-            avt->SetStateVariable("TransportState", "PAUSED_PLAYBACK");
-        }
-        else if (strcmp(message, "OnSpeedChanged") == 0) {
-            avt->SetStateVariable("TransportPlaySpeed", NPT_String::FromInteger(data["player"]["speed"].asInteger()));
-        }
+      /* this could be a transition to next track, so clear next */
+      avt->SetStateVariable("NextAVTransportURI", "");
+      avt->SetStateVariable("NextAVTransportURIMetaData", "");
     }
-    else if (flag == ANNOUNCEMENT::Application && strcmp(message, "OnVolumeChanged") == 0) {
-        if (NPT_FAILED(FindServiceByType("urn:schemas-upnp-org:service:RenderingControl:1", rct)))
-            return;
-
-        std::string buffer;
-
-        buffer = StringUtils::Format("%" PRId64, data["volume"].asInteger());
-        rct->SetStateVariable("Volume", buffer.c_str());
-
-        buffer = StringUtils::Format("%" PRId64, 256 * (data["volume"].asInteger() * 60 - 60) / 100);
-        rct->SetStateVariable("VolumeDb", buffer.c_str());
-
-        rct->SetStateVariable("Mute", data["muted"].asBoolean() ? "1" : "0");
+    else if (message == "OnPause")
+    {
+      int64_t speed = data["player"]["speed"].asInteger();
+      avt->SetStateVariable("TransportPlaySpeed", NPT_String::FromInteger(speed != 0 ? speed : 1));
+      avt->SetStateVariable("TransportState", "PAUSED_PLAYBACK");
     }
+    else if (message == "OnSpeedChanged")
+    {
+      avt->SetStateVariable("TransportPlaySpeed",
+                            NPT_String::FromInteger(data["player"]["speed"].asInteger()));
+    }
+  }
+  else if (flag == ANNOUNCEMENT::Application && message == "OnVolumeChanged")
+  {
+    if (NPT_FAILED(FindServiceByType("urn:schemas-upnp-org:service:RenderingControl:1", rct)))
+      return;
+
+    std::string buffer;
+
+    buffer = StringUtils::Format("%" PRId64, data["volume"].asInteger());
+    rct->SetStateVariable("Volume", buffer.c_str());
+
+    buffer = StringUtils::Format("%" PRId64, 256 * (data["volume"].asInteger() * 60 - 60) / 100);
+    rct->SetStateVariable("VolumeDb", buffer.c_str());
+
+    rct->SetStateVariable("Mute", data["muted"].asBoolean() ? "1" : "0");
+  }
 }
 
 /*----------------------------------------------------------------------

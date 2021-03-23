@@ -7,6 +7,7 @@
  */
 
 #include "guilib/guiinfo/GUIInfoProviders.h"
+
 #include "guilib/guiinfo/IGUIInfoProvider.h"
 
 #include <algorithm>
@@ -82,6 +83,11 @@ bool CGUIInfoProviders::GetLabel(std::string& value, const CFileItem *item, int 
   for (const auto& provider : m_providers)
   {
     if (provider->GetLabel(value, item, contextWindow, info, fallback))
+      return true;
+  }
+  for (const auto& provider : m_providers)
+  {
+    if (provider->GetFallbackLabel(value, item, contextWindow, info, fallback))
       return true;
   }
   return false;

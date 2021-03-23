@@ -7,27 +7,39 @@
  */
 
 #include "WinSystemWin32DX.h"
+
 #include "commons/ilog.h"
-#include "platform/win32/CharsetConverter.h"
 #include "rendering/dx/RenderContext.h"
 #include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "utils/SystemInfo.h"
+#include "utils/XTimeUtils.h"
 #include "utils/log.h"
 #include "windowing/GraphicContext.h"
+#include "windowing/WindowSystemFactory.h"
+
+#include "platform/win32/CharsetConverter.h"
+#include "platform/win32/WIN32Util.h"
 
 #include "system.h"
 
 #ifndef _M_X64
-#pragma comment(lib, "EasyHook32.lib")
 #include "utils/SystemInfo.h"
+#endif
+#if _DEBUG
+#pragma comment(lib, "detoursd.lib")
 #else
-#pragma comment(lib, "EasyHook64.lib")
+#pragma comment(lib, "detours.lib")
 #endif
 #pragma comment(lib, "dxgi.lib")
+#include <windows.h>
+#include <winnt.h>
+#include <winternl.h>
 #pragma warning(disable: 4091)
 #include <d3d10umddi.h>
 #pragma warning(default: 4091)
+#include <detours.h>
 
 using KODI::PLATFORM::WINDOWS::FromW;
 
@@ -39,15 +51,18 @@ static PFND3D10DDI_OPENADAPTER s_fnOpenAdapter10_2{ nullptr };
 static PFND3D10DDI_CREATEDEVICE s_fnCreateDeviceOrig{ nullptr };
 static PFND3D10DDI_CREATERESOURCE s_fnCreateResourceOrig{ nullptr };
 
-std::unique_ptr<CWinSystemBase> CWinSystemBase::CreateWinSystem()
+void CWinSystemWin32DX::Register()
 {
-  std::unique_ptr<CWinSystemBase> winSystem(new CWinSystemWin32DX());
-  return winSystem;
+  KODI::WINDOWING::CWindowSystemFactory::RegisterWindowSystem(CreateWinSystem);
+}
+
+std::unique_ptr<CWinSystemBase> CWinSystemWin32DX::CreateWinSystem()
+{
+  return std::make_unique<CWinSystemWin32DX>();
 }
 
 CWinSystemWin32DX::CWinSystemWin32DX() : CRenderSystemDX()
   , m_hDriverModule(nullptr)
-  , m_hHook(nullptr)
 {
 }
 
@@ -67,7 +82,7 @@ void CWinSystemWin32DX::PresentRenderImpl(bool rendered)
   }
 
   if (!rendered)
-    Sleep(40);
+    KODI::TIME::Sleep(40);
 }
 
 bool CWinSystemWin32DX::CreateNewWindow(const std::string& name, bool fullScreen, RESOLUTION_INFO& res)
@@ -133,9 +148,13 @@ void CWinSystemWin32DX::OnMove(int x, int y)
 
 bool CWinSystemWin32DX::DPIChanged(WORD dpi, RECT windowRect) const
 {
+  // on Win10 FCU the OS keeps window size exactly the same size as it was
+  if (CSysInfo::IsWindowsVersionAtLeast(CSysInfo::WindowsVersionWin10_1709))
+    return true;
+
   m_deviceResources->SetDpi(dpi);
   if (!IsAlteringWindow())
-    return CWinSystemWin32::DPIChanged(dpi, windowRect);
+    return __super::DPIChanged(dpi, windowRect);
 
   return true;
 }
@@ -195,10 +214,13 @@ bool CWinSystemWin32DX::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, boo
 void CWinSystemWin32DX::UninitHooks()
 {
   // uninstall
-  LhUninstallAllHooks();
-  // we need to wait for memory release
-  LhWaitForPendingRemovals();
-  SAFE_DELETE(m_hHook);
+  if (!s_fnOpenAdapter10_2)
+    return;
+
+  DetourTransactionBegin();
+  DetourUpdateThread(GetCurrentThread());
+  DetourDetach(reinterpret_cast<void**>(&s_fnOpenAdapter10_2), HookOpenAdapter10_2);
+  DetourTransactionCommit();
   if (m_hDriverModule)
   {
     FreeLibrary(m_hDriverModule);
@@ -218,7 +240,8 @@ void CWinSystemWin32DX::InitHooks(IDXGIOutput* pOutput)
   bool deviceFound = false;
 
   // delete exiting hooks.
-  UninitHooks();
+  if (s_fnOpenAdapter10_2)
+    UninitHooks();
 
   // enum devices to find matched
   while (EnumDisplayDevicesW(nullptr, adapter, &displayDevice, 0))
@@ -275,11 +298,11 @@ void CWinSystemWin32DX::InitHooks(IDXGIOutput* pOutput)
         s_fnOpenAdapter10_2 = reinterpret_cast<PFND3D10DDI_OPENADAPTER>(GetProcAddress(m_hDriverModule, "OpenAdapter10_2"));
         if (s_fnOpenAdapter10_2 != nullptr)
         {
-          ULONG ACLEntries[1] = { 0 };
-          m_hHook = new HOOK_TRACE_INFO();
+          DetourTransactionBegin();
+          DetourUpdateThread(GetCurrentThread());
+          DetourAttach(reinterpret_cast<void**>(&s_fnOpenAdapter10_2), HookOpenAdapter10_2);
+          if (NO_ERROR == DetourTransactionCommit())
           // install and activate hook into a driver
-          if (SUCCEEDED(LhInstallHook(s_fnOpenAdapter10_2, HookOpenAdapter10_2, nullptr, m_hHook))
-            && SUCCEEDED(LhSetInclusiveACL(ACLEntries, 1, m_hHook)))
           {
             CLog::LogF(LOGDEBUG, "D3D11 hook installed and activated.");
             break;
@@ -287,7 +310,7 @@ void CWinSystemWin32DX::InitHooks(IDXGIOutput* pOutput)
           else
           {
             CLog::Log(LOGDEBUG, __FUNCTION__": Unable ot install and activate D3D11 hook.");
-            SAFE_DELETE(m_hHook);
+            s_fnOpenAdapter10_2 = nullptr;
             FreeLibrary(m_hDriverModule);
             m_hDriverModule = nullptr;
           }
@@ -362,4 +385,39 @@ HRESULT APIENTRY HookOpenAdapter10_2(D3D10DDIARG_OPENADAPTER *pOpenData)
     pOpenData->pAdapterFuncs->pfnCreateDevice = HookCreateDevice;
   }
   return hr;
+}
+
+bool CWinSystemWin32DX::IsHDRDisplay()
+{
+  return (CWIN32Util::GetWindowsHDRStatus() != HDR_STATUS::HDR_UNSUPPORTED);
+}
+
+HDR_STATUS CWinSystemWin32DX::GetOSHDRStatus()
+{
+  return CWIN32Util::GetWindowsHDRStatus();
+}
+
+HDR_STATUS CWinSystemWin32DX::ToggleHDR()
+{
+  return m_deviceResources->ToggleHDR();
+}
+
+bool CWinSystemWin32DX::IsHDROutput() const
+{
+  return m_deviceResources->IsHDROutput();
+}
+
+bool CWinSystemWin32DX::IsTransferPQ() const
+{
+  return m_deviceResources->IsTransferPQ();
+}
+
+void CWinSystemWin32DX::SetHdrMetaData(DXGI_HDR_METADATA_HDR10& hdr10) const
+{
+  m_deviceResources->SetHdrMetaData(hdr10);
+}
+
+void CWinSystemWin32DX::SetHdrColorSpace(const DXGI_COLOR_SPACE_TYPE colorSpace) const
+{
+  m_deviceResources->SetHdrColorSpace(colorSpace);
 }

@@ -6,40 +6,40 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "threads/SystemClock.h"
 #include "GUIWindowSlideShow.h"
+
 #include "Application.h"
-#include "ServiceBroker.h"
-#include "messaging/ApplicationMessenger.h"
-#include "utils/URIUtils.h"
-#include "URL.h"
-#include "guilib/GUIComponent.h"
-#include "guilib/TextureManager.h"
-#include "guilib/GUILabelControl.h"
-#include "input/Key.h"
-#include "GUIInfoManager.h"
-#include "filesystem/Directory.h"
+#include "FileItem.h"
 #include "GUIDialogPictureInfo.h"
+#include "GUIInfoManager.h"
 #include "GUIUserMessages.h"
+#include "PlayListPlayer.h"
+#include "ServiceBroker.h"
+#include "TextureDatabase.h"
+#include "URL.h"
+#include "filesystem/Directory.h"
+#include "guilib/GUIComponent.h"
+#include "guilib/GUILabelControl.h"
 #include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
+#include "guilib/Texture.h"
+#include "guilib/TextureManager.h"
+#include "input/Key.h"
+#include "interfaces/AnnouncementManager.h"
+#include "messaging/ApplicationMessenger.h"
+#include "pictures/GUIViewStatePictures.h"
+#include "pictures/PictureThumbLoader.h"
+#include "rendering/RenderSystem.h"
 #include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "FileItem.h"
-#include "guilib/Texture.h"
-#include "rendering/RenderSystem.h"
-#include "guilib/LocalizeStrings.h"
-#include "TextureDatabase.h"
-#include "utils/log.h"
+#include "threads/SystemClock.h"
 #include "utils/Random.h"
+#include "utils/URIUtils.h"
 #include "utils/Variant.h"
-#include "interfaces/AnnouncementManager.h"
-#include "pictures/GUIViewStatePictures.h"
-#include "pictures/PictureThumbLoader.h"
-#include "PlayListPlayer.h"
-#ifdef TARGET_POSIX
-#include "platform/linux/XTimeUtils.h"
-#endif
+#include "utils/XTimeUtils.h"
+#include "utils/log.h"
+
 #include <random>
 
 using namespace XFILE;
@@ -97,7 +97,7 @@ void CBackgroundPicLoader::Process()
       if (m_pCallback)
       {
         unsigned int start = XbmcThreads::SystemClockMillis();
-        CBaseTexture* texture = CTexture::LoadFromFile(m_strFileName, m_maxWidth, m_maxHeight);
+        CTexture* texture = CTexture::LoadFromFile(m_strFileName, m_maxWidth, m_maxHeight);
         totalTime += XbmcThreads::SystemClockMillis() - start;
         count++;
         // tell our parent
@@ -151,7 +151,7 @@ void CGUIWindowSlideShow::AnnouncePlayerPlay(const CFileItemPtr& item)
   CVariant param;
   param["player"]["speed"] = m_bSlideShow && !m_bPause ? 1 : 0;
   param["player"]["playerid"] = PLAYLIST_PICTURE;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "xbmc", "OnPlay", item, param);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "OnPlay", item, param);
 }
 
 void CGUIWindowSlideShow::AnnouncePlayerPause(const CFileItemPtr& item)
@@ -159,7 +159,7 @@ void CGUIWindowSlideShow::AnnouncePlayerPause(const CFileItemPtr& item)
   CVariant param;
   param["player"]["speed"] = 0;
   param["player"]["playerid"] = PLAYLIST_PICTURE;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "xbmc", "OnPause", item, param);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "OnPause", item, param);
 }
 
 void CGUIWindowSlideShow::AnnouncePlayerStop(const CFileItemPtr& item)
@@ -167,14 +167,14 @@ void CGUIWindowSlideShow::AnnouncePlayerStop(const CFileItemPtr& item)
   CVariant param;
   param["player"]["playerid"] = PLAYLIST_PICTURE;
   param["end"] = true;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "xbmc", "OnStop", item, param);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "OnStop", item, param);
 }
 
 void CGUIWindowSlideShow::AnnouncePlaylistClear()
 {
   CVariant data;
   data["playlistid"] = PLAYLIST_PICTURE;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnClear", data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "OnClear", data);
 }
 
 void CGUIWindowSlideShow::AnnouncePlaylistAdd(const CFileItemPtr& item, int pos)
@@ -182,7 +182,7 @@ void CGUIWindowSlideShow::AnnouncePlaylistAdd(const CFileItemPtr& item, int pos)
   CVariant data;
   data["playlistid"] = PLAYLIST_PICTURE;
   data["position"] = pos;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnAdd", item, data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "OnAdd", item, data);
 }
 
 void CGUIWindowSlideShow::AnnouncePropertyChanged(const std::string &strProperty, const CVariant &value)
@@ -193,7 +193,8 @@ void CGUIWindowSlideShow::AnnouncePropertyChanged(const std::string &strProperty
   CVariant data;
   data["player"]["playerid"] = PLAYLIST_PICTURE;
   data["property"][strProperty] = value;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "xbmc", "OnPropertyChanged", data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "OnPropertyChanged",
+                                                     data);
 }
 
 bool CGUIWindowSlideShow::IsPlaying() const
@@ -245,7 +246,7 @@ void CGUIWindowSlideShow::OnDeinitWindow(int nextWindowID)
       // sleep until the loader finishes loading the current pic
       CLog::Log(LOGDEBUG,"Waiting for BackgroundLoader thread to close");
       while (m_pBackgroundLoader->IsLoading())
-        Sleep(10);
+        KODI::TIME::Sleep(10);
       // stop the thread
       CLog::Log(LOGDEBUG,"Stopping BackgroundLoader thread");
       m_pBackgroundLoader->StopThread();
@@ -509,13 +510,9 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
     }
   }
 
-  if (m_slides.at(m_iCurrentSlide)->IsVideo() &&
-      m_iVideoSlide != m_iCurrentSlide)
-  {
-    if (!PlayVideo())
-      return;
+  bool bPlayVideo = m_slides.at(m_iCurrentSlide)->IsVideo() && m_iVideoSlide != m_iCurrentSlide;
+  if (bPlayVideo)
     bSlideShow = false;
-  }
 
   // render the current image
   if (m_Image[m_iCurrentPic].IsLoaded())
@@ -603,6 +600,8 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
       }
       m_iCurrentSlide = m_iNextSlide;
       m_iNextSlide    = GetNextSlide();
+
+      bPlayVideo = m_slides.at(m_iCurrentSlide)->IsVideo() && m_iVideoSlide != m_iCurrentSlide;
     }
     AnnouncePlayerPlay(m_slides.at(m_iCurrentSlide));
 
@@ -610,6 +609,9 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
     m_fZoom = 1.0f;
     m_fRotate = 0.0f;
   }
+
+  if (bPlayVideo && !PlayVideo())
+      return;
 
   if (m_Image[m_iCurrentPic].IsLoaded())
     CServiceBroker::GetGUI()->GetInfoManager().GetInfoProviders().GetPicturesInfoProvider().SetCurrentSlide(m_slides.at(m_iCurrentSlide).get());
@@ -629,14 +631,30 @@ void CGUIWindowSlideShow::Render()
   if (m_slides.empty())
     return;
 
-  CServiceBroker::GetWinSystem()->GetGfxContext().Clear(0xff000000);
+  CGraphicContext& gfxCtx = CServiceBroker::GetWinSystem()->GetGfxContext();
+  gfxCtx.Clear(0xff000000);
 
   if (m_slides.at(m_iCurrentSlide)->IsVideo())
   {
-    CServiceBroker::GetWinSystem()->GetGfxContext().SetViewWindow(0, 0, m_coordsRes.iWidth, m_coordsRes.iHeight);
-    CServiceBroker::GetWinSystem()->GetGfxContext().SetRenderingResolution(CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution(), false);
-    g_application.GetAppPlayer().Render(true, 255);
-    CServiceBroker::GetWinSystem()->GetGfxContext().SetRenderingResolution(m_coordsRes, m_needsScaling);
+    gfxCtx.SetViewWindow(0, 0, m_coordsRes.iWidth, m_coordsRes.iHeight);
+    gfxCtx.SetRenderingResolution(gfxCtx.GetVideoResolution(), false);
+
+    if (g_application.GetAppPlayer().IsRenderingVideoLayer())
+    {
+      const CRect old = gfxCtx.GetScissors();
+      CRect region = GetRenderRegion();
+      region.Intersect(old);
+      gfxCtx.SetScissors(region);
+      gfxCtx.Clear(0);
+      gfxCtx.SetScissors(old);
+    }
+    else
+    {
+      const UTILS::Color alpha = gfxCtx.MergeAlpha(0xff000000) >> 24;
+      g_application.GetAppPlayer().Render(false, alpha);
+    }
+
+    gfxCtx.SetRenderingResolution(m_coordsRes, m_needsScaling);
   }
   else
   {
@@ -649,6 +667,14 @@ void CGUIWindowSlideShow::Render()
 
   RenderErrorMessage();
   CGUIWindow::Render();
+}
+
+void CGUIWindowSlideShow::RenderEx()
+{
+  if (m_slides.at(m_iCurrentSlide)->IsVideo())
+    g_application.GetAppPlayer().Render(false, 255, false);
+
+  CGUIWindow::RenderEx();
 }
 
 int CGUIWindowSlideShow::GetNextSlide()
@@ -919,7 +945,7 @@ bool CGUIWindowSlideShow::OnMessage(CGUIMessage& message)
       m_Resolution = (RESOLUTION) CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_PICTURES_DISPLAYRESOLUTION);
 
       //FIXME: Use GUI resolution for now
-      if (0 /*m_Resolution != CDisplaySettings::GetInstance().GetCurrentResolution() && m_Resolution != INVALID && m_Resolution!=AUTORES*/)
+      if (false /*m_Resolution != CDisplaySettings::GetInstance().GetCurrentResolution() && m_Resolution != INVALID && m_Resolution!=AUTORES*/)
         CServiceBroker::GetWinSystem()->GetGfxContext().SetVideoResolution(m_Resolution, false);
       else
         m_Resolution = CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution();
@@ -936,7 +962,7 @@ bool CGUIWindowSlideShow::OnMessage(CGUIMessage& message)
 
   case GUI_MSG_SHOW_PICTURE:
     {
-      std::string strFile = message.GetStringParam();
+      const std::string& strFile = message.GetStringParam();
       Reset();
       CFileItem item(strFile, false);
       Add(&item);
@@ -946,9 +972,9 @@ bool CGUIWindowSlideShow::OnMessage(CGUIMessage& message)
 
   case GUI_MSG_START_SLIDESHOW:
     {
-      std::string strFolder = message.GetStringParam();
+      const std::string& strFolder = message.GetStringParam();
       unsigned int iParams = message.GetParam1();
-      std::string beginSlidePath = message.GetStringParam(1);
+      const std::string& beginSlidePath = message.GetStringParam(1);
       //decode params
       bool bRecursive = false;
       bool bRandom = false;
@@ -1110,7 +1136,8 @@ CSlideShowPic::DISPLAY_EFFECT CGUIWindowSlideShow::GetDisplayEffect(int iSlideNu
     return CSlideShowPic::EFFECT_NO_TIMEOUT;
 }
 
-void CGUIWindowSlideShow::OnLoadPic(int iPic, int iSlideNumber, const std::string &strFileName, CBaseTexture* pTexture, bool bFullSize)
+void CGUIWindowSlideShow::OnLoadPic(
+    int iPic, int iSlideNumber, const std::string& strFileName, CTexture* pTexture, bool bFullSize)
 {
   if (pTexture)
   {
@@ -1128,7 +1155,7 @@ void CGUIWindowSlideShow::OnLoadPic(int iPic, int iSlideNumber, const std::strin
     if (URIUtils::IsInRAR(m_slides.at(m_iCurrentSlide)->GetPath()) || URIUtils::IsInZIP(m_slides.at(m_iCurrentSlide)->GetPath())) // move to top for cbr/cbz
     {
       CURL url(m_slides.at(m_iCurrentSlide)->GetPath());
-      std::string strHostName = url.GetHostName();
+      const std::string& strHostName = url.GetHostName();
       if (URIUtils::HasExtension(strHostName, ".cbr|.cbz"))
       {
         m_Image[iPic].m_bIsComic = true;
@@ -1226,7 +1253,8 @@ void CGUIWindowSlideShow::RunSlideShow(const std::string &strPath,
     CVariant param;
     param["player"]["speed"] = 0;
     param["player"]["playerid"] = PLAYLIST_PICTURE;
-    CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "xbmc", "OnPlay", GetCurrentSlide(), param);
+    CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "OnPlay",
+                                                       GetCurrentSlide(), param);
   }
 
   CServiceBroker::GetGUI()->GetWindowManager().ActivateWindow(WINDOW_SLIDESHOW);
@@ -1294,12 +1322,13 @@ std::string CGUIWindowSlideShow::GetPicturePath(CFileItem *item)
 }
 
 
-void CGUIWindowSlideShow::RunSlideShow(std::vector<std::string> paths, int start /* = 0*/)
+void CGUIWindowSlideShow::RunSlideShow(const std::vector<std::string>& paths, int start /* = 0*/)
 {
   auto dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIWindowSlideShow>(WINDOW_SLIDESHOW);
   if (dialog)
   {
     std::vector<CFileItemPtr> items;
+    items.reserve(paths.size());
     for (const auto& path : paths)
       items.push_back(std::make_shared<CFileItem>(CTextureUtils::GetWrappedImageURL(path), false));
 

@@ -7,12 +7,13 @@
  */
 
 #include "APKDirectory.h"
+
 #include "APKFile.h"
 #include "FileItem.h"
 #include "utils/CharsetConverter.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
+#include "utils/log.h"
 
 #include <zip.h>
 
@@ -26,7 +27,7 @@ bool CAPKDirectory::GetDirectory(const CURL& url, CFileItemList &items)
 {
   // uses a <fully qualified path>/filename.apk/...
   std::string path = url.GetFileName();
-  std::string host = url.GetHostName();
+  const std::string& host = url.GetHostName();
   URIUtils::AddSlashAtEnd(path);
 
   int zip_flags = 0, zip_error = 0;

@@ -6,29 +6,32 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "threads/SystemClock.h"
 #include "PlayListPlayer.h"
+
 #include "Application.h"
-#include "PartyModeManager.h"
-#include "settings/AdvancedSettings.h"
-#include "settings/SettingsComponent.h"
 #include "GUIUserMessages.h"
+#include "PartyModeManager.h"
+#include "ServiceBroker.h"
+#include "URL.h"
+#include "dialogs/GUIDialogKaiToast.h"
+#include "filesystem/PluginDirectory.h"
+#include "filesystem/VideoDatabaseFile.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "playlists/PlayList.h"
-#include "utils/log.h"
-#include "utils/StringUtils.h"
-#include "utils/Variant.h"
-#include "music/tags/MusicInfoTag.h"
-#include "dialogs/GUIDialogKaiToast.h"
 #include "guilib/LocalizeStrings.h"
-#include "interfaces/AnnouncementManager.h"
 #include "input/Key.h"
-#include "URL.h"
+#include "interfaces/AnnouncementManager.h"
 #include "messaging/ApplicationMessenger.h"
-#include "filesystem/VideoDatabaseFile.h"
 #include "messaging/helpers/DialogOKHelper.h"
-#include "ServiceBroker.h"
+#include "music/tags/MusicInfoTag.h"
+#include "playlists/PlayList.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
+#include "threads/SystemClock.h"
+#include "utils/StringUtils.h"
+#include "utils/URIUtils.h"
+#include "utils/Variant.h"
+#include "utils/log.h"
 
 using namespace PLAYLIST;
 using namespace KODI::MESSAGING;
@@ -252,7 +255,7 @@ bool CPlayListPlayer::PlaySongId(int songId)
   return Play();
 }
 
-bool CPlayListPlayer::Play(const CFileItemPtr &pItem, std::string player)
+bool CPlayListPlayer::Play(const CFileItemPtr& pItem, const std::string& player)
 {
   int playlist;
   if (pItem->IsAudio())
@@ -273,7 +276,10 @@ bool CPlayListPlayer::Play(const CFileItemPtr &pItem, std::string player)
   return Play(0, player);
 }
 
-bool CPlayListPlayer::Play(int iSong, std::string player, bool bAutoPlay /* = false */, bool bPlayPrevious /* = false */)
+bool CPlayListPlayer::Play(int iSong,
+                           const std::string& player,
+                           bool bAutoPlay /* = false */,
+                           bool bPlayPrevious /* = false */)
 {
   if (m_iCurrentPlayList == PLAYLIST_NONE)
     return false;
@@ -298,7 +304,7 @@ bool CPlayListPlayer::Play(int iSong, std::string player, bool bAutoPlay /* = fa
   m_iCurrentSong = iSong;
   CFileItemPtr item = playlist[m_iCurrentSong];
   if (item->IsVideoDb() && !item->HasVideoInfoTag())
-    *(item->GetVideoInfoTag()) = XFILE::CVideoDatabaseFile::GetVideoTag(CURL(item->GetPath()));
+    *(item->GetVideoInfoTag()) = XFILE::CVideoDatabaseFile::GetVideoTag(CURL(item->GetDynPath()));
 
   playlist.SetPlayed(true);
 
@@ -306,9 +312,9 @@ bool CPlayListPlayer::Play(int iSong, std::string player, bool bAutoPlay /* = fa
 
   unsigned int playAttempt = XbmcThreads::SystemClockMillis();
   bool ret = g_application.PlayFile(*item, player, bAutoPlay);
-  if (ret == false)
+  if (!ret)
   {
-    CLog::Log(LOGERROR,"Playlist Player: skipping unplayable item: %i, path [%s]", m_iCurrentSong, CURL::GetRedacted(item->GetPath()).c_str());
+    CLog::Log(LOGERROR,"Playlist Player: skipping unplayable item: %i, path [%s]", m_iCurrentSong, CURL::GetRedacted(item->GetDynPath()).c_str());
     playlist.SetUnPlayable(m_iCurrentSong);
 
     // abort on 100 failed CONSECTUTIVE songs
@@ -523,6 +529,13 @@ void CPlayListPlayer::SetShuffle(int iPlaylist, bool bYesNo, bool bNotify /* = f
     }
   }
 
+  // its likely that the playlist changed   
+  if (CServiceBroker::GetGUI() != nullptr)
+  {
+    CGUIMessage msg(GUI_MSG_PLAYLIST_CHANGED, 0, 0);
+    CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg);
+  }
+
   AnnouncePropertyChanged(iPlaylist, "shuffled", IsShuffled(iPlaylist));
 }
 
@@ -575,6 +588,14 @@ void CPlayListPlayer::SetRepeat(int iPlaylist, REPEAT_STATE state, bool bNotify 
     data = "off";
     break;
   }
+
+  // its likely that the playlist changed   
+  if (CServiceBroker::GetGUI() != nullptr)
+  {
+    CGUIMessage msg(GUI_MSG_PLAYLIST_CHANGED, 0, 0);
+    CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg);
+  }
+
   AnnouncePropertyChanged(iPlaylist, "repeat", data);
 }
 
@@ -644,6 +665,10 @@ void CPlayListPlayer::Add(int iPlaylist, const CFileItemList& items)
   list.Add(items);
   if (list.IsShuffled())
     ReShuffle(iPlaylist, iSize);
+
+  // its likely that the playlist changed
+  CGUIMessage msg(GUI_MSG_PLAYLIST_CHANGED, 0, 0);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg);
 }
 
 void CPlayListPlayer::Insert(int iPlaylist, const CPlayList& playlist, int iIndex)
@@ -683,6 +708,10 @@ void CPlayListPlayer::Insert(int iPlaylist, const CFileItemList& items, int iInd
     ReShuffle(iPlaylist, iSize);
   else if (m_iCurrentPlayList == iPlaylist && m_iCurrentSong >= iIndex)
     m_iCurrentSong++;
+
+  // its likely that the playlist changed
+  CGUIMessage msg(GUI_MSG_PLAYLIST_CHANGED, 0, 0);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg);
 }
 
 void CPlayListPlayer::Remove(int iPlaylist, int iPosition)
@@ -738,7 +767,8 @@ void CPlayListPlayer::AnnouncePropertyChanged(int iPlaylist, const std::string &
   CVariant data;
   data["player"]["playerid"] = iPlaylist;
   data["property"][strProperty] = value;
-  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "xbmc", "OnPropertyChanged", data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "OnPropertyChanged",
+                                                     data);
 }
 
 int PLAYLIST::CPlayListPlayer::GetMessageMask()
@@ -834,17 +864,21 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
 
   case TMSG_MEDIA_PLAY:
   {
+    g_application.ResetScreenSaver();
+    g_application.WakeUpScreenSaverAndDPMS();
+
     // first check if we were called from the PlayFile() function
     if (pMsg->lpVoid && pMsg->param2 == 0)
     {
+      // Discard the current playlist, if TMSG_MEDIA_PLAY gets posted with just a single item.
+      // Otherwise items may fail to play, when started while a playlist is playing.
+      Reset();
+
       CFileItem *item = static_cast<CFileItem*>(pMsg->lpVoid);
       g_application.PlayFile(*item, "", pMsg->param1 != 0);
       delete item;
       return;
     }
-
-    g_application.ResetScreenSaver();
-    g_application.WakeUpScreenSaverAndDPMS();
 
     //g_application.StopPlaying();
     // play file
@@ -869,6 +903,13 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
         if (list->Size() == 1 && !(*list)[0]->IsPlayList())
         {
           CFileItemPtr item = (*list)[0];
+          // if the item is a plugin we need to resolve the URL to ensure the infotags are filled.
+          // resolve only for a maximum of 5 times to avoid deadlocks (plugin:// paths can resolve to plugin:// paths)
+          for (int i = 0; URIUtils::IsPlugin(item->GetDynPath()) && i < 5; ++i)
+          {
+            if (!XFILE::CPluginDirectory::GetPluginResult(item->GetDynPath(), *item, true))
+              return;
+          }
           if (item->IsAudio() || item->IsVideo())
             Play(item, pMsg->strParam);
           else

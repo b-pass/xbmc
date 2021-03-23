@@ -8,21 +8,23 @@
 
 #include "SeatSelection.h"
 
-#include <poll.h>
-#include <unistd.h>
+#include "Connection.h"
+#include "Registry.h"
+#include "WinEventsWayland.h"
+#include "threads/SingleLock.h"
+#include "utils/StringUtils.h"
+#include "utils/log.h"
+
+#include "platform/posix/utils/FileHandle.h"
 
 #include <cerrno>
 #include <chrono>
 #include <cstring>
 #include <system_error>
+#include <utility>
 
-#include "Connection.h"
-#include "Registry.h"
-#include "threads/SingleLock.h"
-#include "utils/log.h"
-#include "platform/posix/utils/FileHandle.h"
-#include "utils/StringUtils.h"
-#include "WinEventsWayland.h"
+#include <poll.h>
+#include <unistd.h>
 
 using namespace KODI::UTILS::POSIX;
 using namespace KODI::WINDOWING::WAYLAND;
@@ -62,15 +64,14 @@ CSeatSelection::CSeatSelection(CConnection& connection, wayland::seat_t const& s
   {
     // We don't know yet whether this is drag-and-drop or selection, so collect
     // MIME types in either case
-    m_currentOffer = offer;
+    m_currentOffer = std::move(offer);
     m_mimeTypeOffers.clear();
     m_currentOffer.on_offer() = [this](std::string mime)
     {
       m_mimeTypeOffers.push_back(std::move(mime));
     };
   };
-  m_dataDevice.on_selection() = [this](wayland::data_offer_t offer)
-  {
+  m_dataDevice.on_selection() = [this](const wayland::data_offer_t& offer) {
     CSingleLock lock(m_currentSelectionMutex);
     m_matchedMimeType.clear();
 

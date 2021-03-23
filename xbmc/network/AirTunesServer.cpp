@@ -11,36 +11,37 @@
 
 #include "AirTunesServer.h"
 
-#include <map>
-#include <string>
-#include <utility>
-
 #include "Application.h"
-#include "ServiceBroker.h"
-#include "cores/VideoPlayer/DVDDemuxers/DVDDemuxBXA.h"
+#include "CompileInfo.h"
 #include "FileItem.h"
+#include "GUIInfoManager.h"
+#include "ServiceBroker.h"
+#include "URL.h"
+#include "cores/VideoPlayer/DVDDemuxers/DVDDemuxBXA.h"
 #include "filesystem/File.h"
 #include "filesystem/PipeFile.h"
-#include "GUIInfoManager.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
 #include "interfaces/AnnouncementManager.h"
 #include "messaging/ApplicationMessenger.h"
 #include "music/tags/MusicInfoTag.h"
-#include "network/dacp/dacp.h"
 #include "network/Network.h"
 #include "network/Zeroconf.h"
 #include "network/ZeroconfBrowser.h"
+#include "network/dacp/dacp.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "URL.h"
 #include "utils/EndianSwap.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/SystemInfo.h"
 #include "utils/Variant.h"
+#include "utils/log.h"
+
+#include <map>
+#include <string>
+#include <utility>
 
 #if !defined(TARGET_WINDOWS)
 #pragma GCC diagnostic ignored "-Wwrite-strings"
@@ -57,7 +58,6 @@
 using namespace XFILE;
 using namespace KODI::MESSAGING;
 
-DllLibShairplay *CAirTunesServer::m_pLibShairplay = NULL;
 CAirTunesServer *CAirTunesServer::ServerInstance = NULL;
 std::string CAirTunesServer::m_macAddress;
 std::string CAirTunesServer::m_metadata[3];
@@ -163,11 +163,15 @@ void CAirTunesServer::SetMetadataFromBuffer(const char *buffer, unsigned int siz
   RefreshMetadata();
 }
 
-void CAirTunesServer::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data)
+void CAirTunesServer::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                               const std::string& sender,
+                               const std::string& message,
+                               const CVariant& data)
 {
-  if ( (flag & ANNOUNCEMENT::Player) && strcmp(sender, "xbmc") == 0)
+  if ((flag & ANNOUNCEMENT::Player) &&
+      sender == ANNOUNCEMENT::CAnnouncementManager::ANNOUNCEMENT_SENDER)
   {
-    if ((strcmp(message, "OnPlay") == 0 || strcmp(message, "OnResume") == 0) && m_streamStarted)
+    if ((message == "OnPlay" || message == "OnResume") && m_streamStarted)
     {
       RefreshMetadata();
       RefreshCoverArt();
@@ -176,14 +180,14 @@ void CAirTunesServer::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *
         m_pDACP->Play();
     }
 
-    if (strcmp(message, "OnStop") == 0 && m_streamStarted)
+    if (message == "OnStop" && m_streamStarted)
     {
       CSingleLock lock(m_dacpLock);
       if (m_pDACP)
         m_pDACP->Stop();
     }
 
-    if (strcmp(message, "OnPause") == 0 && m_streamStarted)
+    if (message == "OnPause" && m_streamStarted)
     {
       CSingleLock lock(m_dacpLock);
       if (m_pDACP)
@@ -231,7 +235,7 @@ void CAirTunesServer::Process()
       m_actionQueue.clear();
     }
 
-    for (auto currentAction : currentActions)
+    for (const auto& currentAction : currentActions)
     {
       CSingleLock lock(m_dacpLock);
       if (m_pDACP)
@@ -531,17 +535,15 @@ void  CAirTunesServer::AudioOutputFunctions::audio_destroy(void *cls, void *sess
 void shairplay_log(void *cls, int level, const char *msg)
 {
   int xbmcLevel = LOGINFO;
-  if(!CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGAIRTUNES))
+  if (!CServiceBroker::GetLogging().CanLogComponent(LOGAIRTUNES))
     return;
 
   switch(level)
   {
     case RAOP_LOG_EMERG:    // system is unusable
-      xbmcLevel = LOGFATAL;
-      break;
     case RAOP_LOG_ALERT:    // action must be taken immediately
     case RAOP_LOG_CRIT:     // critical conditions
-      xbmcLevel = LOGSEVERE;
+      xbmcLevel = LOGFATAL;
       break;
     case RAOP_LOG_ERR:      // error conditions
       xbmcLevel = LOGERROR;
@@ -550,8 +552,6 @@ void shairplay_log(void *cls, int level, const char *msg)
       xbmcLevel = LOGWARNING;
       break;
     case RAOP_LOG_NOTICE:   // normal but significant condition
-      xbmcLevel = LOGNOTICE;
-      break;
     case RAOP_LOG_INFO:     // informational
       xbmcLevel = LOGINFO;
       break;
@@ -599,22 +599,22 @@ bool CAirTunesServer::StartServer(int port, bool nonlocal, bool usePassword, con
                                              CSysInfo::GetDeviceName().c_str());
 
     std::vector<std::pair<std::string, std::string> > txt;
-    txt.push_back(std::make_pair("txtvers",  "1"));
-    txt.push_back(std::make_pair("cn", "0,1"));
-    txt.push_back(std::make_pair("ch", "2"));
-    txt.push_back(std::make_pair("ek", "1"));
-    txt.push_back(std::make_pair("et", "0,1"));
-    txt.push_back(std::make_pair("sv", "false"));
-    txt.push_back(std::make_pair("tp",  "UDP"));
-    txt.push_back(std::make_pair("sm",  "false"));
-    txt.push_back(std::make_pair("ss",  "16"));
-    txt.push_back(std::make_pair("sr",  "44100"));
-    txt.push_back(std::make_pair("pw",  usePassword?"true":"false"));
-    txt.push_back(std::make_pair("vn",  "3"));
-    txt.push_back(std::make_pair("da",  "true"));
-    txt.push_back(std::make_pair("md",  "0,1,2"));
-    txt.push_back(std::make_pair("am",  "Kodi,1"));
-    txt.push_back(std::make_pair("vs",  "130.14"));
+    txt.emplace_back("txtvers", "1");
+    txt.emplace_back("cn", "0,1");
+    txt.emplace_back("ch", "2");
+    txt.emplace_back("ek", "1");
+    txt.emplace_back("et", "0,1");
+    txt.emplace_back("sv", "false");
+    txt.emplace_back("tp", "UDP");
+    txt.emplace_back("sm", "false");
+    txt.emplace_back("ss", "16");
+    txt.emplace_back("sr", "44100");
+    txt.emplace_back("pw", usePassword ? "true" : "false");
+    txt.emplace_back("vn", "3");
+    txt.emplace_back("da", "true");
+    txt.emplace_back("md", "0,1,2");
+    txt.emplace_back("am", "Kodi,1");
+    txt.emplace_back("vs", "130.14");
 
     CZeroconf::GetInstance()->PublishService("servers.airtunes", "_raop._tcp", appName, port, txt);
   }
@@ -647,30 +647,23 @@ bool CAirTunesServer::IsRunning()
 
 bool CAirTunesServer::IsRAOPRunningInternal()
 {
-  if (m_pLibShairplay != nullptr && m_pRaop != nullptr)
+  if (m_pRaop)
   {
-    return m_pLibShairplay->raop_is_running(m_pRaop) != 0;
+    return raop_is_running(m_pRaop) != 0;
   }
+
   return false;
 }
 
-
 CAirTunesServer::CAirTunesServer(int port, bool nonlocal)
-: CThread("AirTunesActionThread"),
-  m_pRaop(nullptr)
+  : CThread("AirTunesActionThread")
 {
   m_port = port;
-  m_pLibShairplay = new DllLibShairplay();
-  m_pPipe         = new XFILE::CPipeFile;
+  m_pPipe = new XFILE::CPipeFile;
 }
 
 CAirTunesServer::~CAirTunesServer()
 {
-  if (m_pLibShairplay->IsLoaded())
-  {
-    m_pLibShairplay->Unload();
-  }
-  delete m_pLibShairplay;
   delete m_pPipe;
 }
 
@@ -696,45 +689,39 @@ bool CAirTunesServer::Initialize(const std::string &password)
 
   Deinitialize();
 
-  if (m_pLibShairplay->Load())
+  raop_callbacks_t ao = {};
+  ao.cls = m_pPipe;
+  ao.audio_init = AudioOutputFunctions::audio_init;
+  ao.audio_set_volume = AudioOutputFunctions::audio_set_volume;
+  ao.audio_set_metadata = AudioOutputFunctions::audio_set_metadata;
+  ao.audio_set_coverart = AudioOutputFunctions::audio_set_coverart;
+  ao.audio_process = AudioOutputFunctions::audio_process;
+  ao.audio_destroy = AudioOutputFunctions::audio_destroy;
+  ao.audio_remote_control_id = AudioOutputFunctions::audio_remote_control_id;
+  ao.audio_set_progress = AudioOutputFunctions::audio_set_progress;
+  m_pRaop = raop_init(1, &ao, RSA_KEY, nullptr); //1 - we handle one client at a time max
+
+  if (m_pRaop)
   {
+    char macAdr[6];
+    unsigned short port = (unsigned short)m_port;
 
-    raop_callbacks_t ao = {};
-    ao.cls                  = m_pPipe;
-    ao.audio_init           = AudioOutputFunctions::audio_init;
-    ao.audio_set_volume     = AudioOutputFunctions::audio_set_volume;
-    ao.audio_set_metadata   = AudioOutputFunctions::audio_set_metadata;
-    ao.audio_set_coverart   = AudioOutputFunctions::audio_set_coverart;
-    ao.audio_process        = AudioOutputFunctions::audio_process;
-    ao.audio_destroy        = AudioOutputFunctions::audio_destroy;
-    ao.audio_remote_control_id = AudioOutputFunctions::audio_remote_control_id;
-    ao.audio_set_progress   = AudioOutputFunctions::audio_set_progress;
-    m_pLibShairplay->EnableDelayedUnload(false);
-    m_pRaop = m_pLibShairplay->raop_init(1, &ao, RSA_KEY);//1 - we handle one client at a time max
-    ret = m_pRaop != NULL;
-
-    if(ret)
+    raop_set_log_level(m_pRaop, RAOP_LOG_WARNING);
+    if (CServiceBroker::GetLogging().CanLogComponent(LOGAIRTUNES))
     {
-      char macAdr[6];
-      unsigned short port = (unsigned short)m_port;
-
-      m_pLibShairplay->raop_set_log_level(m_pRaop, RAOP_LOG_WARNING);
-      if(CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGAIRTUNES))
-      {
-        m_pLibShairplay->raop_set_log_level(m_pRaop, RAOP_LOG_DEBUG);
-      }
-
-      m_pLibShairplay->raop_set_log_callback(m_pRaop, shairplay_log, NULL);
-
-      CNetworkInterface *net = CServiceBroker::GetNetwork().GetFirstConnectedInterface();
-
-      if (net)
-      {
-        net->GetMacAddressRaw(macAdr);
-      }
-
-      ret = m_pLibShairplay->raop_start(m_pRaop, &port, macAdr, 6, password.c_str()) >= 0;
+      raop_set_log_level(m_pRaop, RAOP_LOG_DEBUG);
     }
+
+    raop_set_log_callback(m_pRaop, shairplay_log, NULL);
+
+    CNetworkInterface* net = CServiceBroker::GetNetwork().GetFirstConnectedInterface();
+
+    if (net)
+    {
+      net->GetMacAddressRaw(macAdr);
+    }
+
+    ret = raop_start(m_pRaop, &port, macAdr, 6, password.c_str()) >= 0;
   }
   return ret;
 }
@@ -743,11 +730,10 @@ void CAirTunesServer::Deinitialize()
 {
   RegisterActionListener(false);
 
-  if (m_pLibShairplay && m_pLibShairplay->IsLoaded())
+  if (m_pRaop)
   {
-    m_pLibShairplay->raop_stop(m_pRaop);
-    m_pLibShairplay->raop_destroy(m_pRaop);
-    m_pLibShairplay->Unload();
+    raop_stop(m_pRaop);
+    raop_destroy(m_pRaop);
     m_pRaop = nullptr;
   }
 }
