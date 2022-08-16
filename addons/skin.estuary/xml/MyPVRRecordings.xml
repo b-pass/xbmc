@@ -40,7 +40,6 @@
 						<item>
 							<label>All Recordings - $INFO[Skin.String(pvrCurrentDir)]</label>
 							<property name="id">all_flat</property>
-							<onclick>-</onclick>
 						</item>
 					</content>
 					<content sortby="label" sortorder="ascending" target="noop">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]</content>
@@ -187,13 +186,6 @@
 								<textcolor>grey</textcolor>
 							</control>
 						</itemlayout>
-					</control>
-					<control type="list" id="50">
-						<visible>false</visible>
-						<itemlayout>
-						</itemlayout>
-						<focusedlayout>
-						</focusedlayout>
 					</control>
 					<control type="scrollbar" id="9973">
 						<right>5</right>
