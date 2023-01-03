@@ -43,13 +43,14 @@
 						</item>
 						<include condition='String.IsEqual(Skin.String(pvrCurrentDir), "Default") + !Skin.HasSetting(HomeMenuNoFavButton)'>FavoritesItem</include>
 					</content>
+					<content target="noop">favourites://</content>
 					<content sortby="label" sortorder="ascending" target="noop">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]</content>
 					<focusedlayout height="80" width="550">
 						<control type="button">
 							<description>Updates the main content list with the proper listing and triggers a check on the content's sort order</description>
 							<visible allowhiddenfocus="true">false</visible>
 							<onfocus condition='String.IsEqual(Container(9950).ListItem.Property(id),"all_flat")'>Container.Update("pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]?view=flat", replace)</onfocus>
-							<onfocus condition='String.IsEqual(Container(9950).ListItem.Property(id),"fav")'>Container.Update("favourites://", replace)</onfocus>
+							<onfocus condition='String.StartsWith(Container(9950).ListItem.FolderPath,"fav")'>Container.Update("favourites://", replace)</onfocus>
 							<onfocus condition='String.IsEqual(Container(9950).ListItem.Property(id),"")'>Container.Update("$INFO[Container(9950).ListItem.FolderPath]", replace)</onfocus>
 							<onfocus condition='!System.HasModalDialog + Skin.HasSetting(NeedSortFix)'>AlarmClock(FixSort,SetFocus(9949),00:00,true)</onfocus>
 							<onfocus condition='!Skin.HasSetting(NeedSortFix)'>Skin.SetBool(NeedSortFix)</onfocus> 
@@ -128,8 +129,8 @@
 							<control type="button">
 									<description>Never let this container show folders</description>
 									<visible allowhiddenfocus="true">false</visible>
-									<onfocus condition='ListItem.IsFolder | String.IsEqual(ListItem.Label, "..") + !'>Control.SetFocus(9950)</onfocus>
-									<onfocus condition='String.IsEqual(Container(9950).ListItem.Property(id),"fav")'>ActivateWindow("favourites")</onfocus>
+									<onfocus condition='ListItem.IsFolder | String.IsEqual(ListItem.Label, "..")'>Control.SetFocus(9950)</onfocus>
+									<onfocus condition='String.StartsWith(ListItem.FolderPath,"fav")'>ActivateWindow("favourites")</onfocus>
 							</control>
 							<control type="image">
 								<left>0</left>
