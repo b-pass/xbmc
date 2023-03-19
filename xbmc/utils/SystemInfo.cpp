@@ -596,7 +596,7 @@ std::string CSysInfo::GetOsName(bool emptyIfUnknown /* = false*/)
 #elif defined(TARGET_DARWIN_TVOS)
     osName = "tvOS";
 #elif defined(TARGET_DARWIN_OSX)
-    osName = "OS X";
+    osName = "macOS";
 #elif defined (TARGET_ANDROID)
     osName = "Android";
 #elif defined(TARGET_LINUX)
@@ -697,6 +697,10 @@ std::string CSysInfo::GetOsPrettyNameWithVersion(void)
       osNameVer.append("10");
       appendWindows10NameVersion(osNameVer);
       break;
+    case WindowsVersionWin11:
+      osNameVer.append("11");
+      appendWindows10NameVersion(osNameVer);
+      break;
     case WindowsVersionFuture:
       osNameVer.append("Unknown future version");
       break;
@@ -719,8 +723,11 @@ std::string CSysInfo::GetOsPrettyNameWithVersion(void)
     osNameVer.append(" unknown");
 #elif defined(TARGET_WINDOWS_STORE)
   osNameVer = GetKernelName() + " " + GetOsVersion();
-#elif defined(TARGET_FREEBSD) || defined(TARGET_DARWIN)
+#elif defined(TARGET_FREEBSD)
   osNameVer = GetOsName() + " " + GetOsVersion();
+#elif defined(TARGET_DARWIN)
+  osNameVer = StringUtils::Format("{} {} ({})", GetOsName(), GetOsVersion(),
+                                  CDarwinUtils::GetOSVersionString());
 #elif defined(TARGET_ANDROID)
   osNameVer = GetOsName() + " " + GetOsVersion() + " API level " +   StringUtils::Format("%d", CJNIBuild::SDK_INT);
 #elif defined(TARGET_LINUX)
@@ -869,6 +876,8 @@ CSysInfo::WindowsVersion CSysInfo::GetWindowsVersion()
         m_WinVer = WindowsVersionWin10_1909;
       else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber == 19041)
         m_WinVer = WindowsVersionWin10_2004;
+      else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 22000)
+        m_WinVer = WindowsVersionWin11;
       else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber > 19041)
         m_WinVer = WindowsVersionWin10_Future;
       /* Insert checks for new Windows versions here */
@@ -929,8 +938,9 @@ int CSysInfo::GetKernelBitness(void)
     if (uname(&un) == 0)
     {
       std::string machine(un.machine);
-      if (machine == "x86_64" || machine == "amd64" || machine == "arm64" || machine == "aarch64" || machine == "ppc64" ||
-          machine == "ia64" || machine == "mips64" || machine == "s390x")
+      if (machine == "x86_64" || machine == "amd64" || machine == "arm64" || machine == "aarch64" ||
+          machine == "ppc64" || machine == "ppc64el" || machine == "ppc64le" || machine == "ia64" ||
+          machine == "mips64" || machine == "s390x" || machine == "riscv64")
         kernelBitness = 64;
       else
         kernelBitness = 32;
@@ -985,6 +995,8 @@ const std::string& CSysInfo::GetKernelCpuFamily(void)
         kernelCpuFamily = "s390";
       else if (machine.compare(0, 3, "ppc", 3) == 0 || machine.compare(0, 5, "power", 5) == 0)
         kernelCpuFamily = "PowerPC";
+      else if (machine.compare(0, 5, "riscv", 5) == 0)
+        kernelCpuFamily = "RISC-V";
     }
 #endif
     if (kernelCpuFamily.empty())
@@ -1256,7 +1268,7 @@ std::string CSysInfo::GetBuildDate()
 std::string CSysInfo::GetBuildTargetPlatformName(void)
 {
 #if defined(TARGET_DARWIN_OSX)
-  return "OS X";
+  return "macOS";
 #elif defined(TARGET_DARWIN_IOS)
   return "iOS";
 #elif defined(TARGET_DARWIN_TVOS)
@@ -1363,6 +1375,8 @@ std::string CSysInfo::GetBuildTargetCpuFamily(void)
   return "s390";
 #elif defined(__powerpc) || defined(__powerpc__) || defined(__powerpc64__) || defined(__ppc__) || defined(__ppc64__) || defined(_M_PPC)
   return "PowerPC";
+#elif defined(__riscv)
+  return "RISC-V";
 #else
   return "unknown CPU family";
 #endif

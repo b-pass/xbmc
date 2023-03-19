@@ -10,8 +10,10 @@
 
 #include "ServiceBroker.h"
 #include "addons/AddonManager.h"
+#include "addons/AudioDecoder.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
+#include "utils/URIUtils.h"
 
 #include <string>
 #include <vector>
@@ -92,6 +94,57 @@ std::string CFileExtensionProvider::GetFileFolderExtensions() const
   return extensions;
 }
 
+bool CFileExtensionProvider::CanOperateExtension(const std::string& path) const
+{
+  /*!
+   * @todo Improve this function to support all cases and not only audio decoder
+   * with tracks inside.
+   */
+
+  // Get file extensions to find addon related to it.
+  std::string strExtension = URIUtils::GetExtension(path);
+  StringUtils::ToLower(strExtension);
+  if (!strExtension.empty() && CServiceBroker::IsBinaryAddonCacheUp())
+  {
+    std::vector<AddonInfoPtr> addonInfos;
+    m_addonManager.GetAddonInfos(addonInfos, true, ADDON_AUDIODECODER);
+    for (const auto& addonInfo : addonInfos)
+    {
+      if (CAudioDecoder::HasTracks(addonInfo))
+      {
+        const auto exts = StringUtils::Split(CAudioDecoder::GetExtensions(addonInfo), "|");
+        if (std::find(exts.begin(), exts.end(), strExtension) != exts.end())
+        {
+          /* Call addon to start a dir read about given file, if success, return
+           * as true.
+           */
+          CAudioDecoder result(addonInfo);
+          if (result.CreateDecoder() && result.ContainsFiles(CURL(path)))
+            return true;
+
+          /* If extension is supported and addon creation failed, we expect the
+           * file is not usable and return false here.
+           */
+          return false;
+        }
+      }
+    }
+
+    /*!
+     * We expect that VFS addons can support the file, and return true.
+     *
+     * @todo Check VFS addons can also be types in conflict with Kodi's
+     * supported parts!
+     */
+    return true;
+  }
+
+  /*!
+   * If no file extensions present, mark it as not supported.
+   */
+  return false;
+}
+
 std::string CFileExtensionProvider::GetAddonExtensions(const TYPE &type) const
 {
   auto it = m_addonExtensions.find(type);
@@ -103,8 +156,8 @@ std::string CFileExtensionProvider::GetAddonExtensions(const TYPE &type) const
 
 std::string CFileExtensionProvider::GetAddonFileFolderExtensions(const TYPE &type) const
 {
-  auto it = m_addonExtensions.find(type);
-  if (it != m_addonExtensions.end())
+  auto it = m_addonFileFolderExtensions.find(type);
+  if (it != m_addonFileFolderExtensions.end())
     return it->second;
 
   return "";
@@ -150,9 +203,8 @@ void CFileExtensionProvider::SetAddonExtensions(const TYPE& type)
     }
   }
 
-  m_addonExtensions.insert(make_pair(type, StringUtils::Join(extensions, "|")));
-  if (!fileFolderExtensions.empty())
-    m_addonFileFolderExtensions.insert(make_pair(type, StringUtils::Join(fileFolderExtensions, "|")));
+  m_addonExtensions[type] = StringUtils::Join(extensions, "|");
+  m_addonFileFolderExtensions[type] = StringUtils::Join(fileFolderExtensions, "|");
 }
 
 void CFileExtensionProvider::OnAddonEvent(const AddonEvent& event)

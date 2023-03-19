@@ -818,6 +818,9 @@ void CVideoBufferCopy::Initialize(CDecoder* decoder)
     // copy decoder surface on decoder device
     m_pDeviceContext->CopySubresourceRegion(m_copyRes.Get(), 0, 0, 0, 0, m_pResource.Get(),
                                             CVideoBuffer::GetIdx(), nullptr);
+
+    if (decoder->m_DVDWorkaround) // DVDs menus/stills need extra Flush()
+      m_pDeviceContext->Flush();
   }
 }
 
@@ -1075,22 +1078,17 @@ static bool HasATIMP2Bug(AVCodecContext* avctx)
       && avctx->color_trc == AVCOL_TRC_GAMMA28;
 }
 
-// UHD HEVC Main10 causes crash on Xbox One S/X
-static bool HasXbox4kHevcMain10Bug(AVCodecContext* avctx)
+static bool HasAMDH264SDiBug(AVCodecContext* avctx)
 {
-  if (CSysInfo::GetWindowsDeviceFamily() != CSysInfo::Xbox)
+  DXGI_ADAPTER_DESC AIdentifier = {};
+  DX::DeviceResources::Get()->GetAdapterDesc(&AIdentifier);
+
+  if (AIdentifier.VendorId != PCIV_ATI)
     return false;
 
-  if (avctx->codec_id != AV_CODEC_ID_HEVC)
-    return false;
-
-  if (avctx->profile != FF_PROFILE_HEVC_MAIN_10)
-    return false;
-
-  if (avctx->height <= 1080 || avctx->width <= 1920)
-    return false;
-
-  return true;
+  // AMD card has issues with SD H264 interlaced content
+  return (avctx->height <= 576 && avctx->codec_id == AV_CODEC_ID_H264 &&
+          avctx->field_order != AV_FIELD_PROGRESSIVE);
 }
 
 static bool CheckCompatibility(AVCodecContext* avctx)
@@ -1106,6 +1104,15 @@ static bool CheckCompatibility(AVCodecContext* avctx)
   if (HasVP3WidthBug(avctx))
   {
     CLog::LogFunction(LOGWARNING,"DXVA", "width %i is not supported with nVidia VP3 hardware. DXVA will not be used.", avctx->coded_width);
+    return false;
+  }
+
+  // AMD H264 SD interlaced incompatibility
+  if (HasAMDH264SDiBug(avctx))
+  {
+    CLog::Log(
+        LOGWARNING,
+        "DXVA: H264 SD interlaced has issues on AMD graphics hardware. DXVA will not be used.");
     return false;
   }
 
@@ -1133,6 +1140,10 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, enum AVPixel
 {
   if (!CheckCompatibility(avctx))
     return false;
+
+  // DVDs menus/stills need extra Flush() after copy texture
+  if (avctx->codec_id == AV_CODEC_ID_MPEG2VIDEO && avctx->height <= 576)
+    m_DVDWorkaround = true;
 
   CSingleLock lock(m_section);
   Close();
@@ -1188,16 +1199,20 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, enum AVPixel
   case AV_CODEC_ID_HEVC:
     /* the HEVC DXVA2 spec asks for 128 pixel aligned surfaces to ensure
        all coding features have enough room to work with */
+    m_surface_alignment = 128;
+    // a driver may use multi-thread decoding internally
+    // on Xbox only add refs for <= Full HD due memory constraints (max 16 refs for 4K)
     if (CSysInfo::GetWindowsDeviceFamily() != CSysInfo::Xbox)
     {
-      m_surface_alignment = 128;
-      // a driver may use multi-thread decoding internally
       m_refs += CServiceBroker::GetCPUInfo()->GetCPUCount();
     }
-
+    else
+    {
+      if (avctx->width <= 1920)
+        m_refs += CServiceBroker::GetCPUInfo()->GetCPUCount() / 2;
+    }
     // by specification hevc decoder can hold up to 8 unique refs
-    /* For some reason avctx->refs returns always 1 ref frame (tested
-       with well known 3 refs frames encodes) */
+    // ffmpeg may report only 1 refs frame when is unknown or not present in headers
     m_refs += (avctx->refs > 1) ? avctx->refs : 8;
     break;
   case AV_CODEC_ID_H264:
@@ -1229,14 +1244,6 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, enum AVPixel
                "Current available video memory ({} MB) is insufficient 4K video decoding (DXVA2) "
                "using {} surfaces. Decoder surfaces has been limited to 16.", videoMem / MB, m_refs);
     m_refs = 16;
-  }
-
-  /* On the Xbox 1/S with limited memory we have to
-     limit refs to avoid crashing device completely */
-  if (HasXbox4kHevcMain10Bug(avctx) && m_refs > 16)
-  {
-    CLog::LogFunction(LOGWARNING, "DXVA", "source requires to much refs which is not supported on Xbox One S/X. dxva will not be used.");
-    return false;
   }
 
   if (!OpenDecoder())

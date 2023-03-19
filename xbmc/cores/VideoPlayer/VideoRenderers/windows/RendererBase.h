@@ -8,6 +8,7 @@
 #pragma once
 
 #include "VideoRenderers/ColorManager.h"
+#include "VideoRenderers/DebugInfo.h"
 #include "VideoRenderers/RenderInfo.h"
 #include "VideoRenderers/VideoShaders/WinVideoFilter.h"
 #include "cores/VideoSettings.h"
@@ -19,6 +20,7 @@
 #include <dxgi1_5.h>
 extern "C" {
 #include <libavutil/mastering_display_metadata.h>
+#include <libavutil/pixdesc.h>
 }
 
 struct VideoPicture;
@@ -79,7 +81,7 @@ public:
   bool full_range = false;
   int bits = 8;
   uint8_t texBits = 8;
-
+  AVPixelFormat pixelFormat = AV_PIX_FMT_NONE; // source pixel format
   bool hasDisplayMetadata = false;
   bool hasLightMetadata = false;
   AVMasteringDisplayMetadata displayMetadata = {};
@@ -127,6 +129,8 @@ public:
   bool Flush(bool saveBuffers);
   void SetBufferSize(int numBuffers) { m_iBuffersRequired = numBuffers; }
 
+  DEBUG_INFO_VIDEO GetDebugInfo(int idx);
+
   static DXGI_FORMAT GetDXGIFormat(const VideoPicture &picture);
   static DXGI_FORMAT GetDXGIFormat(CVideoBuffer* videoBuffer);
   static AVPixelFormat GetAVFormat(DXGI_FORMAT dxgi_format);
@@ -155,7 +159,7 @@ protected:
   bool m_toneMapping = false;
   bool m_useDithering = false;
   bool m_cmsOn = false;
-  bool m_clutLoaded = false;
+  bool m_lutIsLoading = false;
   bool m_useHLGtoPQ = false;
   int m_toneMapMethod = 0;
 

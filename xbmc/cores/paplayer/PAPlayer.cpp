@@ -327,7 +327,23 @@ bool PAPlayer::QueueNextFileEx(const CFileItem &file, bool fadeIn)
 
   StreamInfo *si = new StreamInfo();
   si->m_fileItem = file;
-  if (!si->m_decoder.Create(file, si->m_fileItem.m_lStartOffset))
+
+  // Start stream at zero offset
+  si->m_startOffset = 0;
+  //File item start offset defines where in song to resume
+  double starttime = CUtil::ConvertMilliSecsToSecs(si->m_fileItem.m_lStartOffset);
+
+  // Music from cuesheet => "item_start" and offset match
+  // Start offset defines where this song starts in file of multiple songs
+  if (si->m_fileItem.HasProperty("item_start") &&
+      (si->m_fileItem.GetProperty("item_start").asInteger() == si->m_fileItem.m_lStartOffset))
+  {
+    // Start stream at offset from cuesheet
+    si->m_startOffset = si->m_fileItem.m_lStartOffset;
+    starttime = 0; // No resume point
+  }
+
+  if (!si->m_decoder.Create(file, si->m_startOffset))
   {
     CLog::Log(LOGWARNING, "PAPlayer::QueueNextFileEx - Failed to create the decoder");
 
@@ -367,7 +383,7 @@ bool PAPlayer::QueueNextFileEx(const CFileItem &file, bool fadeIn)
 
   /* init the streaminfo struct */
   si->m_audioFormat = si->m_decoder.GetFormat();
-  si->m_startOffset = file.m_lStartOffset;
+  // si->m_startOffset already initialized
   si->m_endOffset = file.m_lEndOffset;
   si->m_bytesPerSample = CAEUtil::DataFormatToBits(si->m_audioFormat.m_dataFormat) >> 3;
   si->m_bytesPerFrame = si->m_bytesPerSample * si->m_audioFormat.m_channelLayout.Count();
@@ -375,10 +391,7 @@ bool PAPlayer::QueueNextFileEx(const CFileItem &file, bool fadeIn)
   si->m_finishing = false;
   si->m_framesSent = 0;
   si->m_seekNextAtFrame = 0;
-  if (si->m_fileItem.HasProperty("audiobook_bookmark"))
-    si->m_seekFrame = si->m_audioFormat.m_sampleRate * CUtil::ConvertMilliSecsToSecs(si->m_fileItem.GetProperty("audiobook_bookmark").asInteger());
-  else
-    si->m_seekFrame = -1;
+  si->m_seekFrame = -1;
   si->m_stream = NULL;
   si->m_volume = (fadeIn && m_upcomingCrossfadeMS) ? 0.0f : 1.0f;
   si->m_fadeOutTriggered = false;
@@ -388,6 +401,23 @@ bool PAPlayer::QueueNextFileEx(const CFileItem &file, bool fadeIn)
   int64_t streamTotalTime = si->m_decoderTotal;
   if (si->m_endOffset)
     streamTotalTime = si->m_endOffset - si->m_startOffset;
+
+  // Seek to a resume point
+  if (si->m_fileItem.HasProperty("StartPercent") &&
+      (si->m_fileItem.GetProperty("StartPercent").asDouble() > 0) &&
+      (si->m_fileItem.GetProperty("StartPercent").asDouble() <= 100))
+  {
+    si->m_seekFrame =
+        si->m_audioFormat.m_sampleRate *
+        CUtil::ConvertMilliSecsToSecs(static_cast<int>(static_cast<double>(
+            streamTotalTime * (si->m_fileItem.GetProperty("StartPercent").asDouble() / 100.0))));
+  }
+  else if (starttime > 0)
+    si->m_seekFrame = si->m_audioFormat.m_sampleRate * starttime;
+  else if (si->m_fileItem.HasProperty("audiobook_bookmark"))
+    si->m_seekFrame =
+        si->m_audioFormat.m_sampleRate *
+        CUtil::ConvertMilliSecsToSecs(si->m_fileItem.GetProperty("audiobook_bookmark").asInteger());
 
   si->m_prepareNextAtFrame = 0;
   // cd drives don't really like it to be crossfaded or prepared
@@ -835,7 +865,8 @@ inline bool PAPlayer::ProcessStream(StreamInfo *si, double &freeBufferTime)
       if (si->m_audioFormat.m_dataFormat != AE_FMT_RAW)
         free_space = (double)(si->m_stream->GetSpace() / si->m_bytesPerSample) / si->m_audioFormat.m_sampleRate;
       else
-        free_space = (double) si->m_stream->GetSpace() * si->m_audioFormat.m_streamInfo.GetDuration() / 1000;
+        free_space = (double)si->m_stream->GetSpace() *
+                     si->m_audioFormat.m_streamInfo.GetDuration(true) / 1000;
 
       freeBufferTime = std::max(freeBufferTime , free_space);
     }
@@ -883,7 +914,8 @@ bool PAPlayer::QueueData(StreamInfo *si)
         CLog::Log(LOGERROR, "PAPlayer::QueueData - unknown error");
         return false;
       }
-      si->m_framesSent += si->m_audioFormat.m_streamInfo.GetDuration() / 1000 * si->m_audioFormat.m_streamInfo.m_sampleRate;
+      si->m_framesSent += si->m_audioFormat.m_streamInfo.GetDuration(true) / 1000 *
+                          si->m_audioFormat.m_streamInfo.m_sampleRate;
     }
   }
 

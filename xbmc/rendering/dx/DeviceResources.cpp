@@ -24,6 +24,15 @@
 #include "platform/win32/CharsetConverter.h"
 #include "platform/win32/WIN32Util.h"
 
+#ifdef TARGET_WINDOWS_STORE
+#include <winrt/Windows.Graphics.Display.Core.h>
+
+extern "C"
+{
+#include <libavutil/rational.h>
+}
+#endif
+
 #ifdef _DEBUG
 #include <dxgidebug.h>
 #pragma comment(lib, "dxgi.lib")
@@ -94,14 +103,8 @@ void DX::DeviceResources::Release()
 
   ReleaseBackBuffer();
   OnDeviceLost(true);
+  DestroySwapChain();
 
-  // leave fullscreen before destroying
-  BOOL bFullScreen;
-  m_swapChain->GetFullscreenState(&bFullScreen, nullptr);
-  if (!!bFullScreen)
-    m_swapChain->SetFullscreenState(false, nullptr);
-
-  m_swapChain = nullptr;
   m_adapter = nullptr;
   m_dxgiFactory = nullptr;
   m_output = nullptr;
@@ -121,7 +124,7 @@ void DX::DeviceResources::Release()
 void DX::DeviceResources::GetOutput(IDXGIOutput** ppOutput) const
 {
   ComPtr<IDXGIOutput> pOutput;
-  if (FAILED(m_swapChain->GetContainingOutput(pOutput.GetAddressOf())) || !pOutput)
+  if (!m_swapChain || FAILED(m_swapChain->GetContainingOutput(pOutput.GetAddressOf())) || !pOutput)
     m_output.As(&pOutput);
   *ppOutput = pOutput.Detach();
 }
@@ -130,20 +133,27 @@ void DX::DeviceResources::GetAdapterDesc(DXGI_ADAPTER_DESC* desc) const
 {
   if (m_adapter)
     m_adapter->GetDesc(desc);
+
+  // GetDesc() returns VendorId == 0 in Xbox however, we need to know that
+  // GPU is AMD to apply workarounds in DXVA.cpp CheckCompatibility() same as desktop
+  if (CSysInfo::GetWindowsDeviceFamily() == CSysInfo::Xbox)
+    desc->VendorId = PCIV_ATI;
 }
 
 void DX::DeviceResources::GetDisplayMode(DXGI_MODE_DESC* mode) const
 {
   DXGI_OUTPUT_DESC outDesc;
   ComPtr<IDXGIOutput> pOutput;
+  DXGI_SWAP_CHAIN_DESC scDesc;
+
+  if (!m_swapChain)
+    return;
+
+  m_swapChain->GetDesc(&scDesc);
 
   GetOutput(pOutput.GetAddressOf());
   pOutput->GetDesc(&outDesc);
 
-  DXGI_SWAP_CHAIN_DESC scDesc;
-  m_swapChain->GetDesc(&scDesc);
-
-  memset(mode, 0, sizeof(DXGI_MODE_DESC));
   // desktop coords depend on DPI
   mode->Width = DX::ConvertDipsToPixels(outDesc.DesktopCoordinates.right - outDesc.DesktopCoordinates.left, m_dpi);
   mode->Height = DX::ConvertDipsToPixels(outDesc.DesktopCoordinates.bottom - outDesc.DesktopCoordinates.top, m_dpi);
@@ -170,6 +180,17 @@ void DX::DeviceResources::GetDisplayMode(DXGI_MODE_DESC* mode) const
     else
       mode->ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_PROGRESSIVE;
   }
+#else
+  using namespace winrt::Windows::Graphics::Display::Core;
+
+  auto hdmiInfo = HdmiDisplayInformation::GetForCurrentView();
+  if (hdmiInfo) // Xbox only
+  {
+    auto currentMode = hdmiInfo.GetCurrentDisplayMode();
+    AVRational refresh = av_d2q(currentMode.RefreshRate(), 60000);
+    mode->RefreshRate.Numerator = refresh.num;
+    mode->RefreshRate.Denominator = refresh.den;
+  }
 #endif
 }
 
@@ -191,7 +212,7 @@ void DX::DeviceResources::SetViewPort(D3D11_VIEWPORT& viewPort) const
 
 bool DX::DeviceResources::SetFullScreen(bool fullscreen, RESOLUTION_INFO& res)
 {
-  if (!m_bDeviceCreated)
+  if (!m_bDeviceCreated || !m_swapChain)
     return false;
 
   critical_section::scoped_lock lock(m_criticalSection);
@@ -214,7 +235,7 @@ bool DX::DeviceResources::SetFullScreen(bool fullscreen, RESOLUTION_INFO& res)
     const bool isResValid = res.iWidth > 0 && res.iHeight > 0 && res.fRefreshRate > 0.f;
     if (isResValid)
     {
-      DXGI_MODE_DESC currentMode;
+      DXGI_MODE_DESC currentMode = {};
       GetDisplayMode(&currentMode);
       DXGI_SWAP_CHAIN_DESC scDesc;
       m_swapChain->GetDesc(&scDesc);
@@ -515,6 +536,21 @@ HRESULT DX::DeviceResources::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1& desc, DXGI_S
   return hr;
 }
 
+void DX::DeviceResources::DestroySwapChain()
+{
+  if (!m_swapChain)
+    return;
+
+  BOOL bFullcreen = 0;
+  m_swapChain->GetFullscreenState(&bFullcreen, nullptr);
+  if (!!bFullcreen)
+    m_swapChain->SetFullscreenState(false, nullptr); // mandatory before releasing swapchain
+  m_swapChain = nullptr;
+  m_deferrContext->Flush();
+  m_d3dContext->Flush();
+  m_IsTransferPQ = false;
+}
+
 void DX::DeviceResources::ResizeBuffers()
 {
   if (!m_bDeviceCreated)
@@ -525,7 +561,6 @@ void DX::DeviceResources::ResizeBuffers()
   bool bHWStereoEnabled = RENDER_STEREO_MODE_HARDWAREBASED ==
                           CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode();
   bool windowed = true;
-  bool isHdrEnabled = false;
   HRESULT hr = E_FAIL;
   DXGI_SWAP_CHAIN_DESC1 scDesc = {};
 
@@ -534,34 +569,16 @@ void DX::DeviceResources::ResizeBuffers()
     BOOL bFullcreen = 0;
     m_swapChain->GetFullscreenState(&bFullcreen, nullptr);
     if (!!bFullcreen)
-    {
       windowed = false;
-    }
 
-    // check if swapchain needs to be recreated
     m_swapChain->GetDesc1(&scDesc);
-
-    if ((scDesc.Stereo == TRUE) != bHWStereoEnabled)
-    {
-      // check fullscreen state and go to windowing if necessary
-      if (!!bFullcreen)
-      {
-        m_swapChain->SetFullscreenState(false, nullptr); // mandatory before releasing swapchain
-      }
-      m_swapChain = nullptr;
-      m_deferrContext->Flush();
-      m_d3dContext->Flush();
-    }
+    if ((scDesc.Stereo == TRUE) != bHWStereoEnabled) // check if swapchain needs to be recreated
+      DestroySwapChain();
   }
 
-  isHdrEnabled = (HDR_STATUS::HDR_ON == CWIN32Util::GetWindowsHDRStatus());
-
-  if (m_swapChain != nullptr)
+  if (m_swapChain) // If the swap chain already exists, resize it.
   {
-    // If the swap chain already exists, resize it.
     m_swapChain->GetDesc1(&scDesc);
-    isHdrEnabled ? scDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM
-                 : scDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     hr = m_swapChain->ResizeBuffers(scDesc.BufferCount, lround(m_outputSize.Width),
                                     lround(m_outputSize.Height), scDesc.Format,
                                     windowed ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
@@ -575,21 +592,45 @@ void DX::DeviceResources::ResizeBuffers()
       // and correctly set up the new device.
       return;
     }
+    else if (hr == DXGI_ERROR_INVALID_CALL)
+    {
+      // Called when Windows HDR is toggled externally to Kodi.
+      // Is forced to re-create swap chain to avoid crash.
+      CreateWindowSizeDependentResources();
+      return;
+    }
     CHECK_ERR();
   }
-  else
+  else // Otherwise, create a new one using the same adapter as the existing Direct3D device.
   {
-    // Otherwise, create a new one using the same adapter as the existing Direct3D device.
+    HDR_STATUS hdrStatus = CWIN32Util::GetWindowsHDRStatus();
+    const bool isHdrEnabled = (hdrStatus == HDR_STATUS::HDR_ON);
+    bool is10bitSafe = (hdrStatus != HDR_STATUS::HDR_UNSUPPORTED);
+
+// Xbox needs 10 bit swapchain to output true 4K resolution
+#ifdef TARGET_WINDOWS_DESKTOP
+    DXGI_ADAPTER_DESC ad = {};
+    GetAdapterDesc(&ad);
+
+    // Some AMD graphics has issues with 10 bit in SDR.
+    // Enabled by default only in Intel and NVIDIA with latest drivers/hardware
+    if (m_d3dFeatureLevel < D3D_FEATURE_LEVEL_12_1 || ad.VendorId == PCIV_ATI)
+      is10bitSafe = false;
+#endif
+
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
     swapChainDesc.Width = lround(m_outputSize.Width);
     swapChainDesc.Height = lround(m_outputSize.Height);
     swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     swapChainDesc.Stereo = bHWStereoEnabled;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    // HDR 60 fps needs 6 buffers to avoid frame drops but it's good for all
-    swapChainDesc.BufferCount = 6;
+#ifdef TARGET_WINDOWS_DESKTOP
+    swapChainDesc.BufferCount = 6; // HDR 60 fps needs 6 buffers to avoid frame drops
+#else
+    swapChainDesc.BufferCount = 3; // Xbox don't like 6 backbuffers (3 is fine even for 4K 60 fps)
+#endif
     // FLIP_DISCARD improves performance (needed in some systems for 4K HDR 60 fps)
-    swapChainDesc.SwapEffect = (m_d3dFeatureLevel >= D3D_FEATURE_LEVEL_12_0)
+    swapChainDesc.SwapEffect = CSysInfo::IsWindowsVersionAtLeast(CSysInfo::WindowsVersionWin10)
                                    ? DXGI_SWAP_EFFECT_FLIP_DISCARD
                                    : DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
     swapChainDesc.Flags = windowed ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
@@ -604,7 +645,7 @@ void DX::DeviceResources::ResizeBuffers()
     ComPtr<IDXGISwapChain1> swapChain;
     if (m_d3dFeatureLevel >= D3D_FEATURE_LEVEL_11_0 && !bHWStereoEnabled &&
         (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_bTry10bitOutput ||
-         isHdrEnabled))
+         isHdrEnabled || is10bitSafe))
     {
       swapChainDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
       hr = CreateSwapChain(swapChainDesc, scFSDesc, &swapChain);
@@ -666,6 +707,11 @@ void DX::DeviceResources::ResizeBuffers()
 void DX::DeviceResources::CreateWindowSizeDependentResources()
 {
   ReleaseBackBuffer();
+
+  DestroySwapChain();
+
+  if (!m_dxgiFactory->IsCurrent()) // HDR toggling requires re-create factory
+    CreateFactory();
 
   UpdateRenderTargetSize();
   ResizeBuffers();
@@ -858,7 +904,8 @@ void DX::DeviceResources::HandleDeviceLost(bool removed)
   if (backbuferExists)
     ReleaseBackBuffer();
 
-  m_swapChain = nullptr;
+  DestroySwapChain();
+
   CreateDeviceResources();
   UpdateRenderTargetSize();
   ResizeBuffers();
@@ -922,8 +969,6 @@ void DX::DeviceResources::Present()
     {
       CreateWindowSizeDependentResources();
     }
-    if (!m_dxgiFactory->IsCurrent())
-      CreateFactory();
   }
 
   if (m_d3dContext == m_deferrContext)
@@ -1123,7 +1168,7 @@ void DX::DeviceResources::SetHdrMetaData(DXGI_HDR_METADATA_HDR10& hdr10) const
 {
   ComPtr<IDXGISwapChain4> swapChain4;
 
-  if (m_swapChain == nullptr)
+  if (!m_swapChain)
     return;
 
   if (SUCCEEDED(m_swapChain.As(&swapChain4)))
@@ -1169,7 +1214,7 @@ void DX::DeviceResources::SetHdrColorSpace(const DXGI_COLOR_SPACE_TYPE colorSpac
 {
   ComPtr<IDXGISwapChain3> swapChain3;
 
-  if (m_swapChain == nullptr)
+  if (!m_swapChain)
     return;
 
   if (SUCCEEDED(m_swapChain.As(&swapChain3)))
@@ -1190,27 +1235,19 @@ void DX::DeviceResources::SetHdrColorSpace(const DXGI_COLOR_SPACE_TYPE colorSpac
 HDR_STATUS DX::DeviceResources::ToggleHDR()
 {
   DXGI_MODE_DESC md = {};
+  GetDisplayMode(&md);
 
-  if (m_swapChain)
-    GetDisplayMode(&md);
-
-  // Toggle display HDR
+  DX::Windowing()->SetTogglingHDR(true);
   DX::Windowing()->SetAlteringWindow(true);
 
+  // Toggle display HDR
   HDR_STATUS hdrStatus = CWIN32Util::ToggleWindowsHDR(md);
 
   // Kill swapchain
   if (m_swapChain && hdrStatus != HDR_STATUS::HDR_TOGGLE_FAILED)
   {
     CLog::LogF(LOGDEBUG, "Re-create swapchain due HDR <-> SDR switch");
-    BOOL bFullcreen = 0;
-    m_swapChain->GetFullscreenState(&bFullcreen, nullptr);
-    if (!!bFullcreen)
-      m_swapChain->SetFullscreenState(false, nullptr);
-    m_swapChain = nullptr;
-    m_deferrContext->Flush();
-    m_d3dContext->Flush();
-    m_IsTransferPQ = false;
+    DestroySwapChain();
   }
 
   DX::Windowing()->SetAlteringWindow(false);
@@ -1224,4 +1261,42 @@ HDR_STATUS DX::DeviceResources::ToggleHDR()
   }
 
   return hdrStatus;
+}
+
+DEBUG_INFO_RENDER DX::DeviceResources::GetDebugInfo() const
+{
+  if (!m_swapChain)
+    return {};
+
+  DXGI_SWAP_CHAIN_DESC1 desc = {};
+  m_swapChain->GetDesc1(&desc);
+
+  DXGI_MODE_DESC md = {};
+  GetDisplayMode(&md);
+
+  const int bits = (desc.Format == DXGI_FORMAT_R10G10B10A2_UNORM) ? 10 : 8;
+  const int max = (desc.Format == DXGI_FORMAT_R10G10B10A2_UNORM) ? 1024 : 256;
+  const int range_min = DX::Windowing()->UseLimitedColor() ? (max * 16) / 256 : 0;
+  const int range_max = DX::Windowing()->UseLimitedColor() ? (max * 235) / 256 : max - 1;
+
+  DEBUG_INFO_RENDER info;
+
+  info.renderFlags = StringUtils::Format(
+      "Swapchain: {} buffers, flip {}, {}, EOTF: {} (Windows HDR {})", desc.BufferCount,
+      (desc.SwapEffect == DXGI_SWAP_EFFECT_FLIP_DISCARD) ? "discard" : "sequential",
+      Windowing()->IsFullScreen()
+          ? ((desc.Flags == DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH) ? "fullscreen exclusive"
+                                                                    : "fullscreen windowed")
+          : "windowed screen",
+      m_IsTransferPQ ? "PQ" : "SDR", m_IsHDROutput ? "on" : "off");
+
+  info.videoOutput = StringUtils::Format(
+      "Surfaces: {}x{}{} @ {:.3f} Hz, pixel: {} {}-bit, range: {} ({}-{})", desc.Width, desc.Height,
+      (md.ScanlineOrdering > DXGI_MODE_SCANLINE_ORDER_PROGRESSIVE) ? "i" : "p",
+      static_cast<double>(md.RefreshRate.Numerator) /
+          static_cast<double>(md.RefreshRate.Denominator),
+      (desc.Format == DXGI_FORMAT_R10G10B10A2_UNORM) ? "R10G10B10A2" : "B8G8R8A8", bits,
+      DX::Windowing()->UseLimitedColor() ? "limited" : "full", range_min, range_max);
+
+  return info;
 }

@@ -159,10 +159,14 @@ void CGUIButtonControl::ProcessText(unsigned int currentTime)
   CRect label2RenderRect = m_label2.GetRenderRect();
 
   float renderWidth = GetWidth();
-  bool changed = m_label.SetMaxRect(m_posX, m_posY, renderWidth, m_height);
+  float renderTextWidth = renderWidth;
+  if (m_labelMaxWidth > 0 && m_labelMaxWidth < renderWidth)
+    renderTextWidth = m_labelMaxWidth;
+
+  bool changed = m_label.SetMaxRect(m_posX, m_posY, renderTextWidth, m_height);
   changed |= m_label.SetText(m_info.GetLabel(m_parentID));
   changed |= m_label.SetScrolling(HasFocus());
-  changed |= m_label2.SetMaxRect(m_posX, m_posY, renderWidth, m_height);
+  changed |= m_label2.SetMaxRect(m_posX, m_posY, renderTextWidth, m_height);
   changed |= m_label2.SetText(m_info2.GetLabel(m_parentID));
 
   // text changed - images need resizing
@@ -172,7 +176,7 @@ void CGUIButtonControl::ProcessText(unsigned int currentTime)
   // auto-width - adjust hitrect
   if (m_minWidth && m_width != renderWidth)
   {
-    CRect rect(m_posX, m_posY, renderWidth, m_height);
+    CRect rect{m_posX, m_posY, m_posX + renderWidth, m_posY + m_height};
     SetHitRect(rect, m_hitColor);
   }
 

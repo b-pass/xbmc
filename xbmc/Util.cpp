@@ -679,7 +679,7 @@ void CUtil::ClearSubtitles()
 
 void CUtil::ClearTempFonts()
 {
-  std::string searchPath = "special://temp/fonts/";
+  const std::string searchPath = "special://home/media/Fonts/";
 
   if (!CDirectory::Exists(searchPath))
     return;
@@ -691,7 +691,9 @@ void CUtil::ClearTempFonts()
   {
     if (item->m_bIsFolder)
       continue;
-    CFile::Delete(item->GetPath());
+
+    if (StringUtils::StartsWithNoCase(URIUtils::GetFileName(item->GetPath()), "tmp.font."))
+      CFile::Delete(item->GetPath());
   }
 }
 
@@ -1155,14 +1157,16 @@ int CUtil::GetMatchingSource(const std::string& strPath1, VECSOURCES& VECSOURCES
   if (StringUtils::StartsWith(strPath, "special://skin/"))
     return 1;
 
+  // do not return early if URL protocol is "plugin"
+  // since video- and/or audio-plugins can be configured as mediasource
+
   // stack://
   if (checkURL.IsProtocol("stack"))
     strPath.erase(0, 8); // remove the stack protocol
 
   if (checkURL.IsProtocol("shout"))
     strPath = checkURL.GetHostName();
-  if (checkURL.IsProtocol("plugin"))
-    return 1;
+
   if (checkURL.IsProtocol("multipath"))
     strPath = CMultiPathDirectory::GetFirstPath(strPath);
 
@@ -2104,20 +2108,8 @@ ExternalStreamInfo CUtil::GetExternalStreamDetailsFromFilename(const std::string
     std::vector<std::string> tokens;
     StringUtils::Tokenize(inputString, tokens, delimiters);
 
-    for (std::vector<std::string>::iterator it = tokens.begin(); it != tokens.end(); ++it)
+    for (auto it = tokens.rbegin(); it != tokens.rend(); ++it)
     {
-      if (info.language.empty())
-      {
-        std::string langTmp(*it);
-        std::string langCode;
-        // try to recognize language
-        if (g_LangCodeExpander.ConvertToISO6392B(langTmp, langCode))
-        {
-          info.language = langCode;
-          continue;
-        }
-      }
-
       // try to recognize a flag
       std::string flag_tmp(*it);
       StringUtils::ToLower(flag_tmp);
@@ -2137,7 +2129,18 @@ ExternalStreamInfo CUtil::GetExternalStreamDetailsFromFilename(const std::string
         continue;
       }
 
-      name += " " + (*it);
+      if (info.language.empty())
+      {
+        std::string langCode;
+        // try to recognize language
+        if (g_LangCodeExpander.ConvertToISO6392B(*it, langCode))
+        {
+          info.language = langCode;
+          continue;
+        }
+      }
+
+      name = (*it) + " " + name;
     }
   }
   name += " ";

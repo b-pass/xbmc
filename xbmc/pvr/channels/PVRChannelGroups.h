@@ -181,6 +181,14 @@ namespace PVR
     bool DeleteGroup(const CPVRChannelGroup& group);
 
     /*!
+     * @brief Hide/unhide a group in this container.
+     * @param group The group to hide/unhide.
+     * @param bHide True to hide the group, false to unhide it.
+     * @return True on success, false otherwise.
+     */
+    bool HideGroup(const std::shared_ptr<CPVRChannelGroup>& group, bool bHide);
+
+    /*!
      * @brief Create EPG tags for all channels of the internal group.
      * @return True if EPG tags where created successfully, false if not.
      */
@@ -226,6 +234,12 @@ namespace PVR
      * @param channel The channel to remove.
      */
     void RemoveFromAllGroups(const std::shared_ptr<CPVRChannel>& channel);
+
+    /*!
+     * @brief Obtain the first non-hidden channel group.
+     * @return The group or nullptr, if none found.
+     */
+    std::shared_ptr<CPVRChannelGroup> GetFirstNonHiddenChannelGroup() const;
 
     bool m_bRadio; /*!< true if this is a container for radio channels, false if it is for tv channels */
     std::shared_ptr<CPVRChannelGroup> m_selectedGroup; /*!< the group that's currently selected in the UI */

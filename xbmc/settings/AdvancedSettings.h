@@ -18,11 +18,11 @@
 #include <utility>
 #include <vector>
 
-#define CACHE_BUFFER_MODE_INTERNET      0
-#define CACHE_BUFFER_MODE_ALL           1
+#define CACHE_BUFFER_MODE_INTERNET 0
+#define CACHE_BUFFER_MODE_ALL 1
 #define CACHE_BUFFER_MODE_TRUE_INTERNET 2
-#define CACHE_BUFFER_MODE_NONE          3
-#define CACHE_BUFFER_MODE_REMOTE        4
+#define CACHE_BUFFER_MODE_NONE 3
+#define CACHE_BUFFER_MODE_NETWORK 4
 
 class CAppParamParser;
 class CProfileManager;
@@ -285,6 +285,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_curlconnecttimeout;
     int m_curllowspeedtime;
     int m_curlretries;
+    int m_curlKeepAliveInterval;    // seconds
     bool m_curlDisableIPV6;
     bool m_curlDisableHTTP2;
 
@@ -300,12 +301,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_playlistTimeout;
     bool m_GLRectangleHack;
     int m_iSkipLoopFilter;
-
-    /*!< @brief Decision flag to show or hide specific dependencies in the list of the AddonInfo dialog
-    as this information usually adds no value for a consumer.
-    True to recursively show any dependency of the selected add-on
-    False to hide 'low-level' dependencies like e.g. scripts/modules (default) */
-    bool m_showAllDependencies;
 
     bool m_bVirtualShares;
     bool m_bTry10bitOutput;
@@ -375,6 +370,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
 
     std::string m_userAgent;
     uint32_t m_nfsTimeout;
+    int m_nfsRetries;
 
   private:
     void Initialize();

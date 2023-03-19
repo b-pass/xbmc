@@ -414,7 +414,10 @@ bool CRenderManager::Flush(bool wait, bool saveBuffers)
   {
     CLog::Log(LOGDEBUG, "%s - flushing renderer", __FUNCTION__);
 
+// fix deadlock on Windows only when is enabled 'Sync playback to display'
+#ifndef TARGET_WINDOWS
     CSingleExit exitlock(CServiceBroker::GetWinSystem()->GetGfxContext());
+#endif
 
     CSingleLock lock(m_statelock);
     CSingleLock lock2(m_presentlock);
@@ -720,22 +723,33 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
 
     if (m_renderDebug)
     {
-      std::string audio, video, player, vsync;
-
-      m_playerPort->GetDebugInfo(audio, video, player);
-
-      double refreshrate, clockspeed;
-      int missedvblanks;
-      vsync = StringUtils::Format("VSyncOff: %.1f latency: %.3f  ", m_clockSync.m_syncOffset / 1000, DVD_TIME_TO_MSEC(m_displayLatency) / 1000.0f);
-      if (m_dvdClock.GetClockInfo(missedvblanks, clockspeed, refreshrate))
+      if (m_renderDebugVideo)
       {
-        vsync += StringUtils::Format("VSync: refresh:%.3f missed:%i speed:%.3f%%",
-                                     refreshrate,
-                                     missedvblanks,
-                                     clockspeed * 100);
+        DEBUG_INFO_VIDEO video = m_pRenderer->GetDebugInfo(m_presentsource);
+        DEBUG_INFO_RENDER render = CServiceBroker::GetWinSystem()->GetDebugInfo();
+
+        m_debugRenderer.SetInfo(video, render);
+      }
+      else
+      {
+        DEBUG_INFO_PLAYER info;
+
+        m_playerPort->GetDebugInfo(info.audio, info.video, info.player);
+
+        double refreshrate, clockspeed;
+        int missedvblanks;
+        info.vsync =
+            StringUtils::Format("VSyncOff: %.1f latency: %.3f  ", m_clockSync.m_syncOffset / 1000,
+                                DVD_TIME_TO_MSEC(m_displayLatency) / 1000.0f);
+        if (m_dvdClock.GetClockInfo(missedvblanks, clockspeed, refreshrate))
+        {
+          info.vsync += StringUtils::Format("VSync: refresh:%.3f missed:%i speed:%.3f%%",
+                                            refreshrate, missedvblanks, clockspeed * 100);
+        }
+
+        m_debugRenderer.SetInfo(info);
       }
 
-      m_debugRenderer.SetInfo(audio, video, player, vsync);
       m_debugRenderer.Render(src, dst, view);
 
       m_debugTimer.Set(1000);
@@ -894,6 +908,14 @@ void CRenderManager::ToggleDebug()
 {
   m_renderDebug = !m_renderDebug;
   m_debugTimer.SetExpired();
+  m_renderDebugVideo = false;
+}
+
+void CRenderManager::ToggleDebugVideo()
+{
+  m_renderDebug = !m_renderDebug;
+  m_debugTimer.SetExpired();
+  m_renderDebugVideo = true;
 }
 
 bool CRenderManager::AddVideoPicture(const VideoPicture& picture, volatile std::atomic_bool& bStop, EINTERLACEMETHOD deintMethod, bool wait)
@@ -1111,7 +1133,7 @@ void CRenderManager::PrepareNextRender()
     m_dvdClock.SetVsyncAdjust(0);
   }
 
-  CLog::LogF(LOGDEBUG, LOGAVTIMING, "frameOnScreen: %f renderPts: %f nextFramePts: %f -> diff: %f  render: %u forceNext: %u", frameOnScreen, renderPts, nextFramePts, (renderPts - nextFramePts), renderPts >= nextFramePts, m_forceNext);
+  CLog::LogFC(LOGDEBUG, LOGAVTIMING, "frameOnScreen: %f renderPts: %f nextFramePts: %f -> diff: %f  render: %u forceNext: %u", frameOnScreen, renderPts, nextFramePts, (renderPts - nextFramePts), renderPts >= nextFramePts, m_forceNext);
 
   bool combined = false;
   if (m_presentsourcePast >= 0)

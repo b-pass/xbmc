@@ -2306,7 +2306,9 @@ bool CVideoDatabase::GetFileInfo(const std::string& strFilenameAndPath, CVideoIn
       details.m_lastPlayed.SetFromDBDateTime(m_pDS->fv("files.lastPlayed").get_asString());
     if (!details.m_dateAdded.IsValid())
       details.m_dateAdded.SetFromDBDateTime(m_pDS->fv("files.dateAdded").get_asString());
-    if (!details.GetResumePoint().IsSet())
+    if (!details.GetResumePoint().IsSet() ||
+        (!details.GetResumePoint().HasSavedPlayerState() &&
+         !m_pDS->fv("bookmark.playerState").get_asString().empty()))
     {
       details.SetResumePoint(m_pDS->fv("bookmark.timeInSeconds").get_asDouble(),
                              m_pDS->fv("bookmark.totalTimeInSeconds").get_asDouble(),
@@ -2449,7 +2451,7 @@ int CVideoDatabase::SetDetailsForMovie(const std::string& strFilenameAndPath, CV
     details.m_iIdRating = AddRatings(idMovie, MediaTypeMovie, details.m_ratings, details.GetDefaultRating());
 
     // add unique ids
-    details.m_iIdUniqueID = UpdateUniqueIDs(idMovie, MediaTypeMovie, details);
+    details.m_iIdUniqueID = AddUniqueIDs(idMovie, MediaTypeMovie, details);
 
     // add set...
     int idSet = -1;
@@ -2733,7 +2735,7 @@ bool CVideoDatabase::UpdateDetailsForTvShow(int idTvShow, CVideoInfoTag &details
   details.m_iIdRating = AddRatings(idTvShow, MediaTypeTvShow, details.m_ratings, details.GetDefaultRating());
 
   // add unique ids
-  details.m_iIdUniqueID = UpdateUniqueIDs(idTvShow, MediaTypeTvShow, details);
+  details.m_iIdUniqueID = AddUniqueIDs(idTvShow, MediaTypeTvShow, details);
 
   // add "all seasons" - the rest are added in SetDetailsForEpisode
   AddSeason(idTvShow, -1);
@@ -2865,7 +2867,7 @@ int CVideoDatabase::SetDetailsForEpisode(const std::string& strFilenameAndPath, 
     details.m_iIdRating = AddRatings(idEpisode, MediaTypeEpisode, details.m_ratings, details.GetDefaultRating());
 
     // add unique ids
-    details.m_iIdUniqueID = UpdateUniqueIDs(idEpisode, MediaTypeEpisode, details);
+    details.m_iIdUniqueID = AddUniqueIDs(idEpisode, MediaTypeEpisode, details);
 
     if (details.HasStreamDetails())
     {
@@ -9354,7 +9356,7 @@ void CVideoDatabase::CleanDatabase(CGUIDialogProgressBarHandle* handle, const st
       // Otherwise there is a mismatch between the path contents and the hash in the
       // database, leading to potentially missed items on re-scan (if deleted files are
       // later re-added to a source)
-      CLog::LogF(LOGDEBUG, LOGDATABASE, "Cleaning path hashes");
+      CLog::LogFC(LOGDEBUG, LOGDATABASE, "Cleaning path hashes");
       m_pDS->query("SELECT DISTINCT strPath FROM path JOIN files ON files.idPath=path.idPath WHERE files.idFile IN " + filesToDelete);
       int pathHashCount = m_pDS->num_rows();
       while (!m_pDS->eof())
@@ -9362,7 +9364,7 @@ void CVideoDatabase::CleanDatabase(CGUIDialogProgressBarHandle* handle, const st
         InvalidatePathHash(m_pDS->fv("strPath").get_asString());
         m_pDS->next();
       }
-      CLog::LogF(LOGDEBUG, LOGDATABASE, "Cleaned {} path hashes", pathHashCount);
+      CLog::LogFC(LOGDEBUG, LOGDATABASE, "Cleaned {} path hashes", pathHashCount);
 
       CLog::Log(LOGDEBUG, LOGDATABASE, "%s: Cleaning files table", __FUNCTION__);
       sql = "DELETE FROM files WHERE idFile IN " + filesToDelete;

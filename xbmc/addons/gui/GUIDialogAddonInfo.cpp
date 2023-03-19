@@ -15,6 +15,7 @@
 #include "addons/AddonDatabase.h"
 #include "addons/AddonInstaller.h"
 #include "addons/AddonManager.h"
+#include "addons/AddonRepos.h"
 #include "addons/AddonSystemSettings.h"
 #include "addons/IAddon.h"
 #include "addons/gui/GUIDialogAddonSettings.h"
@@ -358,9 +359,14 @@ void CGUIDialogAddonInfo::OnSelectVersion()
           std::string path(items[i]->GetPath());
           if (database.GetPackageHash(processAddonId, items[i]->GetPath(), hash))
           {
-            std::string md5 = CUtil::GetFileDigest(path, KODI::UTILITY::CDigest::Type::MD5);
-            if (StringUtils::EqualsNoCase(md5, hash))
-              versions.emplace_back(AddonVersion(versionString), LOCAL_CACHE);
+            std::string sha256 = CUtil::GetFileDigest(path, KODI::UTILITY::CDigest::Type::SHA256);
+
+            // don't offer locally cached packages that result in an invalid version.
+            // usually this happens when the package filename gets malformed on the fs
+            // e.g. downloading "http://localhost/a+b.zip" ends up in "a b.zip"
+            const AddonVersion version(versionString);
+            if (StringUtils::EqualsNoCase(sha256, hash) && !version.empty())
+              versions.emplace_back(version, LOCAL_CACHE);
           }
         }
       }
@@ -439,10 +445,12 @@ void CGUIDialogAddonInfo::OnInstall()
   {
     if (m_localAddon->Origin() != origin && m_localAddon->Origin() != ORIGIN_SYSTEM)
     {
-      const std::string& header = g_localizeStrings.Get(19098); // Warning!
+      const std::string header = g_localizeStrings.Get(19098); // Warning!
+      const std::string origin =
+          !m_localAddon->Origin().empty() ? m_localAddon->Origin() : g_localizeStrings.Get(39029);
       const std::string text =
-          StringUtils::Format(g_localizeStrings.Get(39028), m_localAddon->ID(),
-                              m_localAddon->Origin(), m_localAddon->Version().asString());
+          StringUtils::Format(g_localizeStrings.Get(39028), m_localAddon->Name(), origin,
+                              m_localAddon->Version().asString());
 
       if (CGUIDialogYesNo::ShowAndGetInput(header, text))
       {
@@ -596,8 +604,7 @@ void CGUIDialogAddonInfo::OnSettings()
 
 bool CGUIDialogAddonInfo::ShowDependencyList(Reactivate reactivate, EntryPoint entryPoint)
 {
-  if (entryPoint != EntryPoint::INSTALL ||
-      (entryPoint == EntryPoint::INSTALL && !m_allDepsInstalled))
+  if (entryPoint != EntryPoint::INSTALL || m_showDepDialogOnInstall)
   {
     auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogSelect>(
         WINDOW_DIALOG_SELECT);
@@ -614,18 +621,27 @@ bool CGUIDialogAddonInfo::ShowDependencyList(Reactivate reactivate, EntryPoint e
 
       if (infoAddon)
       {
-        if (entryPoint != EntryPoint::UPDATE ||
-            (entryPoint == EntryPoint::UPDATE && !it.m_isInstalledUpToDate()))
+        if (entryPoint != EntryPoint::UPDATE || !it.m_isInstalledUpToDate())
         {
           const CFileItemPtr item = std::make_shared<CFileItem>(infoAddon->Name());
           int messageId = 24180; // minversion only
 
           // dep not installed locally, but it is available from a repo!
+          // make sure only non-optional add-ons that meet minVersion are
+          // announced for installation
+
           if (!it.m_installed)
           {
-            if (entryPoint != EntryPoint::SHOW_DEPENDENCIES)
+            if (entryPoint != EntryPoint::SHOW_DEPENDENCIES && !it.m_depInfo.optional)
             {
-              messageId = 24181; // => install
+              if (it.m_depInfo.versionMin <= it.m_available->Version())
+              {
+                messageId = 24181; // => install
+              }
+              else
+              {
+                messageId = 10005; // => not available
+              }
             }
           }
           else // dep is installed locally
@@ -638,15 +654,20 @@ bool CGUIDialogAddonInfo::ShowDependencyList(Reactivate reactivate, EntryPoint e
             }
           }
 
-          item->SetLabel2(StringUtils::Format(
-              g_localizeStrings.Get(messageId).c_str(), it.m_depInfo.versionMin.asString().c_str(),
-              it.m_installed ? it.m_installed->Version().asString().c_str() : "",
-              it.m_available ? it.m_available->Version().asString().c_str() : "",
-              it.m_depInfo.optional ? g_localizeStrings.Get(24184).c_str() : ""));
+          if (entryPoint == EntryPoint::SHOW_DEPENDENCIES ||
+              infoAddon->MainType() != ADDON_SCRIPT_MODULE ||
+              !CAddonRepos::IsFromOfficialRepo(infoAddon, CheckAddonPath::NO))
+          {
+            item->SetLabel2(StringUtils::Format(
+                g_localizeStrings.Get(messageId), it.m_depInfo.versionMin.asString(),
+                it.m_installed ? it.m_installed->Version().asString() : "",
+                it.m_available ? it.m_available->Version().asString() : "",
+                it.m_depInfo.optional ? g_localizeStrings.Get(24184) : ""));
 
-          item->SetArt("icon", infoAddon->Icon());
-          item->SetProperty("addon_id", it.m_depInfo.id);
-          items.Add(item);
+            item->SetArt("icon", infoAddon->Icon());
+            item->SetProperty("addon_id", it.m_depInfo.id);
+            items.Add(item);
+          }
         }
       }
       else
@@ -733,13 +754,10 @@ void CGUIDialogAddonInfo::BuildDependencyList()
   if (!m_item)
     return;
 
-  m_allDepsInstalled = true;
+  m_showDepDialogOnInstall = false;
   m_depsInstalledWithAvailable.clear();
   m_deps = CServiceBroker::GetAddonMgr().GetDepsRecursive(m_item->GetAddonInfo()->ID(),
                                                           OnlyEnabledRootAddon::NO);
-
-  const bool showAllDependencies =
-      CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_showAllDependencies;
 
   for (const auto& dep : m_deps)
   {
@@ -751,7 +769,6 @@ void CGUIDialogAddonInfo::BuildDependencyList()
                                                 OnlyEnabled::YES))
     {
       addonInstalled = nullptr;
-      m_allDepsInstalled = false;
     }
 
     // Find add-on in repositories
@@ -760,23 +777,63 @@ void CGUIDialogAddonInfo::BuildDependencyList()
       addonAvailable = nullptr;
     }
 
-    // Depending on advancedsettings.xml <showalldependencies>:
-    // AddonType ADDON_SCRIPT_MODULE needs to be filtered as these low-level add-ons
-    // should be hidden to the user in the dependency select dialog
-
-    if (showAllDependencies ||
-        (addonInstalled && addonInstalled->MainType() != ADDON_SCRIPT_MODULE) ||
-        (addonAvailable && addonAvailable->MainType() != ADDON_SCRIPT_MODULE) ||
-        (!addonAvailable && !addonInstalled))
+    if (!addonInstalled)
     {
-      m_depsInstalledWithAvailable.emplace_back(
-          CInstalledWithAvailable{dep, addonInstalled, addonAvailable});
+
+      // after pushing the install button the dependency install dialog
+      // will be opened only if...
+      // - dependencies are unavailable (for informational purposes) OR
+      // - the dependency is not a script/module                     OR
+      // - the script/module is not available at an official repo
+      if (!addonAvailable || addonAvailable->MainType() != ADDON_SCRIPT_MODULE ||
+          !CAddonRepos::IsFromOfficialRepo(addonAvailable, CheckAddonPath::NO))
+      {
+        m_showDepDialogOnInstall = true;
+      }
+    }
+    else
+    {
+
+      // only display dialog if updates for already installed dependencies will install
+      if (addonAvailable && addonAvailable->Version() > addonInstalled->Version())
+      {
+        m_showDepDialogOnInstall = true;
+      }
     }
 
-    // sort optional add-ons to top of the list
-
-    std::sort(
-        m_depsInstalledWithAvailable.begin(), m_depsInstalledWithAvailable.end(),
-        [](const auto& a, const auto& b) { return a.m_depInfo.optional > b.m_depInfo.optional; });
+    m_depsInstalledWithAvailable.emplace_back(
+        CInstalledWithAvailable{dep, addonInstalled, addonAvailable});
   }
+
+  std::sort(m_depsInstalledWithAvailable.begin(), m_depsInstalledWithAvailable.end(),
+            [](const auto& a, const auto& b) {
+              // 1. "not installed/available" go to the bottom first
+              const bool depAInstalledOrAvailable =
+                  a.m_installed != nullptr || a.m_available != nullptr;
+              const bool depBInstalledOrAvailable =
+                  b.m_installed != nullptr || b.m_available != nullptr;
+
+              if (depAInstalledOrAvailable != depBInstalledOrAvailable)
+              {
+                return !depAInstalledOrAvailable;
+              }
+
+              // 2. then optional add-ons to top
+              if (a.m_depInfo.optional != b.m_depInfo.optional)
+              {
+                return a.m_depInfo.optional;
+              }
+
+              // 3. scripts/modules to bottom
+              const std::shared_ptr<IAddon>& depA = a.m_installed ? a.m_installed : a.m_available;
+              const std::shared_ptr<IAddon>& depB = b.m_installed ? b.m_installed : b.m_available;
+
+              if (depA && depB && depA->MainType() != depB->MainType())
+              {
+                return depA->MainType() != ADDON_SCRIPT_MODULE;
+              }
+
+              // 4. finally order by addon-id
+              return a.m_depInfo.id < b.m_depInfo.id;
+            });
 }

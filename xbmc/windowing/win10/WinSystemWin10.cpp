@@ -58,12 +58,8 @@ CWinSystemWin10::CWinSystemWin10()
 
   AE::CAESinkFactory::ClearSinks();
   CAESinkXAudio::Register();
+  CAESinkWASAPI::Register();
   CScreenshotSurfaceWindows::Register();
-
-  if (CSysInfo::GetWindowsDeviceFamily() == CSysInfo::WindowsDeviceFamily::Desktop)
-  {
-    CAESinkWASAPI::Register();
-  }
 }
 
 CWinSystemWin10::~CWinSystemWin10()
@@ -476,6 +472,10 @@ void CWinSystemWin10::GetConnectedDisplays(std::vector<MONITOR_DETAILS>& outputs
       if (hdmiInfo != nullptr)
       {
         auto currentMode = hdmiInfo.GetCurrentDisplayMode();
+        // On Xbox, 4K resolutions only are reported by HdmiDisplayInformation API
+        // so ScreenHeight & ScreenWidth are updated with info provided here
+        md.ScreenHeight = currentMode.ResolutionHeightInRawPixels();
+        md.ScreenWidth = currentMode.ResolutionWidthInRawPixels();
         md.RefreshRate = currentMode.RefreshRate();
         md.Bpp = currentMode.BitsPerPixel();
       }

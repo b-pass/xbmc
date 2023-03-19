@@ -367,7 +367,7 @@ void CGUIEPGGridContainer::ProcessItem(float posX, float posY, const CFileItemPt
   {
     if (!item->GetFocusedLayout())
     {
-      item->SetFocusedLayout(CGUIListItemLayoutPtr(new CGUIListItemLayout(*focusedlayout)));
+      item->SetFocusedLayout(std::make_unique<CGUIListItemLayout>(*focusedlayout, this));
     }
 
     if (resize != -1.0f)
@@ -399,7 +399,7 @@ void CGUIEPGGridContainer::ProcessItem(float posX, float posY, const CFileItemPt
   {
     if (!item->GetLayout())
     {
-      item->SetLayout(CGUIListItemLayoutPtr(new CGUIListItemLayout(*normallayout)));
+      item->SetLayout(std::make_unique<CGUIListItemLayout>(*normallayout, this));
     }
 
     if (resize != -1.0f)
@@ -895,6 +895,9 @@ void CGUIEPGGridContainer::ProgrammesScroll(int amount)
 
 void CGUIEPGGridContainer::OnUp()
 {
+  if (!HasData())
+    return CGUIControl::OnUp();
+
   if (m_orientation == VERTICAL)
   {
     CGUIAction action = GetAction(ACTION_MOVE_UP);
@@ -944,6 +947,9 @@ void CGUIEPGGridContainer::OnUp()
 
 void CGUIEPGGridContainer::OnDown()
 {
+  if (!HasData())
+    return CGUIControl::OnDown();
+
   if (m_orientation == VERTICAL)
   {
     CGUIAction action = GetAction(ACTION_MOVE_DOWN);
@@ -994,6 +1000,9 @@ void CGUIEPGGridContainer::OnDown()
 
 void CGUIEPGGridContainer::OnLeft()
 {
+  if (!HasData())
+    return CGUIControl::OnLeft();
+
   if (m_orientation == VERTICAL)
   {
     if (m_gridModel->GetGridItemStartBlock(m_channelCursor + m_channelOffset,
@@ -1043,6 +1052,9 @@ void CGUIEPGGridContainer::OnLeft()
 
 void CGUIEPGGridContainer::OnRight()
 {
+  if (!HasData())
+    return CGUIControl::OnRight();
+
   if (m_orientation == VERTICAL)
   {
     if (m_gridModel->GetGridItemEndBlock(m_channelCursor + m_channelOffset,
@@ -1678,6 +1690,12 @@ void CGUIEPGGridContainer::JumpToNow()
   GoToNow();
 }
 
+void CGUIEPGGridContainer::JumpToDate(const CDateTime& date)
+{
+  m_bEnableProgrammeScrolling = false;
+  GoToDate(date);
+}
+
 void CGUIEPGGridContainer::GoToBegin()
 {
   ScrollToBlockOffset(0);
@@ -1692,15 +1710,26 @@ void CGUIEPGGridContainer::GoToEnd()
 
 void CGUIEPGGridContainer::GoToNow()
 {
-  ScrollToBlockOffset(m_gridModel->GetNowBlock());
-  SetBlock(m_gridModel->GetPageNowOffset());
+  GoToDate(CDateTime::GetUTCDateTime());
 }
 
 void CGUIEPGGridContainer::GoToDate(const CDateTime& date)
 {
   unsigned int offset = m_gridModel->GetPageNowOffset();
   ScrollToBlockOffset(m_gridModel->GetBlock(date) - offset);
-  SetBlock(offset);
+
+  // ensure we're selecting the active event, not its predecessor.
+  const int iChannel = m_channelOffset + m_channelCursor;
+  const int iBlock = m_blockOffset + offset;
+  if (iChannel >= m_gridModel->ChannelItemsSize() || iBlock >= m_gridModel->GridItemsSize() ||
+      m_gridModel->GetGridItemEndTime(iChannel, iBlock) > date)
+  {
+    SetBlock(offset);
+  }
+  else
+  {
+    SetBlock(offset + 1);
+  }
 }
 
 void CGUIEPGGridContainer::GoToFirstChannel()

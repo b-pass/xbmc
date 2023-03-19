@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "DebugInfo.h"
 #include "RenderInfo.h"
 #include "VideoShaders/ShaderFormats.h"
 #include "cores/IPlayer.h"
@@ -92,7 +93,18 @@ public:
 
   void SetVideoSettings(const CVideoSettings &settings);
 
+  // Gets debug info from render buffer
+  virtual DEBUG_INFO_VIDEO GetDebugInfo(int idx) { return {}; };
+
 protected:
+  void CalcDestRect(float offsetX,
+                    float offsetY,
+                    float width,
+                    float height,
+                    float inputFrameRatio,
+                    float zoomAmount,
+                    float verticalShift,
+                    CRect& destRect);
   void CalcNormalRenderRect(float offsetX, float offsetY, float width, float height,
                             float inputFrameRatio, float zoomAmount, float verticalShift);
   void CalculateFrameAspectRatio(unsigned int desired_width, unsigned int desired_height);

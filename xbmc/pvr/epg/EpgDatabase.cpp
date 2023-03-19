@@ -660,9 +660,18 @@ std::vector<std::shared_ptr<CPVREpgInfoTag>> CPVREpgDatabase::GetEpgTags(
 
   if (searchData.m_iGenreType != EPG_SEARCH_UNSET)
   {
-    filter.AppendWhere(PrepareSQL("(iGenreType < %u) OR (iGenreType > %u) OR (iGenreType = %u)",
-                                  EPG_EVENT_CONTENTMASK_MOVIEDRAMA,
-                                  EPG_EVENT_CONTENTMASK_USERDEFINED, searchData.m_iGenreType));
+    if (searchData.m_bIncludeUnknownGenres)
+    {
+      // match the exact genre and everything with unknown genre
+      filter.AppendWhere(PrepareSQL("(iGenreType == %u) OR (iGenreType < %u) OR (iGenreType > %u)",
+                                    searchData.m_iGenreType, EPG_EVENT_CONTENTMASK_MOVIEDRAMA,
+                                    EPG_EVENT_CONTENTMASK_USERDEFINED));
+    }
+    else
+    {
+      // match only the exact genre
+      filter.AppendWhere(PrepareSQL("iGenreType == %u", searchData.m_iGenreType));
+    }
   }
 
   /////////////////////////////////////////////////////////////////////////////////////////////
@@ -1099,7 +1108,7 @@ bool CPVREpgDatabase::QueueDeleteEpgTags(int iEpgId)
   filter.AppendWhere(PrepareSQL("idEpg = %u", iEpgId));
 
   std::string strQuery;
-  BuildSQL(PrepareSQL("DELETE FROM %s ", "epg"), filter, strQuery);
+  BuildSQL(PrepareSQL("DELETE FROM %s ", "epgtags"), filter, strQuery);
   return QueueDeleteQuery(strQuery);
 }
 

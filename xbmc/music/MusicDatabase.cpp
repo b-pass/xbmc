@@ -550,7 +550,7 @@ void CMusicDatabase::CreateNativeDBFunctions()
   // clang-format off
   // udfFirstNumberPos finds the position of the first digit in a string
   m_pDS->exec("DROP FUNCTION IF EXISTS udfFirstNumberPos");
-  m_pDS->exec("CREATE FUNCTION udfFirstNumberPos (instring VARCHAR(256))\n"
+  m_pDS->exec("CREATE FUNCTION udfFirstNumberPos (instring VARCHAR(512))\n"
     "RETURNS int \n"
     "LANGUAGE SQL \n"
     "DETERMINISTIC \n"
@@ -559,7 +559,7 @@ void CMusicDatabase::CreateNativeDBFunctions()
     "BEGIN \n"
     "  DECLARE position int; \n"
     "  DECLARE tmppos int; \n"
-    "  SET position = 1000; \n"
+    "  SET position = 5000; \n"
     "  SET tmppos = LOCATE('0', instring); IF(tmppos > 0 AND tmppos < position) THEN SET position = tmppos; END IF;\n"
     "  SET tmppos = LOCATE('1', instring); IF(tmppos > 0 AND tmppos < position) THEN SET position = tmppos; END IF;\n"
     "  SET tmppos = LOCATE('2', instring); IF(tmppos > 0 AND tmppos < position) THEN SET position = tmppos; END IF;\n"
@@ -570,20 +570,20 @@ void CMusicDatabase::CreateNativeDBFunctions()
     "  SET tmppos = LOCATE('7', instring); IF(tmppos > 0 AND tmppos < position) THEN SET position = tmppos; END IF;\n"
     "  SET tmppos = LOCATE('8', instring); IF(tmppos > 0 AND tmppos < position) THEN SET position = tmppos; END IF;\n"
     "  SET tmppos = LOCATE('9', instring); IF(tmppos > 0 AND tmppos < position) THEN SET position = tmppos; END IF;\n"
-    "  IF(position = 1000) THEN RETURN 0; END IF;\n"
+    "  IF(position = 5000) THEN RETURN 0; END IF;\n"
     "  RETURN position; \n"
     "END\n");
 
   // udfSymbolShift adds "/" (the  last symbol before "0"), in front any of the chars input
   m_pDS->exec("DROP FUNCTION IF EXISTS udfSymbolShift");
-  m_pDS->exec("CREATE FUNCTION udfSymbolShift(instring varchar(256), symbolChars char(25))\n"
-    "RETURNS varchar(256)\n"
+  m_pDS->exec("CREATE FUNCTION udfSymbolShift(instring varchar(512), symbolChars char(25))\n"
+    "RETURNS varchar(1024)\n"
     "LANGUAGE SQL\n"
     "DETERMINISTIC\n"
     "NO SQL\n"
     "SQL SECURITY INVOKER\n"
     "BEGIN\n"
-    "  DECLARE sortString varchar(256);\n"
+    "  DECLARE sortString varchar(1024); -- Allow for every char to be symbol\n"
     "  DECLARE i int;\n"
     "  DECLARE symbolCharsLen int;\n"
     "  DECLARE symbol char(1);\n"
@@ -600,15 +600,20 @@ void CMusicDatabase::CreateNativeDBFunctions()
 
   // udfNaturalSortFormat - provide natural number sorting and ascii symbols above numbers
   m_pDS->exec("DROP FUNCTION IF EXISTS udfNaturalSortFormat");
-  m_pDS->exec("CREATE FUNCTION udfNaturalSortFormat(instring varchar(256), numberLength int, "
+  m_pDS->exec("CREATE FUNCTION udfNaturalSortFormat(instring varchar(512), numberLength int, "
     "sameOrderChars char(25))\n"
-    "RETURNS varchar(256)\n"
+    "RETURNS varchar(1024)\n"
     "LANGUAGE SQL\n"
     "DETERMINISTIC\n"
     "NO SQL\n"
     "SQL SECURITY INVOKER\n"
     "BEGIN\n"
-    "  DECLARE sortString varchar(256);\n"
+    "  DECLARE sortString varchar(1024);\n"
+    "  DECLARE shiftedString varchar(1024);\n"
+    "  DECLARE inLength int;\n"
+    "  DECLARE shiftedLength int;\n"
+    "  DECLARE totalSympadLength int;\n"
+    "  DECLARE symbolshifted512 varchar(1024);\n"
     "  DECLARE numStartIndex int; \n"
     "  DECLARE numEndIndex int; \n"
     "  DECLARE padLength int; \n"
@@ -616,7 +621,8 @@ void CMusicDatabase::CreateNativeDBFunctions()
     "  DECLARE i int; \n"
     "  DECLARE sameOrderCharsLen int;\n"
     "  SET totalPadLength = 0; \n"
-    "  SET instring = TRIM(instring); \n"
+    "  SET instring = TRIM(instring);\n"
+    "  SET inLength = CHAR_LENGTH(inString);\n"
     "  SET sortString = instring; \n"
     "  SET numStartIndex = udfFirstNumberPos(instring); \n"
     "  SET numEndIndex = 0; \n"
@@ -637,12 +643,41 @@ void CMusicDatabase::CreateNativeDBFunctions()
     "    IF padLength < 0 THEN \n"
     "      SET padLength = 0; \n"
     "    END IF; \n"
+    "    IF inLength + totalPadLength + padlength > 1024 THEN \n"
+    "      -- Padding more digits would be too long, pad this one just enough \n"
+    "      SET padLength = 1024 - inLength - totalPadLength; \n"
+    "      SET numStartIndex = 0; \n"
+    "    END IF; \n"
     "    SET sortString = INSERT(sortString, numStartIndex + totalPadLength, 0, REPEAT('0', padLength)); \n"
     "    SET totalPadLength = totalPadLength + padLength; \n"
-    "    SET numStartIndex = udfFirstNumberPos(RIGHT(instring, CHAR_LENGTH(instring) - numEndIndex)); \n"
+    "    IF numStartIndex <> 0 THEN \n"
+    "      SET numStartIndex = udfFirstNumberPos(RIGHT(instring, inLength - numEndIndex)); \n"
+    "    END IF; \n"
     "  END WHILE; \n"
-    // Shift ascii symbols :;<=>?@[\]^_ `{|}~ above 0, note "\" needs escaping
-    "  SET sortString = udfSymbolShift(sortString, ':;<=>?@[\\]^_`{|}~'); \n"
+    "  -- Handle symbol order inserting '/' to shift ascii symbols :;<=>?@[\\]^_ `{|}~ above 0 \n"
+    "  -- when there is space as this could double string length.  Note '\\' needs escaping \n"
+    "  SET numStartIndex = 1; \n"
+    "  SET numEndIndex = inLength + totalPadLength; \n"
+    "  IF numEndIndex < 1024 THEN \n"
+    "    SET shiftedLength = 0; \n"
+    "    SET totalSympadLength = 0; \n"
+    "    WHILE numStartIndex < numEndIndex AND totalSympadLength < 1024 DO \n"
+    "      SET symbolshifted512 = udfSymbolShift(SUBSTRING(sortString, numStartIndex, 512), ':;<=>?@[\\\\]^_`{|}~'); \n"
+    "      SET numStartIndex = numStartIndex + 512; \n"
+    "      SET shiftedLength = CHAR_LENGTH(symbolshifted512); \n"
+    "      IF totalSympadLength = 0 THEN \n"
+    "        SET shiftedString = symbolshifted512; \n"
+    "      ELSE \n"
+    "        IF totalSympadLength + shiftedLength > 1024 THEN \n"
+    "          SET shiftedLength = 1024 - totalSympadLength; \n"
+    "          SET symbolshifted512 = LEFT(symbolshifted512, shiftedLength); \n"
+    "        END IF; \n"
+    "        SET shiftedString = CONCAT(shiftedString, symbolshifted512); \n"
+    "      END IF; \n"
+    "      SET totalSympadLength = totalSympadLength + shiftedLength; \n"
+    "    END WHILE; \n"
+    "    SET sortString = shiftedString; \n"
+    "  END IF; \n"
     "  RETURN sortString; \n"
     "END\n");
   // clang-format on
@@ -1931,6 +1966,7 @@ bool CMusicDatabase::GetArtist(int idArtist, CArtist &artist, bool fetchAll /* =
         discoAlbum.strAlbum = record->at(discographyOffset + 1).get_asString();
         discoAlbum.strYear = record->at(discographyOffset + 2).get_asString();
         discoAlbum.strReleaseGroupMBID = record->at(discographyOffset + 3).get_asString();
+        artist.discography.emplace_back(discoAlbum);
         m_pDS->next();
       }
     }
@@ -2061,58 +2097,67 @@ bool CMusicDatabase::GetArtistDiscography(int idArtist, CFileItemList& items)
        but SQLite not support updatable joins.
     */
     m_pDS->exec("CREATE TABLE tempDisco "
-                "(strAlbum TEXT, iYear INTEGER, mbid TEXT, idAlbum INTEGER)");
+                "(strAlbum TEXT, strYear VARCHAR(4), mbid TEXT, idAlbum INTEGER)");
+    m_pDS->exec("CREATE TABLE tempAlbum "
+                "(strAlbum TEXT, strYear VARCHAR(4), mbid TEXT, idAlbum INTEGER)");
 
     std::string strSQL;
-    strSQL = PrepareSQL("INSERT INTO tempDisco(strAlbum, iYear, mbid, idAlbum) "
-                        "SELECT strAlbum, CAST(discography.strYear AS INTEGER) AS iYear, "
+    strSQL = PrepareSQL("INSERT INTO tempDisco(strAlbum, strYear, mbid, idAlbum) "
+                        "SELECT strAlbum, SUBSTR(discography.strYear, 1, 4) AS strYear, "
                         "strReleaseGroupMBID, NULL "
                         "FROM discography WHERE idArtist = %i",
                         idArtist);
     m_pDS->exec(strSQL);
 
-    // Match albums on release group mbid, if multi-releases then first used
-    strSQL = "UPDATE tempDisco SET idAlbum = (SELECT album.idAlbum FROM album "
-             "WHERE album.strReleaseGroupMBID = tempDisco.mbid "
-             "AND album.strReleaseGroupMBID IS NOT NULL)";
-    m_pDS->exec(strSQL);
-    // Match remaining to albums by artist on title and year
-    strSQL = PrepareSQL("UPDATE tempDisco SET idAlbum = (SELECT album.idAlbum FROM album "
-                        "JOIN album_artist ON album_artist.idAlbum = album.idAlbum "
-                        "WHERE album_artist.idArtist = %i "
-                        "AND NOT EXISTS(SELECT 1 FROM tempDisco AS td "
-                        "WHERE td.idAlbum = album.idAlbum) "
-                        "AND CAST(strOrigReleaseDate AS INTEGER) = tempDisco.iYear "
-                        "AND album.strAlbum = tempDisco.strAlbum) "
-                        "WHERE tempDisco.idAlbum is NULL",
+    strSQL = PrepareSQL("INSERT INTO tempAlbum(strAlbum, strYear, mbid, idAlbum) "
+                        "SELECT strAlbum, SUBSTR(strOrigReleaseDate, 1, 4) AS strYear, "
+                        "strReleaseGroupMBID, album.idAlbum "
+                        "FROM album JOIN album_artist ON album_artist.idAlbum = album.idAlbum "
+                        "WHERE idArtist = %i",
                         idArtist);
-    m_pDS->exec(strSQL);
-    // Match remaining to albums by artist on title only
-    strSQL = PrepareSQL("UPDATE tempDisco SET idAlbum = (SELECT album.idAlbum FROM album "
-                        "JOIN album_artist ON album_artist.idAlbum = album.idAlbum "
-                        "WHERE album_artist.idArtist = %i "
-                        "AND NOT EXISTS(SELECT 1 FROM tempDisco AS td "
-                        "WHERE td.idAlbum = album.idAlbum) "
-                        "AND album.strAlbum = tempDisco.strAlbum) "
-                        "WHERE tempDisco.idAlbum is NULL",
-                        idArtist);
-    m_pDS->exec(strSQL);
-    // Use year from album table, when matched by name only it could be different
-    strSQL = PrepareSQL("UPDATE tempDisco "
-                        "SET iYear = (SELECT CAST(album.strOrigReleaseDate AS INTEGER) FROM album "
-                        "WHERE album.idAlbum = tempDisco.idAlbum) "
-                        "WHERE tempDisco.idAlbum > 0");
     m_pDS->exec(strSQL);
 
-    // Combine distinctly with albums by artist that are not in discography
-    strSQL =
-        PrepareSQL("SELECT strAlbum, iYear, idAlbum FROM tempDisco "
-                   "UNION "
-                   "SELECT strAlbum, CAST(strOrigReleaseDate AS INTEGER) AS iYear, album.idAlbum "
-                   "FROM album JOIN album_artist ON album_artist.idAlbum = album.idAlbum "
-                   "WHERE album_artist.idArtist = %i "
-                   "ORDER BY iYear, strAlbum, idAlbum",
-                   idArtist);
+    // Match albums on release group mbid, if multi-releases then first used
+    // Only use albums credited to this artist
+    strSQL = "UPDATE tempDisco SET idAlbum = (SELECT tempAlbum.idAlbum FROM tempAlbum "
+             "WHERE tempAlbum.mbid = tempDisco.mbid AND tempAlbum.mbid IS NOT NULL)";
+    m_pDS->exec(strSQL);
+    //Delete matched albums
+    strSQL = "DELETE FROM tempAlbum "
+             "WHERE EXISTS(SELECT 1 FROM tempDisco WHERE tempDisco.idAlbum = tempAlbum.idAlbum)";
+    m_pDS->exec(strSQL);
+
+    // Match remaining to albums by artist on title and year
+    strSQL = "UPDATE tempDisco SET idAlbum = (SELECT idAlbum FROM tempAlbum "
+             "WHERE tempAlbum.strAlbum = tempDisco.strAlbum "
+             "AND tempAlbum.strYear = tempDisco.strYear) "
+             "WHERE tempDisco.idAlbum is NULL";
+    m_pDS->exec(strSQL);
+    //Delete matched albums
+    strSQL = "DELETE FROM tempAlbum "
+      "WHERE EXISTS(SELECT 1 FROM tempDisco WHERE tempDisco.idAlbum = tempAlbum.idAlbum)";
+    m_pDS->exec(strSQL);
+
+    // Match remaining to albums by artist on title only
+    strSQL = "UPDATE tempDisco SET idAlbum = (SELECT idAlbum FROM tempAlbum "
+             "WHERE tempAlbum.strAlbum = tempDisco.strAlbum) "
+             "WHERE tempDisco.idAlbum is NULL";
+    m_pDS->exec(strSQL);
+    // Use year from album table, when matched by title only as it could be different
+    strSQL = "UPDATE tempDisco SET strYear = (SELECT strYear FROM tempAlbum "
+             "WHERE tempAlbum.idAlbum = tempDisco.idAlbum) "
+             "WHERE EXISTS(SELECT 1 FROM tempAlbum WHERE tempAlbum.idAlbum = tempDisco.idAlbum)";
+    m_pDS->exec(strSQL);
+    //Delete matched albums
+    strSQL = "DELETE FROM tempAlbum "
+             "WHERE EXISTS(SELECT 1 FROM tempDisco WHERE tempDisco.idAlbum = tempAlbum.idAlbum)";
+    m_pDS->exec(strSQL);
+
+    // Combine distinctly with any remaining unmatched albums by artist
+    strSQL = "SELECT strAlbum, strYear, idAlbum FROM tempDisco "
+             "UNION "
+             "SELECT strAlbum, strYear, idAlbum FROM tempAlbum "
+             "ORDER BY strYear, strAlbum, idAlbum";
 
     if (!m_pDS->query(strSQL))
       return false;
@@ -2132,7 +2177,7 @@ bool CMusicDatabase::GetArtistDiscography(int idArtist, CFileItemList& items)
       if (!strAlbum.empty())
       {
           CFileItemPtr pItem(new CFileItem(strAlbum));
-          pItem->SetLabel2(m_pDS->fv("iYear").get_asString());
+          pItem->SetLabel2(m_pDS->fv("strYear").get_asString());
           pItem->GetMusicInfoTag()->SetDatabaseId(idAlbum, MediaTypeAlbum);
           items.Add(pItem);
       }
@@ -2142,12 +2187,14 @@ bool CMusicDatabase::GetArtistDiscography(int idArtist, CFileItemList& items)
     // cleanup
     m_pDS->close();
     m_pDS->exec("DROP TABLE tempDisco");
+    m_pDS->exec("DROP TABLE tempAlbum");
 
     return true;
   }
   catch (...)
   {
     m_pDS->exec("DROP TABLE tempDisco");
+    m_pDS->exec("DROP TABLE tempAlbum");
     CLog::Log(LOGERROR, "%s failed", __FUNCTION__);
   }
   return false;
@@ -3610,7 +3657,7 @@ void CMusicDatabase::IncrementPlayCount(const CFileItem& item)
   }
 }
 
-bool CMusicDatabase::GetSongsByPath(const std::string& strPath1, MAPSONGS& songs, bool bAppendToMap)
+bool CMusicDatabase::GetSongsByPath(const std::string& strPath1, MAPSONGS& songmap, bool bAppendToMap)
 {
   std::string strPath(strPath1);
   try
@@ -3619,15 +3666,21 @@ bool CMusicDatabase::GetSongsByPath(const std::string& strPath1, MAPSONGS& songs
       URIUtils::AddSlashAtEnd(strPath);
 
     if (!bAppendToMap)
-      songs.clear();
+      songmap.clear();
 
     if (nullptr == m_pDB)
       return false;
     if (nullptr == m_pDS)
       return false;
 
-    std::string strSQL=PrepareSQL("SELECT * FROM songview WHERE strPath='%s'", strPath.c_str());
-    if (!m_pDS->query(strSQL)) return false;
+    // Filename is not unique for a path as songs from a cuesheet have same filename.
+    // Songs from cuesheets often have consecutive ID but not always e.g. more than one cuesheet
+    // in a folder and some edited and rescanned.
+    // Hence order by filename so these songs can be gathered together.
+    std::string strSQL = PrepareSQL(
+        "SELECT * FROM songview WHERE strPath='%s' ORDER BY strFileName", strPath.c_str());
+    if (!m_pDS->query(strSQL))
+      return false;
     CLog::Log(LOGDEBUG, "%s query: %s", __FUNCTION__, strSQL.c_str());
     int iRowsFound = m_pDS->num_rows();
     if (iRowsFound == 0)
@@ -3635,14 +3688,25 @@ bool CMusicDatabase::GetSongsByPath(const std::string& strPath1, MAPSONGS& songs
       m_pDS->close();
       return false;
     }
+
+    // Each file is potentially mapped to a list of songs, gather these and save as list
+    VECSONGS songs;
+    std::string filename;
     while (!m_pDS->eof())
     {
       CSong song = GetSongFromDataset();
-      // For songs from cue sheets strFileName is not unique, so only 1st song gets added to song map
-      songs.insert(std::make_pair(song.strFileName, song));
+      if (!filename.empty() && filename != song.strFileName)
+      {
+        // Save songs for previous filename
+        songmap.insert(std::make_pair(filename, songs));
+        songs.clear();
+      }
+      filename = song.strFileName;
+      songs.emplace_back(song);
       m_pDS->next();
     }
     m_pDS->close(); // cleanup recordset data
+    songmap.insert(std::make_pair(filename, songs)); // Save songs for last filename
     return true;
   }
   catch (...)
@@ -5495,7 +5559,7 @@ bool CMusicDatabase::GetDiscsByWhere(CMusicDbUrl& musicUrl,
     items.Reserve(total);
     int albumOffset = 2;
     CAlbum album;
-    bool useTitle = false;
+    bool useTitle = true; // Assume we want to match by disc title later unless we have no titles
     std::string oldDiscTitle;
     const dbiplus::query_data& data = m_pDS->get_result_set().records;
     for (const auto& i : results)
@@ -5506,23 +5570,22 @@ bool CMusicDatabase::GetDiscsByWhere(CMusicDbUrl& musicUrl,
       {
         if (album.idAlbum != record->at(albumOffset + album_idAlbum).get_asInt())
         { // New album
-          useTitle = false;
+          useTitle = true;
           album = GetAlbumFromDataset(record, albumOffset);
         }
 
         int discnum = record->at(0).get_asInt();
         std::string strDiscSubtitle = record->at(1).get_asString();
         if (strDiscSubtitle.empty())
-          // Make (fake) disc title from disc number
-          strDiscSubtitle = StringUtils::Format("%s %i", g_localizeStrings.Get(427), discnum);
+        { // Make (fake) disc title from disc number, group by disc number as no real title to match
+          strDiscSubtitle = StringUtils::Format("{} {}", g_localizeStrings.Get(427), discnum);
+          useTitle = false;
+        }
         else if (oldDiscTitle == strDiscSubtitle)
-        { // When real disc titles are provided (as they ALWAYS are for boxed sets)
-          // group discs together by title not number.
-          useTitle = true;
+        { // disc title already added to list, fetch the next disc
           continue;
         }
-        else
-          oldDiscTitle = strDiscSubtitle;
+        oldDiscTitle = strDiscSubtitle;
 
         CMusicDbUrl itemUrl = musicUrl;
         std::string path = StringUtils::Format("%i/", discnum);
@@ -10463,7 +10526,7 @@ bool CMusicDatabase::GetPathHash(const std::string &path, std::string &hash)
   return false;
 }
 
-bool CMusicDatabase::RemoveSongsFromPath(const std::string &path1, MAPSONGS& songs, bool exact)
+bool CMusicDatabase::RemoveSongsFromPath(const std::string &path1, MAPSONGS& songmap, bool exact)
 {
   // We need to remove all songs from this path, as their tags are going
   // to be re-read.  We need to remove all songs from the song table + all links to them
@@ -10503,31 +10566,47 @@ bool CMusicDatabase::RemoveSongsFromPath(const std::string &path1, MAPSONGS& son
     if (nullptr == m_pDS)
       return false;
 
+    // Filename is not unique for a path as songs from a cuesheet have same filename.
+    // Songs from cuesheets often have consecutive ID but not always e.g. more than one cuesheet
+    // in a folder and some edited and rescanned.    
+    // Hence order by filename so these songs can be gathered together.
     std::string where;
     if (exact)
       where = PrepareSQL(" where strPath='%s'", path.c_str());
     else
       where = PrepareSQL(" where SUBSTR(strPath,1,%i)='%s'", StringUtils::utf8_strlen(path.c_str()), path.c_str());
-    std::string sql = "select * from songview" + where;
+    std::string sql = "SELECT * FROM songview" + where + " ORDER BY strFileName";
     if (!m_pDS->query(sql)) return false;
     int iRowsFound = m_pDS->num_rows();
     if (iRowsFound > 0)
     {
+      // Each file is potentially mapped to a list of songs, gather these and save as list
+      VECSONGS songs;
+      std::string filename;
       std::vector<std::string> songIds;
       while (!m_pDS->eof())
       {
         CSong song = GetSongFromDataset();
+        if (!filename.empty() && filename != song.strFileName)
+        {
+          // Save songs for previous filename
+          songmap.insert(std::make_pair(filename, songs));
+          songs.clear();
+        }
         song.strThumb = GetArtForItem(song.idSong, MediaTypeSong, "thumb");
-        songs.insert(std::make_pair(song.strFileName, song));
+        songs.emplace_back(song);
         songIds.push_back(PrepareSQL("%i", song.idSong));
+        filename = song.strFileName;
+
         m_pDS->next();
       }
       m_pDS->close();
+      songmap.insert(std::make_pair(filename, songs)); // Save songs for last filename
 
       //! @todo move this below the m_pDS->exec block, once UPnP doesn't rely on this anymore
-      for (const auto &song : songs)
-        AnnounceRemove(MediaTypeSong, song.second.idSong);
-            
+      for (const auto& id : songIds)
+        AnnounceRemove(MediaTypeSong, atoi(id.c_str()));
+
       // Delete all songs, and anything linked to them via triggers
       std::string strIDs = StringUtils::Join(songIds, ",");
       sql = "DELETE FROM song WHERE idSong in (" + strIDs + ")";

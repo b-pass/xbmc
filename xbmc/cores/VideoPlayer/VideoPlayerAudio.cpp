@@ -390,9 +390,21 @@ void CVideoPlayerAudio::Process()
       DemuxPacket* pPacket = static_cast<CDVDMsgDemuxerPacket*>(pMsg)->GetPacket();
       bool bPacketDrop  = static_cast<CDVDMsgDemuxerPacket*>(pMsg)->GetPacketDrop();
 
-      if (bPacketDrop ||
-          (!m_processInfo.IsTempoAllowed(static_cast<float>(m_speed)/DVD_PLAYSPEED_NORMAL) &&
-           m_syncState == IDVDStreamPlayer::SYNC_INSYNC))
+      if (bPacketDrop)
+      {
+        pMsg->Release();
+        if (m_syncState != IDVDStreamPlayer::SYNC_STARTING)
+        {
+          m_audioSink.Drain();
+          m_audioSink.Flush();
+          audioframe.nb_frames = 0;
+        }
+        m_syncState = IDVDStreamPlayer::SYNC_STARTING;
+        continue;
+      }
+
+      if (!m_processInfo.IsTempoAllowed(static_cast<float>(m_speed) / DVD_PLAYSPEED_NORMAL) &&
+          m_syncState == IDVDStreamPlayer::SYNC_INSYNC)
       {
         pMsg->Release();
         continue;
@@ -413,8 +425,11 @@ void CVideoPlayerAudio::Process()
       {
         onlyPrioMsgs = true;
       }
-
-    } // demuxer packet
+    }
+    else if (pMsg->IsType(CDVDMsg::PLAYER_DISPLAY_RESET))
+    {
+      m_displayReset = true;
+    }
 
     pMsg->Release();
   }
@@ -469,6 +484,17 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
       }
     }
 
+    // Display reset event has occurred
+    // See if we should enable passthrough
+    if (m_displayReset)
+    {
+      if (SwitchCodecIfNeeded())
+      {
+        audioframe.nb_frames = 0;
+        return false;
+      }
+    }
+
     // demuxer reads metatags that influence channel layout
     if (m_streaminfo.codec == AV_CODEC_ID_FLAC && m_streaminfo.channellayout)
       audioframe.format.m_channelLayout = CAEUtil::GetAEChannelLayout(m_streaminfo.channellayout);
@@ -484,11 +510,13 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
       if (!m_audioSink.Create(audioframe, m_streaminfo.codec, m_synctype == SYNC_RESAMPLE))
         CLog::Log(LOGERROR, "%s - failed to create audio renderer", __FUNCTION__);
 
-      m_audioSink.SetDynamicRangeCompression((long)(m_processInfo.GetVideoSettings().m_VolumeAmplification * 100));
-
       if (m_syncState == IDVDStreamPlayer::SYNC_INSYNC)
         m_audioSink.Resume();
     }
+
+    // Apply VolumeAmplification from settings on playback
+    m_audioSink.SetDynamicRangeCompression(
+        static_cast<long>(m_processInfo.GetVideoSettings().m_VolumeAmplification * 100));
 
     SetSyncType(audioframe.passthrough);
 
@@ -605,7 +633,13 @@ bool CVideoPlayerAudio::AcceptsData() const
 
 bool CVideoPlayerAudio::SwitchCodecIfNeeded()
 {
-  CLog::Log(LOGDEBUG, "CVideoPlayerAudio: stream props changed, checking for passthrough");
+  if (m_displayReset)
+    CLog::Log(LOGINFO, "CVideoPlayerAudio: display reset occurred, checking for passthrough");
+  else
+    CLog::Log(LOGDEBUG, "CVideoPlayerAudio: stream props changed, checking for passthrough");
+
+  m_displayReset = false;
+
   bool allowpassthrough = !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK);
   if (m_processInfo.IsRealtimeStream() || m_synctype == SYNC_RESAMPLE)
     allowpassthrough = false;

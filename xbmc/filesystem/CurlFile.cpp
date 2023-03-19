@@ -645,6 +645,18 @@ void CCurlFile::SetCommonOptions(CReadState* state, bool failOnError /* = true *
   // Set the lowspeed time very low as it seems Curl takes much longer to detect a lowspeed condition
   g_curlInterface.easy_setopt(h, CURLOPT_LOW_SPEED_TIME, m_lowspeedtime);
 
+  // enable tcp keepalive
+  if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_curlKeepAliveInterval > 0)
+  {
+    g_curlInterface.easy_setopt(h, CURLOPT_TCP_KEEPALIVE, 1L);
+    g_curlInterface.easy_setopt(
+        h, CURLOPT_TCP_KEEPIDLE,
+        CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_curlKeepAliveInterval / 2);
+    g_curlInterface.easy_setopt(
+        h, CURLOPT_TCP_KEEPINTVL,
+        CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_curlKeepAliveInterval);
+  }
+
   // Setup allowed TLS/SSL ciphers. New versions of cURL may deprecate things that are still in use.
   if (!m_cipherlist.empty())
     g_curlInterface.easy_setopt(h, CURLOPT_SSL_CIPHER_LIST, m_cipherlist.c_str());
@@ -658,9 +670,12 @@ void CCurlFile::SetCommonOptions(CReadState* state, bool failOnError /* = true *
   // set CA bundle file
   std::string caCert = CSpecialProtocol::TranslatePath(
       CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_caTrustFile);
+#ifdef TARGET_WINDOWS_STORE
+  // UWP Curl - Setting CURLOPT_CAINFO with a valid cacert file path is required for UWP
+  g_curlInterface.easy_setopt(h, CURLOPT_CAINFO, "system\\certs\\cacert.pem");
+#endif
   if (!caCert.empty() && XFILE::CFile::Exists(caCert))
     g_curlInterface.easy_setopt(h, CURLOPT_CAINFO, caCert.c_str());
-
 }
 
 void CCurlFile::SetRequestHeaders(CReadState* state)
@@ -712,7 +727,7 @@ void CCurlFile::ParseAndCorrectUrl(CURL &url2)
 
   // lookup host in DNS cache
   std::string resolvedHost;
-  if (CDNSNameCache::Lookup(url2.GetHostName(), resolvedHost))
+  if (CDNSNameCache::GetCached(url2.GetHostName(), resolvedHost))
   {
     struct curl_slist* tempCache;
     int entryPort = url2.GetPort();
