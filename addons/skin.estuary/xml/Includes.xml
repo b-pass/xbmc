@@ -1159,7 +1159,7 @@
 						<fadetime>300</fadetime>
 						<aspectratio aligny="center" align="center">keep</aspectratio>
 						<texture>dialogs/volume/mute.png</texture>
-						<visible>Player.Muted</visible>
+						<visible>Player.Muted + Player.HasMedia</visible>
 					</control>
 				</control>
 				<control type="label" id="23000">
@@ -1232,17 +1232,26 @@
 		<width>auto</width>
 	</include>
 	<include name="ColoredBackgroundImages">
+                <control type="image">
+                        <depth>DepthBackground</depth>
+                        <include>FullScreenDimensions</include>
+                        <aspectratio>scale</aspectratio>
+                        <texture colordiffuse="C0FFFFFF">$INFO[Skin.String(custom_background)]</texture>
+                        <visible>Skin.HasSetting(use_custom_bg) + !String.IsEmpty(Skin.String(custom_background))</visible>
+                </control>
 		<control type="image">
 			<depth>DepthBackground</depth>
 			<include>FullScreenDimensions</include>
 			<aspectratio>scale</aspectratio>
 			<texture colordiffuse="primary_background">special://skin/extras/backgrounds/primary.jpg</texture>
+			<visible>!Skin.HasSetting(use_custom_bg) | String.IsEmpty(Skin.String(custom_background))</visible>
 		</control>
 		<control type="image">
 			<depth>DepthBackground</depth>
 			<include>FullScreenDimensions</include>
 			<aspectratio>scale</aspectratio>
 			<texture colordiffuse="secondary_background" fallback="special://skin/extras/backgrounds/pattern1.jpg">$INFO[Skin.String(background_overlay),special://skin/extras/backgrounds/pattern,.jpg]</texture>
+			<visible>!Skin.HasSetting(use_custom_bg) | String.IsEmpty(Skin.String(custom_background))</visible>
 		</control>
 	</include>
 	<include name="DefaultBackground">

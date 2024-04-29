@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <includes>
+	<include name="FavoritesItem">
+		<item>
+			<label>All Favorites</label>
+			<property name="id">fav</property>
+		</item>
+	</include>
+       <include name="FavouritesItems">
+	       <content sortby="label" sortorder="ascending">favourites://</content>
+	</include>
 	<expression name="listitem_has_episode_info">!String.IsEmpty(ListItem.Episode) | !String.IsEmpty(ListItem.EpisodeName) | !String.IsEmpty(ListItem.Season)</expression>
 	<expression name="listitem_has_epg_event_info">!String.IsEmpty(ListItem.EpgEventTitle) | $EXP[listitem_has_episode_info]</expression>
 	<include name="PVRListItemLayout">

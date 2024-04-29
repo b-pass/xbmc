@@ -102,7 +102,21 @@
 					<onclick condition="String.IsEqual(Skin.String(background_overlay),2)">Skin.SetString(background_overlay,3)</onclick>
 					<onclick condition="String.IsEqual(Skin.String(background_overlay),1)">Skin.SetString(background_overlay,2)</onclick>
 					<onclick condition="String.IsEqual(Skin.String(background_overlay),0)">Skin.SetString(background_overlay,1)</onclick>
+					<enable>!Skin.HasSetting(use_custom_bg)</enable>
 				</control>
+                                <control type="radiobutton" id="9607">
+                                        <label>Use custom background</label>
+                                        <include>DefaultSettingButton</include>
+                                        <onclick>Skin.ToggleSetting(use_custom_bg)</onclick>
+                                        <selected>Skin.HasSetting(use_custom_bg)</selected>
+                                </control>
+                                <control type="button" id="9608">
+                                        <label>Choose image path</label>
+                                        <label2>$INFO[Skin.String(custom_background)]</label2>
+                                        <include>DefaultSettingButton</include>
+                                        <onclick>Skin.SetImage(custom_background)</onclick>
+                                        <enable>Skin.HasSetting(use_custom_bg)</enable>
+                                </control>
 				<control type="button" id="608">
 					<label>$LOCALIZE[31131]</label>
 					<label2>$INFO[Skin.String(HomeFanart.name)]</label2>

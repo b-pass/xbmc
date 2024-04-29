@@ -18,6 +18,11 @@
 				<include>ButtonMenuList</include>
 				<content>
 					<item>
+						<label>$LOCALIZE[13313]</label>
+						<onclick>RestartApp()</onclick>
+						<visible>System.ShowExitButton</visible>
+					</item>
+					<item>
 						<label>$LOCALIZE[13012]</label>
 						<onclick>Quit()</onclick>
 						<visible>System.ShowExitButton</visible>

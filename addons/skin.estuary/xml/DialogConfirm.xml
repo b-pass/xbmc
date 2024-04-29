@@ -2,8 +2,9 @@
 <window>
 	<include>Animation_DialogPopupOpenClose</include>
 	<depth>DepthDialog+</depth>
+	<defaultcontrol always="true">9000</defaultcontrol>
 	<controls>
-		<control type="group">
+		<control type="group"  id="9001">>
 			<height>400</height>
 			<centertop>50%</centertop>
 			<centerleft>50%</centerleft>
@@ -35,6 +36,7 @@
 				<top>290</top>
 				<width>915</width>
 				<align>center</align>
+				<defaultcontrol always="true">10</defaultcontrol>
 				<include content="DefaultDialogButton">
 					<param name="id" value="11" />
 					<param name="label" value="" />
