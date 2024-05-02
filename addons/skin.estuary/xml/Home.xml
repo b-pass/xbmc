@@ -474,6 +474,31 @@
 						<param name="button_id" value="22400"/>
 						<param name="button2_onclick" value="Skin.SetBool(HomeMenuNoTVButton)"/>
 					</include>
+					
+					<control type="group">
+                       <visible>System.HasPVRAddon + Integer.IsEqual(Container(22100).NumItems, 0)</visible>
+                       <control type="image">
+                               <depth>DepthMax</depth>
+                               <left>160</left>
+                               <top>210</top>
+                               <width>80</width>
+                               <height>80</height>
+                               <aspectratio>keep</aspectratio>
+                               <animation effect="rotate" end="-45" center="auto" time="200" delay="600" loop="true" reversible="false" condition="true">Conditional</animation>
+                               <texture colordiffuse="button_focus">spinner.png</texture>
+                       </control>
+                       <control type="image">
+                               <depth>DepthMax</depth>
+                               <left>175</left>
+                               <top>225</top>
+                               <width>50</width>
+                               <height>50</height>
+                               <aspectratio>keep</aspectratio>
+                               <animation effect="rotate" end="45" center="auto" time="200" delay="600" loop="true" reversible="false" condition="true">Conditional</animation>
+                               <texture flipx="true" colordiffuse="button_focus">spinner.png</texture>
+                       </control>
+                    </control>
+
           <control type="list" id="22100">
             <visible>System.HasPVRAddon</visible>
             <left>100</left>
