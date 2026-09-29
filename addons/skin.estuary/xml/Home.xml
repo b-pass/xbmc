@@ -511,7 +511,7 @@
             <onback>SetFocus(9000)</onback>
             <!--onright>22200</onright-->
             <preloaditems>1</preloaditems>
-            <content sortby="label" target="noop">pvr://recordings/tv/active/</content>
+            <content sortby="label" target="noop">pvr://recordings/tv/active/?view=grouped</content>
             <onclick>Skin.SetString(pvrCurrentDir, "$INFO[ListItem.Label]")</onclick>
             <onclick>ActivateWindow(tvrecordings,"$INFO[ListItem.FolderPath]")</onclick>
             <focusedlayout height="73">

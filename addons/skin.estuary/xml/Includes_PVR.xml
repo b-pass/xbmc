@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <includes>
-	<include name="FavoritesItem">
-		<item>
-			<label>All Favorites</label>
-			<property name="id">fav</property>
-		</item>
-	</include>
        <include name="FavouritesItems">
 	       <content sortby="label" sortorder="ascending">favourites://</content>
 	</include>

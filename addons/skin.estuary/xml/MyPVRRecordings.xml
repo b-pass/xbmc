@@ -5,7 +5,7 @@
 	<views>50</views>
 	<onload condition="!Skin.String(pvrCurrentDir)">Skin.SetString(pvrCurrentDir, "Default")</onload>
 	<onload condition="Player.HasMedia">AlarmClock(StopPlayback,PlayerControl(stop),00:00,true)</onload>
-	<onload>Container.SetSortMethod(date)</onload>
+	<onload>Container.SetSortMethod(2)</onload>
 	<onload>Skin.SetBool(NeedSortFix)</onload>
 	<controls>
 		<include>DefaultBackground</include>
@@ -27,7 +27,7 @@
 					<description>side Show listing, changes what is displayed in the main episode listing</description>
 					<left>0</left>
 					<top>list_top_offset</top>
-					<right>550</right>
+					<width>550</width>
 					<bottom>list_bottom_offset</bottom>
 					<onright>50</onright>
 					<onclick condition='!String.StartsWith(ListItem.FolderPath,"fav")'>Control.SetFocus(50, 0, absolute)</onclick>
@@ -41,8 +41,8 @@
 							<property name="id">all_flat</property>
 						</item>
 					</content>
-					<content sortby="label" sortorder="ascending">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]</content>
-					<include condition='String.IsEqual(Skin.String(pvrCurrentDir), "Default")'>FavouritesItems</include>
+					<content sortby="label" sortorder="ascending">pvr://recordings/tv/active/$INFO[Skin.String(pvrCurrentDir)]?view=grouped</content>
+					<include condition='String.IsEqual(Skin.String(pvrCurrentDir), "Default") | String.IsEmpty(Skin.String(pvrCurrentDir))'>FavouritesItems</include>
 					<focusedlayout height="80" width="550">
 						<control type="button">
 							<description>Updates the main content list with the proper listing and triggers a check on the content's sort order</description>
@@ -150,7 +150,6 @@
 						<pagecontrol>9973</pagecontrol>
 						<scrolltime>200</scrolltime>
 						<orientation>vertical</orientation>
-						<scrolltime>100</scrolltime>
 						<focusedlayout height="60" width="1325">
 							<control type="button">
 									<description>Never let this container show folders</description>
@@ -171,13 +170,13 @@
 								<top>14</top>
 								<width>32</width>
 								<height>32</height>
-								<texture colordiffuse="white">$VAR[ListWatchedIconVar]</texture>
+								<texture colordiffuse="white">$VAR[ListPVRRecordingsIconVar]</texture>
 							</control>
 							<control type="label">
 								<left>37</left>
 								<right>300</right>
 								<aligny>center</aligny>
-								<font>font30</font>
+								<font>font13</font>
 								<label>$VAR[PVR_Episode_List_Entry]</label>
 								<shadowcolor>text_shadow</shadowcolor>
 							</control>
@@ -196,7 +195,7 @@
 								<top>14</top>
 								<width>32</width>
 								<height>32</height>
-								<texture colordiffuse="white">$VAR[ListWatchedIconVar]</texture>
+								<texture colordiffuse="white">$VAR[ListPVRRecordingsIconVar]</texture>
 							</control>
 							<control type="label">
 								<left>37</left>
@@ -261,7 +260,7 @@
 						<control type="label">
 							<top>25</top>
 							<height>40</height>
-							<width>1000</width>
+							<width>910</width>
 							<font>font32_title</font>
 							<scroll>true</scroll>
 							<textcolor>button_focus</textcolor>
@@ -299,7 +298,7 @@
 						<control type="label">
 							<top>25</top>
 							<height>40</height>
-							<width>1000</width>
+							<width>910</width>
 							<font>font32_title</font>
 							<scroll>true</scroll>
 							<textcolor>button_focus</textcolor>
@@ -358,7 +357,7 @@
 						<control type="label">
 							<top>25</top>
 							<height>40</height>
-							<width>1000</width>
+							<width>910</width>
 							<font>font32_title</font>
 							<scroll>true</scroll>
 							<textcolor>button_focus</textcolor>
@@ -367,22 +366,22 @@
 						
 						<control type="label">
 							<top>65</top>
-							<width>1000</width>
+							<width>910</width>
 							<height>40</height>
 							<font>font36_title</font>
 							<scroll>true</scroll>
 							<visible>!String.IsEmpty(Container(50).ListItem.EpisodeName)</visible>
-							<label>$INFO[ListItem.Season,S]$INFO[ListItem.Episode,E,: ]$INFO[Container(50).ListItem.EpisodeName,","]</label>
+							<label>$INFO[Container(50).ListItem.Season,S]$INFO[Container(50).ListItem.Episode,E,: ]$INFO[Container(50).ListItem.EpisodeName,","]</label>
 						</control>
 
 						<control type="label">
 							<top>65</top>
-							<width>1000</width>
+							<width>910</width>
 							<height>40</height>
 							<font>font36_title</font>
 							<scroll>true</scroll>
 							<visible>String.IsEmpty(Container(50).ListItem.EpisodeName)</visible>
-							<label>$INFO[ListItem.Season,Season ,$COMMA ]$INFO[ListItem.Episode,Episode ,]</label>
+							<label>$INFO[Container(50).ListItem.Season,Season ,$COMMA ]$INFO[Container(50).ListItem.Episode,Episode ,]</label>
 						</control>
 
 						<control type="label">
@@ -393,7 +392,7 @@
 							<font>font25_narrow</font>
 							<align>right</align>
 							<textcolor>grey</textcolor>
-							<label>$INFO[Container(50).ListItem.ChannelName][CR]$INFO[Container(50).ListItem.StartDate][CR]Length: $INFO[Container(50).ListItem.Duration]</label>
+							<label>$INFO[Container(50).ListItem.ChannelName][CR]$INFO[Container(50).ListItem.StartDate]$INFO[Container(50).ListItem.Duration,[CR]Length: ]</label>
 						</control>
 						
 						<control type="textbox">
