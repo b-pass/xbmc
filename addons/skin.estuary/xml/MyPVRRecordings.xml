@@ -26,9 +26,9 @@
 				<control type="fixedlist" id="9950">
 					<description>side Show listing, changes what is displayed in the main episode listing</description>
 					<left>0</left>
-					<top>list_y_offset</top>
+					<top>list_top_offset</top>
 					<right>550</right>
-					<bottom>list_y_offset</bottom>
+					<bottom>list_bottom_offset</bottom>
 					<onright>50</onright>
 					<onclick condition='!String.StartsWith(ListItem.FolderPath,"fav")'>Control.SetFocus(50, 0, absolute)</onclick>
 					<movement>3</movement>
@@ -120,9 +120,9 @@
 				</include>
 				<control type="scrollbar" id="73">
 					<left>-40</left>
-					<top>list_y_offset</top>
+					<top>list_top_offset</top>
 					<width>12</width>
-					<bottom>list_y_offset</bottom>
+					<bottom>list_bottom_offset</bottom>
 					<onleft>9950</onleft>
 					<onright>9950</onright>
 					<orientation>vertical</orientation>
