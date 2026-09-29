@@ -91,6 +91,7 @@
 #include <androidjni/MediaStore.h>
 #include <androidjni/NetworkInfo.h>
 #include <androidjni/PackageManager.h>
+#include <androidjni/Resources.h>
 #include <androidjni/StatFs.h>
 #include <androidjni/System.h>
 #include <androidjni/SystemClock.h>
@@ -223,6 +224,11 @@ void CXBMCApp::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
       m_mediaSessionUpdated = false;
       UpdateSessionState();
     }
+    else if (message == "OnAVStart")
+    {
+      m_mediaSessionUpdated = false;
+      UpdateSessionState();
+    }
   }
   else if (flag & Info)
   {
@@ -315,6 +321,10 @@ void CXBMCApp::onResume()
     const auto appPower = components.GetComponent<CApplicationPowerHandling>();
     appPower->ResetShutdownTimers();
   }
+
+  const auto messenger = CServiceBroker::GetAppMessenger();
+  if (messenger)
+    messenger->PostMsg(TMSG_RESUMEAPP);
 
   m_headsetPlugged = isHeadsetPlugged();
 
@@ -971,9 +981,9 @@ void CXBMCApp::OnPlayBackStopped()
   CLog::Log(LOGDEBUG, "{}", __PRETTY_FUNCTION__);
 
   m_playback_state = PLAYBACK_STATE_STOPPED;
+  m_mediaSessionUpdated = false;
   UpdateSessionState();
   m_mediaSession->activate(false);
-  m_mediaSessionUpdated = false;
 
   RequestVisibleBehind(false);
   CAndroidKey::SetHandleMediaKeys(true);
@@ -1725,6 +1735,40 @@ std::shared_ptr<CNativeWindow> CXBMCApp::GetNativeWindow(int timeout) const
     m_mainView->waitForSurface(timeout);
 
   return m_window;
+}
+
+// The map must contain keys "id" and "color", both are integers
+void CXBMCApp::SetViewBackgroundColorCallback(void* mapVariant)
+{
+  CVariant* mapV = static_cast<CVariant*>(mapVariant);
+  int viewId = (*mapV)["id"].asInteger();
+  int color = (*mapV)["color"].asInteger();
+
+  delete mapV;
+
+  CJNIView view = findViewById(viewId);
+  if (view)
+  {
+    view.setBackgroundColor(color);
+  }
+}
+
+void CXBMCApp::SetVideoLayoutBackgroundColor(const int color)
+{
+  CJNIResources resources = CJNIContext::getResources();
+  if (resources)
+  {
+    int id = resources.getIdentifier("VideoLayout", "id", CJNIContext::getPackageName());
+    if (id > 0)
+    {
+      // this object is deallocated in the callback
+      CVariant* msg = new CVariant(CVariant::VariantTypeObject);
+      (*msg)["id"] = id;
+      (*msg)["color"] = color;
+
+      runNativeOnUiThread(SetViewBackgroundColorCallback, msg);
+    }
+  }
 }
 
 void CXBMCApp::RegisterInputDeviceCallbacks(IInputDeviceCallbacks* handler)

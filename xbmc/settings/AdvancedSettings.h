@@ -13,6 +13,7 @@
 #include "settings/lib/ISettingsHandler.h"
 #include "utils/SortUtils.h"
 
+#include <cstdint>
 #include <set>
 #include <string>
 #include <utility>
@@ -153,7 +154,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_videoIgnoreSecondsAtStart;
     float m_videoIgnorePercentAtEnd;
     float m_audioApplyDrc;
-    unsigned int m_maxPassthroughOffSyncDuration = 10; // when 10 ms off adjust
+    unsigned int m_maxPassthroughOffSyncDuration = 50; // when 50 ms off adjust
     bool m_AllowMultiChannelFloat = false; // Android only switch to be removed in v22
     bool m_superviseAudioDelay = false; // Android only to correct broken audio firmwares
 
@@ -331,6 +332,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_guiVisualizeDirtyRegions;
     int  m_guiAlgorithmDirtyRegions;
     bool m_guiSmartRedraw;
+    bool m_guiVideoLayoutTransparent{false};
     unsigned int m_addonPackageFolderSize;
 
     bool m_jsonOutputCompact;

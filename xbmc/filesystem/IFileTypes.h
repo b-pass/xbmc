@@ -40,6 +40,9 @@ namespace XFILE
 /* indicate that caller want to reopen a file if its already open  */
   static const unsigned int READ_REOPEN = 0x100;
 
+/* indicate that caller want open a file without intermediate buffer regardless to file type */
+  static const unsigned int READ_NO_BUFFER = 0x200;
+
 struct SNativeIoControl
 {
   unsigned long int   request;
@@ -87,7 +90,7 @@ enum CURLOPTIONTYPE
  * accept-charset: Set the "accept-charset" header
  * acceptencoding or encoding: Set the "accept-encoding" header
  * active-remote: Set the "active-remote" header
- * auth: Set the authentication method. Possible values: any, anysafe, digest, ntlm
+ * auth: Set the authentication method. Possible values: any, anysafe, digest, ntlm, basic
  * connection-timeout: Set the connection timeout in seconds
  * cookie: Set the "cookie" header
  * customrequest: Set a custom HTTP request like DELETE

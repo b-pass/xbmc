@@ -250,9 +250,7 @@ bool CGUIWindowVideoBase::OnItemInfo(const CFileItem& fileItem)
   const ADDON::ScraperPtr scraper = m_database.GetScraperForPath(strDir, settings, foundDirectly);
 
   if (!fileItem.HasVideoInfoTag() && !scraper && !(fileItem.IsPlugin() || fileItem.IsScript()) &&
-      !(m_database.HasMovieInfo(fileItem.GetDynPath()) || m_database.HasTvShowInfo(strDir) ||
-        m_database.HasEpisodeInfo(fileItem.GetDynPath()) ||
-        m_database.HasMusicVideoInfo(fileItem.GetDynPath())))
+      !VIDEO_UTILS::HasItemVideoDbInformation(fileItem))
   {
     // We have no chance to fill a video info tag, neither scraper nor db data available.
     HELPERS::ShowOKDialogText(CVariant{20176}, // Show video information
@@ -367,12 +365,13 @@ bool CGUIWindowVideoBase::ShowInfo(const CFileItemPtr& item2, const ScraperPtr& 
   {
     m_database.Open(); // since we can be called from the music library
 
-    int dbId = item->HasVideoInfoTag() ? item->GetVideoInfoTag()->m_iDbId : -1;
+    const int dbId{item->HasVideoInfoTag() ? item->GetVideoInfoTag()->m_iDbId : -1};
     if (info->Content() == CONTENT_MOVIES)
     {
       const int versionId{item->HasVideoInfoTag() ? item->GetVideoInfoTag()->GetAssetInfo().GetId()
                                                   : -1};
-      bHasInfo = m_database.GetMovieInfo(item->GetPath(), movieDetails, dbId, versionId);
+      const int fileId{item->HasVideoInfoTag() ? item->GetVideoInfoTag()->m_iFileId : -1};
+      bHasInfo = m_database.GetMovieInfo(item->GetPath(), movieDetails, dbId, versionId, fileId);
     }
     if (info->Content() == CONTENT_TVSHOWS)
     {
@@ -414,7 +413,7 @@ bool CGUIWindowVideoBase::ShowInfo(const CFileItemPtr& item2, const ScraperPtr& 
     }
     m_database.Close();
   }
-  else if(item->HasVideoInfoTag())
+  else if (item->HasVideoInfoTag() && !item->GetVideoInfoTag()->IsEmpty())
   {
     bHasInfo = true;
     movieDetails = *item->GetVideoInfoTag();
@@ -602,7 +601,7 @@ protected:
 
   bool OnInfoSelected() override { return m_window.OnItemInfo(*m_item); }
 
-  bool OnMoreSelected() override
+  bool OnChooseSelected() override
   {
     // window only shows the default version, so no window specific context menu items available
     if (m_item->HasVideoVersions() && !m_item->GetVideoInfoTag()->IsDefaultVideoVersion())

@@ -21,6 +21,9 @@
 #include "input/joysticks/interfaces/IButtonMapper.h"
 #include "input/keyboard/Key.h"
 #include "input/keymaps/interfaces/IKeymap.h"
+#include "peripherals/PeripheralTypes.h"
+#include "peripherals/Peripherals.h"
+#include "peripherals/devices/Peripheral.h"
 #include "utils/log.h"
 
 #include <algorithm>
@@ -451,31 +454,34 @@ bool CButtonMapping::MapPrimitive(const CDriverPrimitive& primitive)
 {
   bool bHandled = false;
 
-  auto now = std::chrono::steady_clock::now();
-
-  bool bTimeoutElapsed = true;
-
-  if (m_buttonMapper->NeedsCooldown())
-    bTimeoutElapsed = (now >= m_lastAction + std::chrono::milliseconds(MAPPING_COOLDOWN_MS));
-
-  if (bTimeoutElapsed)
-  {
-    bHandled = m_buttonMapper->MapPrimitive(m_buttonMap, m_keymap, primitive);
-
-    if (bHandled)
-      m_lastAction = std::chrono::steady_clock::now();
-  }
-  else if (m_buttonMap->IsIgnored(primitive))
+  if (m_buttonMap->IsIgnored(primitive))
   {
     bHandled = true;
   }
   else
   {
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastAction);
+    auto now = std::chrono::steady_clock::now();
 
-    CLog::Log(LOGDEBUG, "Button mapping: rapid input after {}ms dropped for profile \"{}\"",
-              duration.count(), m_buttonMapper->ControllerID());
-    bHandled = true;
+    bool bTimeoutElapsed = true;
+
+    if (m_buttonMapper->NeedsCooldown())
+      bTimeoutElapsed = (now >= m_lastAction + std::chrono::milliseconds(MAPPING_COOLDOWN_MS));
+
+    if (bTimeoutElapsed)
+    {
+      bHandled = m_buttonMapper->MapPrimitive(m_buttonMap, m_keymap, primitive);
+
+      if (bHandled)
+        m_lastAction = std::chrono::steady_clock::now();
+    }
+    else
+    {
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastAction);
+
+      CLog::Log(LOGDEBUG, "Button mapping: rapid input after {}ms dropped for profile \"{}\"",
+                duration.count(), m_buttonMapper->ControllerID());
+      bHandled = true;
+    }
   }
 
   return bHandled;
@@ -529,7 +535,25 @@ CAxisDetector& CButtonMapping::GetAxis(
   {
     AxisConfiguration config(initialConfig);
 
-    if (m_frameCount >= 2)
+    bool isGcController = false;
+
+    // Avoid showing the "capture input" dialog for the GCController driver, as
+    // analog stick axes are always late due to zeroed events not always being
+    // sent
+#if defined(TARGET_DARWIN)
+    const std::string peripheralLocation = m_buttonMap->Location();
+
+    PERIPHERALS::CPeripherals& peripheralManager = CServiceBroker::GetPeripherals();
+
+    const PERIPHERALS::PeripheralPtr peripheral =
+        peripheralManager.GetPeripheralAtLocation(peripheralLocation);
+
+    if (peripheral &&
+        peripheral->GetBusType() == PERIPHERALS::PeripheralBusType::PERIPHERAL_BUS_GCCONTROLLER)
+      isGcController = true;
+#endif
+
+    if (m_frameCount >= 2 && !isGcController)
     {
       config.bLateDiscovery = true;
       OnLateDiscovery(axisIndex);

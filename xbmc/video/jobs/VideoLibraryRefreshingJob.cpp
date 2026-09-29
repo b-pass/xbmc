@@ -23,6 +23,8 @@
 #include "guilib/LocalizeStrings.h"
 #include "media/MediaType.h"
 #include "messaging/helpers/DialogOKHelper.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/log.h"
@@ -117,6 +119,14 @@ bool CVideoLibraryRefreshingJob::Work(CVideoDatabase &db)
       {
         std::unique_ptr<CVideoInfoTag> tag(new CVideoInfoTag());
         nfoResult = loader->Load(*tag, false);
+
+        // keep some properties only if advancedsettings.xml says so
+        const auto advancedSettings = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings();
+        if (!advancedSettings->m_bVideoLibraryImportWatchedState)
+          tag->ResetPlayCount();
+        if (!advancedSettings->m_bVideoLibraryImportResumePoint)
+          tag->SetResumePoint(CBookmark());
+
         if (nfoResult == CInfoScanner::FULL_NFO && m_item->IsPlugin() && scraper->ID() == "metadata.local")
         {
           // get video info and art from plugin source with metadata.local scraper
@@ -181,6 +191,8 @@ bool CVideoLibraryRefreshingJob::Work(CVideoDatabase &db)
       {
         CFileItemList items;
         items.Add(m_item);
+        items.SetPath(m_item->m_bIsFolder ? URIUtils::GetParentPath(m_item->GetPath())
+                                          : URIUtils::GetDirectory(m_item->GetPath()));
         CVideoInfoScanner scanner;
         if (scanner.RetrieveVideoInfo(items, scanSettings.parent_name, scraper->Content(),
                                       !ignoreNfo, nullptr, m_refreshAll, GetProgressDialog()))

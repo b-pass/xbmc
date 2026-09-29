@@ -27,6 +27,7 @@
 #include "utils/URIUtils.h"
 #include "utils/XTimeUtils.h"
 #include "utils/log.h"
+#include "video/VideoInfoTag.h"
 
 #include <functional>
 #include <limits>
@@ -43,17 +44,10 @@ using namespace std::chrono_literals;
 
 static int read_blocks(void* handle, void* buf, int lba, int num_blocks)
 {
-  int result = -1;
-  CDVDInputStreamFile* lpstream = reinterpret_cast<CDVDInputStreamFile*>(handle);
-  int64_t offset = static_cast<int64_t>(lba) * 2048;
-  if (lpstream->Seek(offset, SEEK_SET) >= 0)
-  {
-    int64_t size = static_cast<int64_t>(num_blocks) * 2048;
-    if (size <= std::numeric_limits<int>::max())
-      result = lpstream->Read(reinterpret_cast<uint8_t*>(buf), static_cast<int>(size)) / 2048;
-  }
-
-  return result;
+  CDVDInputStreamBluray* blurayStream = reinterpret_cast<CDVDInputStreamBluray*>(handle);
+  if (!blurayStream)
+    return -1;
+  return blurayStream->ReadBlocks(reinterpret_cast<uint8_t*>(buf), lba, num_blocks);
 }
 
 static void bluray_overlay_cb(void *this_gen, const BD_OVERLAY * ov)
@@ -91,6 +85,17 @@ void CDVDInputStreamBluray::Abort()
 bool CDVDInputStreamBluray::IsEOF()
 {
   return false;
+}
+
+BLURAY_TITLE_INFO* CDVDInputStreamBluray::GetTitleFromState(const std::string& xmlstate)
+{
+  BlurayState blurayState;
+  if (!m_blurayStateSerializer.XMLToBlurayState(blurayState, xmlstate))
+  {
+    CLog::LogF(LOGWARNING, "Failed to deserialize Bluray state");
+    return nullptr;
+  }
+  return bd_get_playlist_info(m_bd, blurayState.playlistId, 0);
 }
 
 BLURAY_TITLE_INFO* CDVDInputStreamBluray::GetTitleLongest()
@@ -228,7 +233,7 @@ bool CDVDInputStreamBluray::Open()
 
   if (openStream)
   {
-    if (!bd_open_stream(m_bd, m_pstream.get(), read_blocks))
+    if (!bd_open_stream(m_bd, this, read_blocks))
     {
       CLog::Log(LOGERROR, "CDVDInputStreamBluray::Open - failed to open {} in stream mode",
                 CURL::GetRedacted(root));
@@ -334,9 +339,8 @@ bool CDVDInputStreamBluray::Open()
   }
   else if (resumable && m_item.GetStartOffset() == STARTOFFSET_RESUME && m_item.IsResumable())
   {
-    // resuming a bluray for which we have a saved state - the playlist will be open later on SetState
     m_navmode = false;
-    return true;
+    m_titleInfo = GetTitleFromState(m_item.GetVideoInfoTag()->GetResumePoint().playerState);
   }
   else
   {
@@ -690,6 +694,23 @@ int CDVDInputStreamBluray::Read(uint8_t* buf, int buf_size)
     result = bd_read(m_bd, buf, buf_size);
     while (bd_get_event(m_bd, &m_event))
       ProcessEvent();
+  }
+  return result;
+}
+
+int CDVDInputStreamBluray::ReadBlocks(uint8_t* buf, int lba, int num_blocks)
+{
+  CDVDInputStreamFile* lpstream = m_pstream.get();
+  if (!lpstream)
+    return -1;
+  int result = -1;
+  int64_t offset = static_cast<int64_t>(lba) * 2048;
+  std::unique_lock<CCriticalSection> lock(m_readBlocksLock);
+  if (lpstream->Seek(offset, SEEK_SET) >= 0)
+  {
+    int64_t size = static_cast<int64_t>(num_blocks) * 2048;
+    if (size <= std::numeric_limits<int>::max())
+      result = lpstream->Read(buf, static_cast<int>(size)) / 2048;
   }
   return result;
 }

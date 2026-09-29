@@ -270,11 +270,13 @@ void CApplication::HandlePortEvents()
         {
           if (!CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_fullScreen)
           {
-            CServiceBroker::GetWinSystem()->GetGfxContext().ApplyWindowResize(newEvent.resize.w, newEvent.resize.h);
+            CServiceBroker::GetWinSystem()->GetGfxContext().ApplyWindowResize(
+                newEvent.resize.width * newEvent.resize.scale,
+                newEvent.resize.height * newEvent.resize.scale);
 
             const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-            settings->SetInt(CSettings::SETTING_WINDOW_WIDTH, newEvent.resize.w);
-            settings->SetInt(CSettings::SETTING_WINDOW_HEIGHT, newEvent.resize.h);
+            settings->SetInt(CSettings::SETTING_WINDOW_WIDTH, newEvent.resize.width);
+            settings->SetInt(CSettings::SETTING_WINDOW_HEIGHT, newEvent.resize.height);
             settings->Save();
           }
           else
@@ -1543,6 +1545,15 @@ void CApplication::OnApplicationMessage(ThreadMessage* pMsg)
     *static_cast<bool*>(pMsg->lpVoid) = CServiceBroker::GetWinSystem()->DestroyWindow();
     GetComponent<CApplicationPowerHandling>()->SetRenderGUI(false);
     break;
+
+  case TMSG_RESUMEAPP:
+  {
+    m_ServiceManager->GetNetwork().NetworkMessage(CNetworkBase::SERVICES_UP, 0);
+    CGUIComponent* gui = CServiceBroker::GetGUI();
+    if (gui)
+      gui->GetWindowManager().MarkDirty();
+    break;
+  }
 #endif
 
   case TMSG_START_ANDROID_ACTIVITY:
@@ -1584,8 +1595,9 @@ void CApplication::OnApplicationMessage(ThreadMessage* pMsg)
   {
     XBMC_Event newEvent = {};
     newEvent.type = XBMC_VIDEORESIZE;
-    newEvent.resize.w = pMsg->param1;
-    newEvent.resize.h = pMsg->param2;
+    newEvent.resize.width = pMsg->param1;
+    newEvent.resize.height = pMsg->param2;
+    newEvent.resize.scale = 1.0;
     OnEvent(newEvent);
     CServiceBroker::GetGUI()->GetWindowManager().MarkDirty();
   }
@@ -2817,13 +2829,7 @@ bool CApplication::OnMessage(CGUIMessage& message)
       const auto appPlayer = GetComponent<CApplicationPlayer>();
       if (!m_itemCurrentFile->IsLiveTV() ||
           (!appPlayer->IsPlayingVideo() && !appPlayer->IsPlayingAudio()))
-      {
-        CGUIDialogBusy* dialog =
-            CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogBusy>(
-                WINDOW_DIALOG_BUSY);
-        if (dialog && !dialog->IsDialogRunning())
-          dialog->WaitOnEvent(m_playerEvent);
-      }
+        CGUIDialogBusy::WaitOnEvent(m_playerEvent);
 
       return true;
     }
