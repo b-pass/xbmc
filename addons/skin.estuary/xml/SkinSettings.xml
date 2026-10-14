@@ -107,6 +107,11 @@
                                 <control type="radiobutton" id="9607">
                                         <label>Use custom background</label>
                                         <include>DefaultSettingButton</include>
+                                        <!-- centerstage.background is the custom background in use, empty when it's off, for
+                                             script.centerstage's window. Conditions are checked before any action runs, so these
+                                             see use_custom_bg as it was. -->
+                                        <onclick condition="Skin.HasSetting(use_custom_bg)">Skin.Reset(centerstage.background)</onclick>
+                                        <onclick condition="!Skin.HasSetting(use_custom_bg)">Skin.SetString(centerstage.background,"$INFO[Skin.String(custom_background)]")</onclick>
                                         <onclick>Skin.ToggleSetting(use_custom_bg)</onclick>
                                         <selected>Skin.HasSetting(use_custom_bg)</selected>
                                 </control>
@@ -115,6 +120,7 @@
                                         <label2>$INFO[Skin.String(custom_background)]</label2>
                                         <include>DefaultSettingButton</include>
                                         <onclick>Skin.SetImage(custom_background)</onclick>
+                                        <onclick>Skin.SetString(centerstage.background,"$INFO[Skin.String(custom_background)]")</onclick>
                                         <enable>Skin.HasSetting(use_custom_bg)</enable>
                                 </control>
 				<control type="button" id="608">
@@ -166,6 +172,13 @@
 					<include>DefaultSettingButton</include>
 					<selected>!Skin.HasSetting(home_no_categories_widget)</selected>
 					<onclick>Skin.ToggleSetting(home_no_categories_widget)</onclick>
+				</control>
+				<control type="radiobutton" id="628">
+					<label>Center Stage</label>
+					<include>DefaultSettingButton</include>
+					<selected>!Skin.HasSetting(HomeMenuNoCenterStageButton)</selected>
+					<onclick>Skin.ToggleSetting(HomeMenuNoCenterStageButton)</onclick>
+					<visible>System.HasAddon(script.centerstage)</visible>
 				</control>
 				<control type="radiobutton" id="611">
 					<label>$LOCALIZE[342]</label>
