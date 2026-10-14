@@ -102,7 +102,19 @@
 					<onclick condition="String.IsEqual(Skin.String(background_overlay),2)">Skin.SetString(background_overlay,3)</onclick>
 					<onclick condition="String.IsEqual(Skin.String(background_overlay),1)">Skin.SetString(background_overlay,2)</onclick>
 					<onclick condition="String.IsEqual(Skin.String(background_overlay),0)">Skin.SetString(background_overlay,1)</onclick>
-					<enable>!Skin.HasSetting(use_custom_bg)</enable>
+					<enable>!Skin.HasSetting(use_custom_bg) + !Skin.HasSetting(monthly_bg)</enable>
+				</control>
+				<control type="radiobutton" id="9609">
+					<label>Monthly background</label>
+					<include>DefaultSettingButton</include>
+					<!-- a picture for each month and some holidays (MonthlyBackgroundVar); turns the
+					     custom background off. It changes by itself, so centerstage.background (a
+					     fixed path) is cleared: Center Stage's Myth Estuary layout shows it anyway,
+					     through ColoredBackgroundImages. -->
+					<onclick condition="!Skin.HasSetting(monthly_bg)">Skin.Reset(use_custom_bg)</onclick>
+					<onclick condition="!Skin.HasSetting(monthly_bg)">Skin.Reset(centerstage.background)</onclick>
+					<onclick>Skin.ToggleSetting(monthly_bg)</onclick>
+					<selected>Skin.HasSetting(monthly_bg)</selected>
 				</control>
                                 <control type="radiobutton" id="9607">
                                         <label>Use custom background</label>
@@ -112,6 +124,7 @@
                                              see use_custom_bg as it was. -->
                                         <onclick condition="Skin.HasSetting(use_custom_bg)">Skin.Reset(centerstage.background)</onclick>
                                         <onclick condition="!Skin.HasSetting(use_custom_bg)">Skin.SetString(centerstage.background,"$INFO[Skin.String(custom_background)]")</onclick>
+                                        <onclick condition="!Skin.HasSetting(use_custom_bg)">Skin.Reset(monthly_bg)</onclick>
                                         <onclick>Skin.ToggleSetting(use_custom_bg)</onclick>
                                         <selected>Skin.HasSetting(use_custom_bg)</selected>
                                 </control>

@@ -909,4 +909,37 @@
 		<value condition="ListItem.IsStereoscopic">$INFO[ListItem.Duration,$LOCALIZE[180]: ][CR]$VAR[VideoCodecVar,, ]$INFO[ListItem.VideoResolution,| , ]$VAR[VideoResolutionTypeVar,, ]$VAR[VideoHDRVar,| , ]| 3D $INFO[ListItem.VideoAspect,| ,:1 ]$VAR[AudioCodecVar,| , ]$VAR[AudioChannelsVar]</value>
 		<value>$INFO[ListItem.Duration,$LOCALIZE[180]: ][CR]$VAR[VideoCodecVar,, ]$INFO[ListItem.VideoResolution,| , ]$VAR[VideoResolutionTypeVar,, ]$VAR[VideoHDRVar,| , ]$INFO[ListItem.VideoAspect,| ,:1 ]$VAR[AudioCodecVar,| , ]$VAR[AudioChannelsVar]</value>
 	</variable>
+	<!-- The "Monthly background": one picture per month from extras/backgrounds/monthly, plus
+	     holidays. System.Date(start,end) is MM-DD, start inclusive, end exclusive, and wraps
+	     around the new year; the first matching value wins, so the holidays come first.
+	     Thanksgiving (the fourth Thursday, Nov 22-28) and the day before use thanksgiving.jpg,
+	     and December starts the day after. The weekday comes from System.Date(DDDD), the
+	     localized day name, compared with the same localized strings (11 Monday ... 17 Sunday). -->
+	<expression name="today_is_monday">String.IsEqual(System.Date(DDDD),$LOCALIZE[11])</expression>
+	<expression name="today_is_tuesday">String.IsEqual(System.Date(DDDD),$LOCALIZE[12])</expression>
+	<expression name="today_is_wednesday">String.IsEqual(System.Date(DDDD),$LOCALIZE[13])</expression>
+	<expression name="today_is_thursday">String.IsEqual(System.Date(DDDD),$LOCALIZE[14])</expression>
+	<expression name="today_is_friday">String.IsEqual(System.Date(DDDD),$LOCALIZE[15])</expression>
+	<expression name="today_is_saturday">String.IsEqual(System.Date(DDDD),$LOCALIZE[16])</expression>
+	<expression name="today_is_sunday">String.IsEqual(System.Date(DDDD),$LOCALIZE[17])</expression>
+	<variable name="MonthlyBackgroundVar">
+		<value condition="System.Date(12-31,01-02)">special://skin/extras/backgrounds/monthly/newyears.jpg</value>
+		<value condition="System.Date(07-04,07-05)">special://skin/extras/backgrounds/monthly/independenceday.jpg</value>
+		<value condition="System.Date(11-11,11-12)">special://skin/extras/backgrounds/monthly/veteransday.jpg</value>
+		<value condition="[System.Date(11-22,11-29) + $EXP[today_is_thursday]] | [System.Date(11-21,11-28) + $EXP[today_is_wednesday]]">special://skin/extras/backgrounds/monthly/thanksgiving.jpg</value>
+		<value condition="System.Date(11-29,12-26) | [System.Date(11-23,11-29) + $EXP[today_is_friday]] | [System.Date(11-24,11-29) + $EXP[today_is_saturday]] | [System.Date(11-25,11-29) + $EXP[today_is_sunday]] | [System.Date(11-26,11-29) + $EXP[today_is_monday]] | [System.Date(11-27,11-29) + $EXP[today_is_tuesday]] | [System.Date(11-28,11-29) + $EXP[today_is_wednesday]]">special://skin/extras/backgrounds/monthly/december.jpg</value>
+		<value condition="System.Date(12-26,12-31)">special://skin/extras/backgrounds/monthly/january.jpg</value>
+		<value condition="System.Date(01-01,02-01)">special://skin/extras/backgrounds/monthly/january.jpg</value>
+		<value condition="System.Date(02-01,03-01)">special://skin/extras/backgrounds/monthly/february.jpg</value>
+		<value condition="System.Date(03-01,04-01)">special://skin/extras/backgrounds/monthly/march.jpg</value>
+		<value condition="System.Date(04-01,05-01)">special://skin/extras/backgrounds/monthly/april.jpg</value>
+		<value condition="System.Date(05-01,06-01)">special://skin/extras/backgrounds/monthly/may.jpg</value>
+		<value condition="System.Date(06-01,07-01)">special://skin/extras/backgrounds/monthly/june.jpg</value>
+		<value condition="System.Date(07-01,08-01)">special://skin/extras/backgrounds/monthly/july.jpg</value>
+		<value condition="System.Date(08-01,09-01)">special://skin/extras/backgrounds/monthly/august.jpg</value>
+		<value condition="System.Date(09-01,10-01)">special://skin/extras/backgrounds/monthly/september.jpg</value>
+		<value condition="System.Date(10-01,11-01)">special://skin/extras/backgrounds/monthly/october.jpg</value>
+		<value condition="System.Date(11-01,12-01)">special://skin/extras/backgrounds/monthly/november.jpg</value>
+		<value>special://skin/extras/backgrounds/monthly/december.jpg</value>
+	</variable>
 </includes>

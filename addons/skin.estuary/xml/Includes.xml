@@ -1243,15 +1243,22 @@
 			<depth>DepthBackground</depth>
 			<include>FullScreenDimensions</include>
 			<aspectratio>scale</aspectratio>
+			<texture colordiffuse="C0FFFFFF">$VAR[MonthlyBackgroundVar]</texture>
+			<visible>Skin.HasSetting(monthly_bg) + ![Skin.HasSetting(use_custom_bg) + !String.IsEmpty(Skin.String(custom_background))]</visible>
+		</control>
+		<control type="image">
+			<depth>DepthBackground</depth>
+			<include>FullScreenDimensions</include>
+			<aspectratio>scale</aspectratio>
 			<texture colordiffuse="primary_background">special://skin/extras/backgrounds/primary.jpg</texture>
-			<visible>!Skin.HasSetting(use_custom_bg) | String.IsEmpty(Skin.String(custom_background))</visible>
+			<visible>!Skin.HasSetting(monthly_bg) + [!Skin.HasSetting(use_custom_bg) | String.IsEmpty(Skin.String(custom_background))]</visible>
 		</control>
 		<control type="image">
 			<depth>DepthBackground</depth>
 			<include>FullScreenDimensions</include>
 			<aspectratio>scale</aspectratio>
 			<texture colordiffuse="secondary_background" fallback="special://skin/extras/backgrounds/pattern1.jpg">$INFO[Skin.String(background_overlay),special://skin/extras/backgrounds/pattern,.jpg]</texture>
-			<visible>!Skin.HasSetting(use_custom_bg) | String.IsEmpty(Skin.String(custom_background))</visible>
+			<visible>!Skin.HasSetting(monthly_bg) + [!Skin.HasSetting(use_custom_bg) | String.IsEmpty(Skin.String(custom_background))]</visible>
 		</control>
 	</include>
 	<include name="DefaultBackground">
